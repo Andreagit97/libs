@@ -1458,16 +1458,26 @@ struct ppm_event_info {
 #else
 #pragma pack(push, 1)
 #endif
+
+
+
+
+
 struct ppm_evt_hdr {
 #ifdef PPM_ENABLE_SENTINEL
 	uint32_t sentinel_begin;
 #endif
 	uint64_t ts; /* timestamp, in nanoseconds from epoch */
 	uint64_t tid; /* the tid of the thread that generated this event */
-	uint32_t len; /* the event len, including the header */
+	uint32_t len; /* the event len, including the header */  // mi sa che contiene header, lunghezze e effetivamente anche i parametri.
 	uint16_t type; /* the event type */
 	uint32_t nparams; /* the number of parameters of the event */
 };
+
+
+
+
+
 #if defined __sun
 #pragma pack()
 #else
@@ -1566,6 +1576,8 @@ struct ppm_proclist_info {
 	struct ppm_proc_info entries[0];
 };
 
+
+// 
 enum syscall_flags {
 	UF_NONE = 0,
 	UF_USED = (1 << 0),
@@ -1636,6 +1648,7 @@ struct ppm_event_entry {
 /*
  * Return codes
  */
+/// PPM È un nome per indicare il modulo kernel
 #define PPM_SUCCESS 0
 #define PPM_FAILURE_BUFFER_FULL -1
 #define PPM_FAILURE_INVALID_USER_MEMORY -2

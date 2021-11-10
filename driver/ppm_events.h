@@ -27,15 +27,24 @@ or GPL2.txt for full copies of the license.
 
 #include "ppm_events_public.h"
 
+
+
+
+
+
+
 /*
  * Various crap that a callback might need
  */
+
 struct fault_data_t {
 	unsigned long address;
 	struct pt_regs *regs;
 	unsigned long error_code;
 };
 
+
+// questa struttura contiene informazioni su evento che sta per essere inserito nel ring buffer.
 struct event_filler_arguments {
 	ppm_consumer_t *consumer;
 	char *buffer; /* the buffer that will be filled with the data */

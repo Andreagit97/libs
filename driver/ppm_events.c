@@ -90,6 +90,17 @@ or GPL2.txt for full copies of the license.
 #include "ppm_flag_helpers.h"
 #include "ppm_version.h"
 
+
+
+
+/*
+ * Ci sono delle utility per lavorare in memoria per esempio, da memoria kernel a user.
+ */
+
+
+
+
+
 /*
  * The kernel patched with grsecurity makes the default access_ok trigger a
  * might_sleep(), so if present we use the one defined by them
@@ -243,6 +254,8 @@ inline int sock_getname(struct socket* sock, struct sockaddr* sock_address, int 
 #endif
 }
 
+
+/// COSA È SNAPLEN:
 /**
  * Compute the snaplen for the arguments.
  *

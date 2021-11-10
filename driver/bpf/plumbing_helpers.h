@@ -22,6 +22,8 @@ or GPL2.txt for full copies of the license.
 		    _val;					\
 		 })
 
+
+// devo definire questa quando faccio il debug almeno mi stampa tutt facilmente in quel file di cui faccio il cat !!!
 #ifdef BPF_DEBUG
 #define bpf_printk(fmt, ...)					\
 	do {							\
@@ -33,6 +35,31 @@ or GPL2.txt for full copies of the license.
 #endif
 
 #ifndef BPF_SUPPORTS_RAW_TRACEPOINTS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+////////////////////////////////
+//  STASH AND UNSTASH SYSCALL ARGUMENT
+/////////////////////////////
+
+
+// qualcuno mette gli argomenti per quel pid in una mappa
 static __always_inline int __stash_args(unsigned long long id,
 					unsigned long *args)
 {
@@ -51,10 +78,14 @@ static __always_inline int stash_args(unsigned long *args)
 	return __stash_args(id, args);
 }
 
+
+
+// dato quell pid più tid si prendono una entry in una mappa stash che non so dove sia.
 static __always_inline unsigned long *__unstash_args(unsigned long long id)
 {
 	struct sys_stash_args *args;
 
+	// prendo gli argomenti in base al pid con cui la sto chimando, non però chi ce li ha messi gli argomenti.!!!
 	args = bpf_map_lookup_elem(&stash_map, &id);
 	if (!args)
 		return NULL;
@@ -62,6 +93,8 @@ static __always_inline unsigned long *__unstash_args(unsigned long long id)
 	return args->args;
 }
 
+
+// prende pid e basta solo i 32 bassi
 static __always_inline unsigned long *unstash_args(void)
 {
 	unsigned long long id = bpf_get_current_pid_tgid() & 0xffffffff;
@@ -77,6 +110,38 @@ static __always_inline void delete_args(void)
 }
 #endif
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* Can be called just from an exit event
  */
 static __always_inline long bpf_syscall_get_retval(void *ctx)
@@ -86,12 +151,22 @@ static __always_inline long bpf_syscall_get_retval(void *ctx)
 	return args->ret;
 }
 
+
+
+
+
+
+
+
 /* Can be called from both enter and exit event, id is at the same
  * offset in both struct sys_enter_args and struct sys_exit_args
  */
+// Ritorna id della syscall
 static __always_inline long bpf_syscall_get_nr(void *ctx)
 {
 	struct sys_enter_args *args = (struct sys_enter_args *)ctx;
+	// perchè non lo hanno preso come parametro direttamente della struct (?)
+	// perchè nella struct per un tracepoint di uscita non c'è tra i due parametri immediati, solo in quello in ingresso c'è.
 	long id;
 
 #ifdef BPF_SUPPORTS_RAW_TRACEPOINTS
@@ -119,6 +194,15 @@ static __always_inline unsigned long bpf_syscall_get_argument_from_args(unsigned
 	return arg;
 }
 #endif
+
+
+
+
+
+
+
+
+
 
 static __always_inline unsigned long bpf_syscall_get_argument_from_ctx(void *ctx,
 								       int idx)
@@ -177,6 +261,8 @@ static __always_inline char *get_frame_scratch_area(unsigned int cpu)
 {
 	char *scratchp;
 
+    // questo buffer in cui inserisco la roba è ottenuto tramite una mappa bpf, a ogni cpu corrisponde un buffer.
+	// quindi è un area allocata da qualcuno devo ancora capire allocata come !! non sembra esserci in scap un punto che lo fa.
 	scratchp = bpf_map_lookup_elem(&frame_scratch_map, &cpu);
 	if (!scratchp)
 		bpf_printk("frame scratch NULL\n");
@@ -184,6 +270,8 @@ static __always_inline char *get_frame_scratch_area(unsigned int cpu)
 	return scratchp;
 }
 
+
+// come area di passaggio
 static __always_inline char *get_tmp_scratch_area(unsigned int cpu)
 {
 	char *scratchp;
@@ -195,6 +283,7 @@ static __always_inline char *get_tmp_scratch_area(unsigned int cpu)
 	return scratchp;
 }
 
+// si ha un lookup con quella mappa che lega la syscall a eventi di ingresso e di uscita, e quindi si torna una syscall_evt_pair 
 static __always_inline const struct syscall_evt_pair *get_syscall_info(int id)
 {
 	const struct syscall_evt_pair *p =
@@ -244,6 +333,7 @@ static __always_inline struct sysdig_bpf_per_cpu_state *get_local_state(unsigned
 {
 	struct sysdig_bpf_per_cpu_state *state;
 
+	// prendo uno stato della cpu ma non mi sembra venga riempita questa mappa da scap
 	state = bpf_map_lookup_elem(&local_state_map, &cpu);
 	if (!state)
 		bpf_printk("state NULL\n");
@@ -251,6 +341,8 @@ static __always_inline struct sysdig_bpf_per_cpu_state *get_local_state(unsigned
 	return state;
 }
 
+
+// da chi ne faccio il lock (?) se ci sono io sulla cpu?
 static __always_inline bool acquire_local_state(struct sysdig_bpf_per_cpu_state *state)
 {
 	if (state->in_use) {
@@ -273,12 +365,14 @@ static __always_inline bool release_local_state(struct sysdig_bpf_per_cpu_state 
 	return true;
 }
 
+// funzione molto utile che inizializza il data_filler usato nei filler
 static __always_inline int init_filler_data(void *ctx,
 					    struct filler_data *data,
 					    bool is_syscall)
 {
 	unsigned int cpu;
 
+    // contiene i registri e i parametri come visto per il tracepoint originale.
 	data->ctx = ctx;
 
 	data->settings = get_bpf_settings();
@@ -287,6 +381,7 @@ static __always_inline int init_filler_data(void *ctx,
 
 	cpu = bpf_get_smp_processor_id();
 
+	// non è chiaro chi mi alloca questo spazio nelle mappe
 	data->buf = get_frame_scratch_area(cpu);
 	if (!data->buf)
 		return PPM_FAILURE_BUG;
@@ -294,7 +389,8 @@ static __always_inline int init_filler_data(void *ctx,
 	data->state = get_local_state(cpu);
 	if (!data->state)
 		return PPM_FAILURE_BUG;
-
+	
+	// non è chiaro chi mi alloca questo spazio nelle mappe
 	data->tmp_scratch = get_tmp_scratch_area(cpu);
 	if (!data->tmp_scratch)
 		return PPM_FAILURE_BUG;
@@ -307,6 +403,7 @@ static __always_inline int init_filler_data(void *ctx,
 	if (!data->filler_info)
 		return PPM_FAILURE_BUG;
 
+// è un ifndef a me non interessa !!!
 #ifndef BPF_SUPPORTS_RAW_TRACEPOINTS
 	if (is_syscall) {
 		data->args = unstash_args();
@@ -326,16 +423,40 @@ static __always_inline int bpf_test_bit(int nr, unsigned long *addr)
 	return 1UL & (_READ(addr[BIT_WORD(nr)]) >> (nr & (BITS_PER_LONG - 1)));
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 static __always_inline bool drop_event(void *ctx,
 				       struct sysdig_bpf_per_cpu_state *state,
 				       enum ppm_event_type evt_type,
 				       struct sysdig_bpf_settings *settings,
 				       enum syscall_flags drop_flags)
 {
+	///NOTA: il drop avviene a due livelli da un lato dentro la setting map settata da scap deve esserci il flag che dice di droppare
+	// e inoltre l'evento deve avere tra i suoi flag l'opzione per essere droppato.
 	if (!settings->dropping_mode)
 		return false;
 
+	// per alcune syscall droppo solo in alcuni casi
 	switch (evt_type) {
+	// qui droppo solo se è fallita la syscall		
 	case PPME_SYSCALL_CLOSE_X:
 	case PPME_SOCKET_BIND_X: {
 		long ret = bpf_syscall_get_retval(ctx);
@@ -399,11 +520,12 @@ static __always_inline bool drop_event(void *ctx,
 	if (drop_flags & UF_NEVER_DROP)
 		return false;
 
+	/// IMPORTANTE: su tutte le nostre syscall ne droppiamo 42 
 	if (drop_flags & UF_ALWAYS_DROP)
 		return true;
 
-	if (state->tail_ctx.ts % 1000000000 >= 1000000000 /
-	    settings->sampling_ratio) {
+	// una logica sul drop con dei tempi 
+	if (state->tail_ctx.ts % 1000000000 >= 1000000000 / settings->sampling_ratio) {
 		if (!settings->is_dropping) {
 			settings->is_dropping = true;
 			state->tail_ctx.evt_type = PPME_DROP_E;
@@ -422,6 +544,38 @@ static __always_inline bool drop_event(void *ctx,
 	return false;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// tail context penso che sia quello che poi passeremo al filler.
 static __always_inline void reset_tail_ctx(struct sysdig_bpf_per_cpu_state *state,
 					   enum ppm_event_type evt_type,
 					   unsigned long long ts)
@@ -434,6 +588,31 @@ static __always_inline void reset_tail_ctx(struct sysdig_bpf_per_cpu_state *stat
 	state->tail_ctx.prev_res = 0;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// preambolo prima di chimare il filler
 static __always_inline void call_filler(void *ctx,
 					void *stack_ctx,
 					enum ppm_event_type evt_type,
@@ -446,12 +625,15 @@ static __always_inline void call_filler(void *ctx,
 	unsigned long long ts;
 	unsigned int cpu;
 
+	// mi segno l'id della cpu dalla quale ho preso il controllo in questo programma bpf
 	cpu = bpf_get_smp_processor_id();
 
+	// mappa che ha una entry per ogni cpu con questa struttura.
 	state = get_local_state(cpu);
 	if (!state)
 		return;
 
+	// avrebbe senso solo se più filler prendessero il controllo della stessa cpu nello stesso momento. ma un filler bpf non può essere interrotto.
 	if (!acquire_local_state(state))
 		return;
 
@@ -460,24 +642,34 @@ static __always_inline void call_filler(void *ctx,
 		drop_flags = UF_NEVER_DROP;
 	}
 
+	// tempo di adesso
 	ts = settings->boot_time + bpf_ktime_get_ns();
 	reset_tail_ctx(state, evt_type, ts);
 
 	/* drop_event can change state->tail_ctx.evt_type */
+	/// IL DROP VA SPOSTATO A PRIMA APPENA PARTE IL FILLER E SE POSSIBILE DEVE ESSERE RINFORZATO:, poche syscall vengono droppate.
+	// non ha troppo senso tenerlo qui se l'evento viene droppato
 	if (drop_event(stack_ctx, state, evt_type, settings, drop_flags))
 		goto cleanup;
 
+	// incremento eventi totali visti dalla cpu. Nota gli eventi droppati non vengono salvati
 	++state->n_evts;
 
 	filler_info = get_event_filler_info(state->tail_ctx.evt_type);
 	if (!filler_info)
 		goto cleanup;
 
+
+	/// NOTA: questo helper serve per chiamare un altro programma bpf,
+	// dal filler id nella mappa mi sono segnato il flile descriptor del giusot programma bpf da chaimare.
+	// questa funzione ritorna solo in caso di errore.
 	bpf_tail_call(ctx, &tail_map, filler_info->filler_id);
 	bpf_printk("Can't tail call filler evt=%d, filler=%d\n",
 		   state->tail_ctx.evt_type,
 		   filler_info->filler_id);
 
+// se la bpf_tail_call non torna in caso di successo chi mette a posto il flag nella mappa dello stato?
+/// IMPORTANTE: viene rilasciato poi dal terminte filler.
 cleanup:
 	release_local_state(state);
 }

@@ -36,6 +36,7 @@ or GPL2.txt for full copies of the license.
 #include <linux/unistd.h>
 #endif /* UDIG */
 #endif /* WDIG */
+
 #ifdef __mips__
 #define SYSCALL_TABLE_ID0 __NR_Linux
 #else /* __mips__ */
@@ -52,9 +53,25 @@ or GPL2.txt for full copies of the license.
 #endif
 #endif /* __KERNEL__ */
 
+
+
+
+
+/*
+ * Associo il numero reale della syscall nel sistema a una serie di info tra le quali gli eventi che sono associati.
+ * Nella routing table si associa il numero reale della syscall nel sistema il numero interno.
+ * https://hackmd.io/@S83QR0hJTWi8M9PyLEkQaA/ByVrLMfmK
+ */
+
+
+
+
+
+
 /*
  * SYSCALL TABLE
  */
+//////// LEGA IL NUMERO VERO DELLA SYSCALL NEL SISTEMA A UNA SERIE DI FLAGS e i 2 eventi non si capisce in base a cosa vengono messi questi flag.
 const struct syscall_evt_pair g_syscall_table[SYSCALL_TABLE_SIZE] = {
 #ifdef __NR_open
 	[__NR_open - SYSCALL_TABLE_ID0] =                       {UF_USED | UF_NEVER_DROP, PPME_SYSCALL_OPEN_E, PPME_SYSCALL_OPEN_X},

@@ -79,11 +79,11 @@ typedef struct wh_t wh_t;
 //
 typedef struct scap_device
 {
-	int m_fd;
+	int m_fd; // file descriptor del perf file
 	int m_bufinfo_fd; // used by udig
-	char* m_buffer;
+	char* m_buffer; // buffer risulatante da memory mapping con il fd.
 	uint32_t m_buffer_size; // used by udig
-	uint32_t m_lastreadsize;
+	uint32_t m_lastreadsize; // ultima volta che ho controllato distanza tra head e tail, questo valore in byte era il valore
 	char* m_sn_next_event; // Pointer to the next event available for scap_next
 	uint32_t m_sn_len; // Number of bytes available in the buffer pointed by m_sn_next_event
 	union
@@ -113,9 +113,11 @@ typedef struct scap_tid
 //
 // The open instance handle
 //
+// diverse informazioni per la cattura.
 struct scap
 {
 	scap_mode_t m_mode;
+	// è vettore di strutture che tengono info sui device del kernel e quindi sulla posizione dei buffer
 	scap_device* m_devs;
 	uint32_t m_ndevs;
 #ifdef USE_ZLIB

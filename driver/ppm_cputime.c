@@ -10,6 +10,8 @@ or GPL2.txt for full copies of the license.
 
 // These function are taken from the linux kernel and are used only
 // on versions that don't export task_cputime_adjusted()
+
+
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37))

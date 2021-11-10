@@ -27,6 +27,8 @@ or GPL2.txt for full copies of the license.
 #endif /* __x86_64__ */
 #endif /* __KERNEL__ */
 
+
+// FN è la funzione che deve essere applicata.
 #define FILLER_LIST_MAPPER(FN)			\
 	FN(sys_autofill)			\
 	FN(sys_generic)				\
@@ -119,6 +121,8 @@ or GPL2.txt for full copies of the license.
 	FN(terminate_filler)
 
 #define FILLER_ENUM_FN(x) PPM_FILLER_##x,
+
+// Un enum per i vari filler.
 enum ppm_filler_id {
 	FILLER_LIST_MAPPER(FILLER_ENUM_FN)
 	PPM_FILLER_MAX

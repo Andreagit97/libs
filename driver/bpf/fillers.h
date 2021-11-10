@@ -50,12 +50,19 @@ struct timeval {
 #define timeval64 timeval
 #endif
 
+// un po' strano sembra definire un prototipo e poi però la chiamata avviene in maniera diversa
 #define FILLER_RAW(x)							\
 static __always_inline int __bpf_##x(struct filler_data *data);		\
 									\
 __bpf_section(TP_NAME "filler/" #x)					\
 static __always_inline int bpf_##x(void *ctx)				\
 
+
+
+
+// non è chiaro perchè viene ripetuto due volte, il primo sembra il prototipo e il secondo proprio la definizione della funzione
+// mi serve definirne il prototipo sopra perchè in realtà i programmi bpf che vengono caricati non sono i veri filler che scriviamo noi ma questa roba scritta nella macro.
+/// NOTA: quando si fa la prima bpf_tail_call si arriva qui dove inizializzo dei dati per il per il vero filler, poi il filler viene chiamato come una funzione sostanzialmente, quella che scriviamo noi di solito per le syscall `res = __bpf_##x(&data);` e poi in fondo viene chiamato un altro programma bpf con bpf_tail call
 #define FILLER(x, is_syscall)						\
 static __always_inline int __bpf_##x(struct filler_data *data);		\
 									\
@@ -84,15 +91,24 @@ static __always_inline int bpf_##x(void *ctx)				\
 }									\
 									\
 static __always_inline int __bpf_##x(struct filler_data *data)		\
+// {
+//	 questa sarà la riga di chiamata della funzione
+// }
 
+
+// qui non scrivo nulla per comunicare i campi dell'evento con scap, la comunicazione avviene tutta per forza nella funzione "filler" che scriviamo noi, in val_to_ring().
 FILLER_RAW(terminate_filler)
 {
 	struct sysdig_bpf_per_cpu_state *state;
 
+	// quel lock visto prima come booleano in questa mappa è fasullo non ne vedo il senso, posso usare la mappa basta che non controllo quel flag.
+	// ATTENZIONE: il vero motivo può essere che durante una bpf_tail, magari un altro evento può prendere il controllo della cpu però mi sembra strano anche percgè così facendo perderei quell'evento che arriva, in quanto se la mappa è bloccata faccio una return.
 	state = get_local_state(bpf_get_smp_processor_id());
 	if (!state)
 		return 0;
 
+	// questo prev_res lo ho riempito alla fine del filler della syscall precedente
+	// in caso di successo non viene messo niente dentro questa struct, solo incrementato il numero di eventi come visto prima
 	switch (state->tail_ctx.prev_res) {
 	case PPM_SUCCESS:
 		break;
@@ -144,6 +160,7 @@ FILLER(sys_single, true)
 	unsigned long val;
 	int res;
 
+	// questo viene dai plumbing_
 	val = bpf_syscall_get_argument(data, 0);
 	res = bpf_val_to_ring(data, val);
 
@@ -160,6 +177,56 @@ FILLER(sys_single_x, true)
 
 	return res;
 }
+
+
+
+// #define FILLER(x, is_syscall)						\
+// static __always_inline int __bpf_sys_open_x(struct filler_data *data);		
+// 									
+// __attribute__((section("raw_tracepoint/filler/sys_open_x"), used))
+// static __always_inline int bpf_sys_open_x(void *ctx)				\
+// {									\
+// 	struct filler_data data;					\
+// 	int res;							\
+// 									\
+// 	res = init_filler_data(ctx, &data, is_syscall);			\
+// 	if (res == PPM_SUCCESS) {					\
+// 		if (!data.state->tail_ctx.len)				\
+// 			write_evt_hdr(&data);				\
+// 		res = __bpf_##x(&data);					\
+// 	}								\
+// 									\
+// 	if (res == PPM_SUCCESS)						\
+// 		res = push_evt_frame(ctx, &data);			\
+// 									\
+// 	if (data.state)							\
+// 		data.state->tail_ctx.prev_res = res;			\
+// 									\
+// 	bpf_tail_call(ctx, &tail_map, PPM_FILLER_terminate_filler);	\
+// 	bpf_printk("Can't tail call terminate filler\n");		\
+// 	return 0;							\
+// }									\
+// 									\
+// static __always_inline int __bpf_##x(struct filler_data *data)
+// {
+// 	unsigned int flags;
+// 	unsigned int mode;
+// 	unsigned long val;
+// 	unsigned long dev;
+// 	unsigned long ino;
+// 	long retval;
+// 	int res;
+
+// 	/*
+// 	 * fd
+// 	 */
+// 	retval = bpf_syscall_get_retval(data->ctx);
+// 	res = bpf_val_to_ring(data, retval);
+// 	if (res != PPM_SUCCESS)
+// 		return res;
+
+//  .... qui sotto parte direttamente la funzione
+// }		
 
 FILLER(sys_open_x, true)
 {

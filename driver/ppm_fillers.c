@@ -110,6 +110,26 @@ static inline struct pid_namespace *pid_ns_for_children(struct task_struct *task
 }
 #endif /* UDIG */
 
+
+
+
+
+
+
+/*
+ * Contiene tutti i fillers per le system call.
+ */
+
+
+
+
+
+
+
+
+
+
+
 int f_sys_generic(struct event_filler_arguments *args)
 {
 	int res;

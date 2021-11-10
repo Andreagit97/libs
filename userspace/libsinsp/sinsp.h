@@ -125,6 +125,9 @@ class k8s_api_handler;
 
 std::vector<std::string> sinsp_split(const std::string &s, char delim);
 
+
+
+
 /*!
   \brief Information about a group of filter/formatting fields.
 */
@@ -143,6 +146,7 @@ public:
 		m_flags = 0;
 	}
 
+	// questo penso sia tipo "evt"
 	string m_name; ///< Field class name.
 	int32_t m_nfields; ///< Number of fields in this field group.
 	const filtercheck_field_info* m_fields; ///< Array containing m_nfields field descriptions.

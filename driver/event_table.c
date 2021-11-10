@@ -7,6 +7,13 @@ or GPL2.txt for full copies of the license.
 
 */
 
+
+/*
+*  è una tabella dove basta mettere come indice il numero dell'evento, quindi l'enum e si ottengono informazioni su di esso, come a che syscall appartiene, alcuni flag, e i parametri che vengono passati. 
+* Serve sia libscap che al driver. Descrivo l'evento in modo che poi libscap sappiamo come estrarlo dal ringbuffer, è una sorta di accordo
+*
+*/
+
 #include "ppm_events_public.h"
 
 const struct ppm_event_info g_event_info[PPM_EVENT_MAX] = {

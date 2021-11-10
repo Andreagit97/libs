@@ -11,6 +11,7 @@ or GPL2.txt for full copies of the license.
 
 #ifdef __KERNEL__
 
+// That one is a compiler attribute we use to tell LLVM to put the object code for the bpf_openat_parser function into a separate Executable and Linkable Format (ELF) section, named raw_tracepoint/sys_enter in the final object file.
 #define __bpf_section(NAME) __attribute__((section(NAME), used))
 
 #ifndef __always_inline
@@ -123,6 +124,8 @@ struct signal_deliver_args {
 };
 #endif
 
+
+// struttura con argomenti delle syscall
 #ifndef BPF_SUPPORTS_RAW_TRACEPOINTS
 struct sys_stash_args {
 	unsigned long args[6];
@@ -159,21 +162,25 @@ struct perf_event_sample {
 /*
  * Unfortunately the entire perf event length must fit in u16
  */
+// struttra che contiene dati e header al massimo cede stare su 16 bit.
 #define PERF_EVENT_MAX_SIZE (0xffff - sizeof(struct perf_event_sample))
 
 /*
  * Due to the way the verifier works with accessing variable memory,
  * the scratch size needs to be at least 2^N > PERF_EVENT_MAX_SIZE * 2
  */
+
+//con scratch register si intendono valori temporanei
 #define SCRATCH_SIZE (1 << 18)
 #define SCRATCH_SIZE_MAX (SCRATCH_SIZE - 1)
 #define SCRATCH_SIZE_HALF (SCRATCH_SIZE_MAX >> 1)
 
 #endif /* __KERNEL__ */
 
+// lo user tramite questi enum può sapere dove trovare le varie mappe.
 enum sysdig_map_types {
 	SYSDIG_PERF_MAP = 0,
-	SYSDIG_TAIL_MAP = 1,
+	SYSDIG_TAIL_MAP = 1, // questa contiene come chiave l'id del filler e come valore il fd del bpf programm corrispondente a quel filler.
 	SYSDIG_SYSCALL_CODE_ROUTING_TABLE = 2,
 	SYSDIG_SYSCALL_TABLE = 3,
 	SYSDIG_EVENT_INFO_TABLE = 4,
@@ -192,7 +199,7 @@ struct sysdig_bpf_settings {
 	void *socket_file_ops;
 	uint32_t snaplen;
 	uint32_t sampling_ratio;
-	bool capture_enabled;
+	bool capture_enabled; //  la cattura può essere anche sospesa ?
 	bool do_dynamic_snaplen;
 	bool page_faults;
 	bool dropping_mode;

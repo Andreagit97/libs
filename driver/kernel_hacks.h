@@ -5,12 +5,18 @@
  * or GPL2.txt for full copies of the license.
  */
 
+
+
 /**
  * @file kernel_hacks.h
  *
  * This file contains kernel-version-dependent preprocessor instructions to
  * help the driver compile on as many kernel versions as possible.
  */
+
+
+
+
 
 #include <linux/version.h>
 

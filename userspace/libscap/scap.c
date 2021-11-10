@@ -164,6 +164,11 @@ static uint32_t get_max_consumers()
 }
 
 #ifndef _WIN32
+
+
+/// Scap deve avere privilegi di root perchè legge un mucchio di info di sistema, interfacce di reti, user, processi, quindi colleziona un mucchio di dati che poi userà per arricchire gli eventi che vengono catturati con i filler nel kernel.
+
+
 scap_t* scap_open_live_int(char *error, int32_t *rc,
 			   proc_entry_callback proc_callback,
 			   void* proc_callback_context,
@@ -175,7 +180,9 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 	char filename[SCAP_MAX_PATH_SIZE];
 	scap_t* handle = NULL;
 	uint32_t ndevs;
+    
 
+	
 	//
 	// Allocate the handle
 	//
@@ -190,7 +197,9 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 	//
 	// Preliminary initializations
 	//
+	// modalità di cattura 
 	handle->m_mode = SCAP_MODE_LIVE;
+	// forse è quella cosa strana con cattura solo lato user, senza kernel ma non so.
 	handle->m_udig = false;
 
 	//
@@ -201,9 +210,13 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 	//
 	if(!bpf_probe)
 	{
+		// ritorna il valore della variabile di ambiente se esiste
+		// devo settare la variabile se voglio che esista
+		/// NOTE: questo è il path di dove è stato buildato il probe BPF
 		bpf_probe = scap_get_bpf_probe_from_env();
 	}
 
+    // dentro bpf probe che poi è una stringa, viene messo il path di dove si trova l'elf della probe. 
 	char buf[SCAP_MAX_PATH_SIZE];
 	if(bpf_probe)
 	{
@@ -241,6 +254,10 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 	//
 	// Find out how many devices we have to open, which equals to the number of CPUs
 	//
+
+	// numero di cpu del sistema, bisogna aprire tanti device quante sono le cpus.
+
+	/// ONLINE CPU: quindi non tutte quelle presenti !!!
 	ndevs = sysconf(_SC_NPROCESSORS_ONLN);
 	if(ndevs == -1)
 	{
@@ -250,6 +267,8 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 		return NULL;
 	}
 
+
+	// i device ci sono sia con la probe che con il kernel module.
 	handle->m_devs = (scap_device*) calloc(sizeof(scap_device), ndevs);
 	if(!handle->m_devs)
 	{
@@ -291,8 +310,14 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 	handle->m_win_descs_handle = NULL;
 #endif
 
+    //
+	// Come sappiamo libscap raccoglie informazioni sul contesto oltre agli eventi.
 	//
-	// Create the interface list
+
+
+	//
+	// Create the interface list, 
+	// lista di NETWIRK INTERFACES.
 	//
 	if((*rc = scap_create_iflist(handle)) != SCAP_SUCCESS)
 	{
@@ -302,7 +327,8 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 	}
 
 	//
-	// Create the user list
+	// Create the user list, 
+	// lista di utenti e gruppi del Sistema
 	//
 	if(import_users)
 	{
@@ -332,6 +358,7 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 	handle->m_num_suppressed_evts = 0;
 	handle->m_buffer_empty_wait_time_us = BUFFER_EMPTY_WAIT_TIME_US_START;
 
+	// non si capisce tanto cosa sono questi supressed command.
 	if ((*rc = copy_comms(handle, suppressed_comms)) != SCAP_SUCCESS)
 	{
 		scap_close(handle);
@@ -339,11 +366,20 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 		return NULL;
 	}
 
+
+
+    // I device sono i ring buffer probabilmente
+
+    
+
 	//
-	// Open and initialize all the devices
+	// Open and initialize all the devices 
 	//
+	// BPF PROBE
 	if(handle->m_bpf)
 	{
+		// variabile bpf_probe dovrebbe contenere un path
+		// questa è la fase di loading della probe.
 		if((*rc = scap_bpf_load(handle, bpf_probe)) != SCAP_SUCCESS)
 		{
 			snprintf(error, SCAP_LASTERR_SIZE, "%s", handle->m_lasterr);
@@ -351,14 +387,15 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 			return NULL;
 		}
 	}
-	else
-	{
+	else // KERNEL DRIVER
+	{ 
 		int len;
 		uint32_t all_scanned_devs;
 
 		//
 		// Allocate the device descriptors.
 		//
+		// 16 MB di memoria nello spazio virtuale sostanzialmente.
 		len = RING_BUF_SIZE * 2;
 
 		for(j = 0, all_scanned_devs = 0; j < handle->m_ndevs && all_scanned_devs < handle->m_ncpus; ++all_scanned_devs)
@@ -366,8 +403,11 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 			//
 			// Open the device
 			//
+
+			// qui ci sarà il nome del device /dev/falco0
 			snprintf(filename, sizeof(filename), "%s/dev/" PROBE_DEVICE_NAME "%d", scap_get_host_root(), all_scanned_devs);
 
+			// provo ad aprire il device
 			if((handle->m_devs[j].m_fd = open(filename, O_RDWR | O_SYNC)) < 0)
 			{
 				if(errno == ENODEV)
@@ -393,6 +433,7 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 			}
 
 			// Set close-on-exec for the fd
+			// quando si fa un exec, bisogna chiudere i file descriptor.
 			if (fcntl(handle->m_devs[j].m_fd, F_SETFD, FD_CLOEXEC) == -1) {
 				snprintf(error, SCAP_LASTERR_SIZE, "Can not set close-on-exec flag for fd for device %s (%s)", filename, scap_strerror(handle, errno));
 				scap_close(handle);
@@ -403,6 +444,12 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 			//
 			// Map the ring buffer
 			//
+			// mappa un device in memoria, nello spazio virtuale del processo, 
+			// qui c'è scritto a partire da 0 ma in realtà è semplicemente un consiglio.
+			// il vero indirizzo di mapping in questo caso è ritornato in m_buffer.
+			// una volta che il mapping è avvenuto il descriptor può essere chiuso.
+			// Questo è molto utile, perchè mappa sostanzialmente dei file /dev del processo sysdig o falco che sia.
+			// Nel proprio spazio virtuale si trova dei riferimenti al buffer
 			handle->m_devs[j].m_buffer = (char*)mmap(0,
 						len,
 						PROT_READ,
@@ -424,6 +471,7 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 			//
 			// Map the ppm_ring_buffer_info that contains the buffer pointers
 			//
+			// non si capisce perchè sembra mappare di nuovo l'inizio del file descriptor, contenente le info sta volta
 			handle->m_devs[j].m_bufinfo = (struct ppm_ring_buffer_info*)mmap(0,
 						sizeof(struct ppm_ring_buffer_info),
 						PROT_READ | PROT_WRITE,
@@ -448,18 +496,28 @@ scap_t* scap_open_live_int(char *error, int32_t *rc,
 		}
 	}
 
+
+
+
+
+
+
+
+	// inizialmente ovviamente segno di non aver letto nulla da nessun device
 	for(j = 0; j < handle->m_ndevs; ++j)
 	{
 		//
 		// Additional initializations
 		//
+
+
 		handle->m_devs[j].m_lastreadsize = 0;
 		handle->m_devs[j].m_sn_len = 0;
 		scap_stop_dropping_mode(handle);
 	}
 
 	//
-	// Create the process list
+	// Create the process list, si prende tutta la lista di processi dalla cartella proc. da cui può estrarre tutta una serie di info
 	//
 	error[0] = '\0';
 	snprintf(filename, sizeof(filename), "%s/proc", scap_get_host_root());
@@ -1357,6 +1415,45 @@ static void scap_advance_tail(scap_t* handle, uint32_t cpuid)
 	handle->m_devs[cpuid].m_lastreadsize = 0;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	// int32_t res = scap_readbuf(handle,
+	// 	                           j,
+	// 	                           &dev->m_sn_next_event,
+	// 	                           &dev->m_sn_len);
+
+
+
 int32_t scap_readbuf(scap_t* handle, uint32_t cpuid, OUT char** buf, OUT uint32_t* len)
 {
 	uint32_t thead;
@@ -1391,6 +1488,23 @@ int32_t scap_readbuf(scap_t* handle, uint32_t cpuid, OUT char** buf, OUT uint32_
 
 	return SCAP_SUCCESS;
 }
+
+
+
+
+
+
+
+
+//////////////////////////////////////////////
+//////////////////////////////////////////////
+//////////////////////////////////////////////
+//
+//     Verifico se buffer sono vuoti o no
+//
+//////////////////////////////////////////////
+//////////////////////////////////////////////
+//////////////////////////////////////////////
 
 static uint64_t buf_size_used(scap_t* handle, uint32_t cpu)
 {
@@ -1431,6 +1545,49 @@ static bool are_buffers_empty(scap_t* handle)
 	return true;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 int32_t refill_read_buffers(scap_t* handle)
 {
 	uint32_t j;
@@ -1448,7 +1605,7 @@ int32_t refill_read_buffers(scap_t* handle)
 	}
 	else
 	{
-		handle->m_buffer_empty_wait_time_us = BUFFER_EMPTY_WAIT_TIME_US_START;
+		handle->m_buffer_empty_wait_time_us = BUFFER_EMPTY_WAIT_TIME_US_START; // penso che capisca che sono entrato in questo else perchè è la prima volta
 	}
 
 	//
@@ -1462,7 +1619,7 @@ int32_t refill_read_buffers(scap_t* handle)
 		int32_t res = scap_readbuf(handle,
 		                           j,
 		                           &dev->m_sn_next_event,
-		                           &dev->m_sn_len);
+		                           &dev->m_sn_len); //dopo che ho letto tutto sarà differenza tra head e tail
 
 		if(res != SCAP_SUCCESS)
 		{
@@ -1480,6 +1637,51 @@ int32_t refill_read_buffers(scap_t* handle)
 
 #endif // HAS_CAPTURE
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/// IMPORTANTE: è vero che ho il memory mapping con il file, ma come faccio a sapere quando c'è roba nuova da leggere non posso muovere il puntatore a caso in avanti...
+
+// da quello che ho capito per ora, leggo un po' dal buffer e quando ho finito di leggere tutti quegli eventi sposto il puntatore
+
+// PER ESEMPIO ALL'INIZIO CI ENTRO CON:
+// -> dev->m_lastreadsize = 0;
+// -> dev->m_sn_len = 0;
+
+
 #ifndef _WIN32
 static inline int32_t scap_next_live(scap_t* handle, OUT scap_evt** pevent, OUT uint16_t* pcpuid)
 #else
@@ -1494,16 +1696,23 @@ static int32_t scap_next_live(scap_t* handle, OUT scap_evt** pevent, OUT uint16_
 	return SCAP_FAILURE;
 #else
 	uint32_t j;
+	// massimo timestamp iniziale.
 	uint64_t max_ts = 0xffffffffffffffffLL;
+	
+	// puntatore a header all'inizio dell'evento
 	scap_evt* pe = NULL;
 	uint32_t ndevs = handle->m_ndevs;
 
+	// si inizializza il valore attuale della cpu a questo numero alto, in modo che non possa corrsipondere a un numero reale di cpu
 	*pcpuid = 65535;
 
+	// devo guardare i ring per ogni cpu.
 	for(j = 0; j < ndevs; j++)
 	{
 		scap_device* dev = &(handle->m_devs[j]);
 
+		// cioè se tutto l'evento che c'era prima è stato completato
+		// qualcuno setta queste misure quando il buffer avanza.
 		if(dev->m_sn_len == 0)
 		{
 			//
@@ -1511,22 +1720,39 @@ static int32_t scap_next_live(scap_t* handle, OUT scap_evt** pevent, OUT uint16_
 			// still occupying, free the resources for the
 			// producer rather than sitting on them.
 			//
-			if(dev->m_lastreadsize > 0)
+			// la chiave è qui, chi sposta questo m_lastreadsize, perchè dice sostanzialmente che si può
+			// riscrivere il buffer penso sia "sinsp"
+			if(dev->m_lastreadsize > 0) // readsize era tutta la lunghezza di ciò che non avevo letto al giro precedente tail-head
 			{
+				// quando libisnp ha finito di leggere quello che c'è sopra.
 				scap_advance_tail(handle, j);
 			}
 
+			///NOTA: inizialmente per tutti i buffer vado qui se sono vuoti.
 			continue;
 		}
+
+
+
+
+		// SE ARRIVO QUI CI SONO SICURAMENTE BYTE DISPONIBILI.
+
+
 
 		if(handle->m_bpf)
 		{
 #ifndef _WIN32
+            // ritorna header evento con il timestamp per esempio.
+			// questo m_sn_next_event sarà un puntatore a una zona del ring buffer memory mapped
+			/// IMPORTANTE: bisogna capire chi sposta sto puntatore del device `m_sn_next_event`.
 			pe = scap_bpf_evt_from_perf_sample(dev->m_sn_next_event);
 #endif
 		}
-		else
+		else // KERNEL MODULE IMMAGINO
 		{
+			// il solito header già visto con PPM
+			// qui si mette il puntatore iniziale alla struttura ma andando avanti con il puntatore trovo tutti i dati
+			// NON È ANCORA CHIARO QUANDO POSSO DIRE DI RISCRIVERE QUEI DATI perchè non mi servono più
 			pe = (scap_evt *) dev->m_sn_next_event;
 		}
 
@@ -1546,8 +1772,11 @@ static int32_t scap_next_live(scap_t* handle, OUT scap_evt** pevent, OUT uint16_
 				return SCAP_FAILURE;
 			}
 
+			// setto gli header da tornare e il numero della cpu.
+			// ritorno il puntatore all'header ma di seguito ho sostanzialmente tutti i parametri
 			*pevent = pe;
 			*pcpuid = j;
+			// guardo tra i vari buffer ring che ci sono disponibili per le varie cpu quale ha il timestamp più alto
 			max_ts = pe->ts;
 		}
 	}
@@ -1565,16 +1794,18 @@ static int32_t scap_next_live(scap_t* handle, OUT scap_evt** pevent, OUT uint16_
 		if(handle->m_bpf)
 		{
 #ifndef _WIN32
+			///NOTA: sposto il puntatore all'evento successivo nel buffer
 			scap_bpf_advance_to_evt(handle, *pcpuid, true,
 						dev->m_sn_next_event,
 						&dev->m_sn_next_event,
-						&dev->m_sn_len);
+						&dev->m_sn_len); // questa è inizialmente tutta la linghezza che mi ero letto tra tail e head poi pian piano la decremento
 #endif
 		}
 		else
 		{
 			ASSERT(dev->m_sn_len >= (*pevent)->len);
-			dev->m_sn_len -= (*pevent)->len;
+			dev->m_sn_len -= (*pevent)->len; // quindi dovrebbe andare a 0 per la prossima next()
+			// punatore già a prossimo evento da leggere
 			dev->m_sn_next_event += (*pevent)->len;
 		}
 
@@ -1582,6 +1813,9 @@ static int32_t scap_next_live(scap_t* handle, OUT scap_evt** pevent, OUT uint16_
 	}
 	else
 	{
+
+        // nel caso in cui nessun buffer abbia dati da leggere, aspetto con una sleep..
+
 		//
 		// All the buffers have been consumed. Check if there's enough data to keep going or
 		// if we should wait.
@@ -1590,6 +1824,12 @@ static int32_t scap_next_live(scap_t* handle, OUT scap_evt** pevent, OUT uint16_
 	}
 #endif
 }
+
+
+
+
+
+
 
 #ifndef _WIN32
 static inline int32_t scap_next_udig(scap_t* handle, OUT scap_evt** pevent, OUT uint16_t* pcpuid)
@@ -1880,6 +2120,9 @@ int32_t scap_next(scap_t* handle, OUT scap_evt** pevent, OUT uint16_t* pcpuid)
 		res = SCAP_FAILURE;
 	}
 
+
+    // In caso di successo
+
 	if(res == SCAP_SUCCESS)
 	{
 		bool suppressed;
@@ -2029,6 +2272,7 @@ int32_t scap_start_capture(scap_t* handle)
 		if(handle->m_bpf)
 		{
 #ifndef _WIN32
+			// mette solo un flag nella mappa delle info e basta.
 			return scap_bpf_start_capture(handle);
 #endif
 		}
@@ -2042,6 +2286,8 @@ int32_t scap_start_capture(scap_t* handle)
 			uint32_t j;
 			for(j = 0; j < handle->m_ndevs; j++)
 			{
+				// per ogni device bisogna tipo settare un flag per abilitare la cattura, bisogna tipo mettere
+				//  un 1 in alcuni file. ioctl è un altro di quei meotdi che il driver aveva abilitato per farlo usare agli utenti.
 				if(ioctl(handle->m_devs[j].m_fd, PPM_IOCTL_ENABLE_CAPTURE))
 				{
 					snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "scap_start_capture failed for device %" PRIu32, j);

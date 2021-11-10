@@ -40,9 +40,13 @@ static void signal_callback(int signal)
 
 int main(int argc, char** argv)
 {
+
 	char error[SCAP_LASTERR_SIZE];
 	int32_t res;
+
+	// header di un evento, con alcune informazioni su di esso.
 	scap_evt* ev;
+	// id della cpu dove l'evento è stato catturato.
 	uint16_t cpuid;
 
 	if(signal(SIGINT, signal_callback) == SIG_ERR)
@@ -51,7 +55,26 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
+	/////// ROBA AGGIUNTA DA ME
+	printf("DEBUG -- Apro handle di cattura.\n");
+	//const char* bpf_probe = scap_get_bpf_probe_from_env();
+	setenv("SYSDIG_BPF_PROBE","/vagrant/libs/build/driver/bpf/probe.o",1); 
+
+	static const char *SYSDIG_BPF_PROBE_ENV = "SYSDIG_BPF_PROBE";
+	char*  bpf_probe;
+	bpf_probe = getenv(SYSDIG_BPF_PROBE_ENV);
+	
+	printf("DEBUG -- %s", bpf_probe);
+    ///////
+
+
+	// g_h = handler dell'istanza di cattura se torna con successo.
+	// ha fatto i memory mapping dei device allocando circa 16 MB.
+	// e quindi ha i puntatori ai ring buffer settati nei deivce.
+	// la cattura si avvia settando i flag in alcuni file
 	g_h = scap_open_live(error, &res);
+
+
 	if(g_h == NULL)
 	{
 		fprintf(stderr, "%s (%d)\n", error, res);
@@ -60,6 +83,8 @@ int main(int argc, char** argv)
 	
 	while(1)
 	{
+		// abbiamo avviato la cattura adesso scap deve andare a leggere dai ring buffer questi eventi.
+		/// NOTA: credo che sinsp chiami next solo quando ha finito di processare evento completamente quindi non gli servono più i dati nel buffer
 		res = scap_next(g_h, &ev, &cpuid);
 
 		if(res > 0)

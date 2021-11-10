@@ -67,6 +67,7 @@ option(WITH_CHISEL "Include chisel implementation" OFF)
 
 option(CREATE_TEST_TARGETS "Enable make-targets for unit testing" ON)
 
+# da qua vado ad esefuire il codice dei due moduli che trovo in cmake/modules
 include(libscap)
 include(libsinsp)
 

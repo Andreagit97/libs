@@ -80,6 +80,8 @@ struct ppm_device {
 	wait_queue_head_t read_queue;
 };
 
+
+// Questi sono dati sull'evento.
 struct event_data_t {
 	enum ppm_capture_category category;
 	int socketcall_syscall;
@@ -133,6 +135,9 @@ void ppm_task_cputime_adjusted(struct task_struct *p, cputime_t *ut, cputime_t *
  #error The kernel must have HAVE_SYSCALL_TRACEPOINTS in order to work
 #endif
 
+
+
+/// Da capire a cosa servono questi probe.
 TRACEPOINT_PROBE(syscall_enter_probe, struct pt_regs *regs, long id);
 TRACEPOINT_PROBE(syscall_exit_probe, struct pt_regs *regs, long ret);
 TRACEPOINT_PROBE(syscall_procexit_probe, struct task_struct *p);
@@ -153,6 +158,7 @@ TRACEPOINT_PROBE(signal_deliver_probe, int sig, struct siginfo *info, struct k_s
 #ifdef CAPTURE_PAGE_FAULTS
 TRACEPOINT_PROBE(page_fault_probe, unsigned long address, struct pt_regs *regs, unsigned long error_code);
 #endif
+
 
 DECLARE_BITMAP(g_events_mask, PPM_EVENT_MAX);
 static struct ppm_device *g_ppm_devs;
@@ -306,6 +312,10 @@ static void check_remove_consumer(struct ppm_consumer_t *consumer, int remove_fr
 /*
  * user I/O functions
  */
+// Queste sono funzioni chiamate in spazio gli user, i consumer sono i processi che vogliono leggere i ring buffer.
+// non è chiaro se ci sono ring buffer diversi per ogni consumer, oppure no (?)
+
+// è una funzione molto importante che attacca i probe ai tracepoint e resetta i ring buffer.
 static int ppm_open(struct inode *inode, struct file *filp)
 {
 	int ret;
@@ -327,6 +337,7 @@ static int ppm_open(struct inode *inode, struct file *filp)
 
 	mutex_lock(&g_consumer_mutex);
 
+    // Chi è il consumer e quanti ce ne possono essere ?
 	consumer = ppm_find_consumer(consumer_id);
 	if (!consumer) {
 		unsigned int cpu;
@@ -452,6 +463,8 @@ static int ppm_open(struct inode *inode, struct file *filp)
 	consumer->fullcapture_port_range_start = 0;
 	consumer->fullcapture_port_range_end = 0;
 	consumer->statsd_port = PPM_PORT_STATSD;
+
+
 	bitmap_fill(g_events_mask, PPM_EVENT_MAX); /* Enable all syscall to be passed to userspace */
 	reset_ring_buffer(ring);
 	ring->open = true;
@@ -463,6 +476,7 @@ static int ppm_open(struct inode *inode, struct file *filp)
 		 */
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 20)
+		// qui si attaccano i probe ai tracepoint del kernel
 		ret = compat_register_trace(syscall_exit_probe, "sys_exit", tp_sys_exit);
 #else
 		ret = register_trace_syscall_exit(syscall_exit_probe);
@@ -537,6 +551,12 @@ cleanup_open:
 
 	return ret;
 }
+
+
+
+
+
+
 
 static int ppm_release(struct inode *inode, struct file *filp)
 {
@@ -1564,6 +1584,8 @@ static void record_event_all_consumers(enum ppm_event_type event_type,
 /*
  * Returns 0 if the event is dropped
  */
+
+// Non viene chiamata solo per system call ma per anche altri eventi di cattura, page fault, context switches, ecc..
 static int record_event_consumer(struct ppm_consumer_t *consumer,
 	enum ppm_event_type event_type,
 	enum syscall_flags drop_flags,
@@ -1605,7 +1627,13 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 	/*
 	 * FROM THIS MOMENT ON, WE HAVE TO BE SUPER FAST
 	 */
+
+	// c'è un buffer per ogni cpu, che poi il buffer è un dev/falco/0..1..2
+
+	// get_cpu() e put_cpu() prendo e rilascio cpu().
 	cpu = get_cpu();
+
+	// si ogni consumer ha i propri ring_buffers()
 	ring = per_cpu_ptr(consumer->ring_buffers, cpu);
 	ASSERT(ring);
 
@@ -1617,6 +1645,7 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 	}
 
 	ring_info->n_evts++;
+	// l'HOTPLUG è quando una cpu non era attiva e lo diventa poi, probabilmente si aggiunge un ringbuffer a runtime.
 	if (event_datap->category == PPMC_CONTEXT_SWITCH && event_datap->event_info.context_data.sched_prev != NULL) {
 		if (event_type != PPME_SYSDIGEVENT_E && event_type != PPME_CPU_HOTPLUG_E) {
 			ASSERT(event_datap->event_info.context_data.sched_prev != NULL);
@@ -1652,9 +1681,13 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 	/*
 	 * Calculate the space currently available in the buffer
 	 */
+	// prima di registrare il nuovo evento avvenuto, guardo quanto spazio ho
+	// scrive da head !
 	head = ring_info->head;
+	// legge da tail !
 	ttail = ring_info->tail;
 
+	// spazio libero in un buffer circolare.
 	if (ttail > head)
 		freespace = ttail - head - 1;
 	else
@@ -1705,22 +1738,28 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 	/*
 	 * Determine how many arguments this event has
 	 */
+	// questa è una struttura necessaria per raccogliere dati sui parametri e sul tipo di evento.
 	args.nargs = g_event_info[event_type].nparams;
+	// 2 byte * per il numero di parametri dell'evtno
 	args.arg_data_offset = args.nargs * sizeof(u16);
 
 	/*
 	 * Make sure we have enough space for the event header.
 	 * We need at least space for the header plus 16 bit per parameter for the lengths.
 	 */
+
+	// nel ring buffer per ogni evento si mette l'header e poi dopo tutti i parametri uno dopo l'altro, non è chiaro per cosa siano questi 16 bit.
 	if (likely(freespace >= sizeof(struct ppm_evt_hdr) + args.arg_data_offset)) {
 		/*
 		 * Populate the header
 		 */
+		// scrivo prima prima l'header, alloco il puntatore alla testa del ring buffer dove posso scrivere.
 		struct ppm_evt_hdr *hdr = (struct ppm_evt_hdr *)(ring->buffer + head);
 
 #ifdef PPM_ENABLE_SENTINEL
 		hdr->sentinel_begin = ring->nevents;
 #endif
+		// timestamp che poi mi servirà a decidere da quale ring buffer tirare fuori evento.
 		hdr->ts = ns;
 		hdr->tid = current->pid;
 		hdr->type = event_type;
@@ -1730,6 +1769,9 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 		 * Populate the parameters for the filler callback
 		 */
 		args.consumer = consumer;
+		// ring->buffer: punta all'inizio del buffer ring.
+		// head: mi dice dove posso scrivere all'inizio.
+		// args->buffer: punterà adesso a dove posso scrivere i primi parametri.
 		args.buffer = ring->buffer + head + sizeof(struct ppm_evt_hdr);
 #ifdef PPM_ENABLE_SENTINEL
 		args.sentinel = ring->nevents;
@@ -1795,6 +1837,7 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 		/*
 		 * Fire the filler callback
 		 */
+		//// NOTA: qui si chiama il filler vediamo come
 		if (likely(g_ppm_events[event_type].filler_callback)) {
 			cbres = g_ppm_events[event_type].filler_callback(&args);
 		} else {
@@ -1906,9 +1949,26 @@ static inline void g_n_tracepoint_hit_inc(void)
 #endif
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/// Viene chiamato quando arriva una syscall. 
+// è un probe come dice la funzione stessa, si attacca al tracepoint sys_enter.
 TRACEPOINT_PROBE(syscall_enter_probe, struct pt_regs *regs, long id)
 {
 	long table_index;
+	// prendo le due tabelle
 	const struct syscall_evt_pair *cur_g_syscall_table = g_syscall_table;
 	const enum ppm_syscall_code *cur_g_syscall_code_routing_table = g_syscall_code_routing_table;
 	bool compat = false;
@@ -1961,6 +2021,7 @@ TRACEPOINT_PROBE(syscall_enter_probe, struct pt_regs *regs, long id)
 		} else
 			type = cur_g_syscall_table[table_index].enter_event_type;
 #else
+        // scopro il tipo di syscall event enter che è stato chiamato.
 		type = cur_g_syscall_table[table_index].enter_event_type;
 #endif
 
@@ -1978,10 +2039,15 @@ TRACEPOINT_PROBE(syscall_enter_probe, struct pt_regs *regs, long id)
 	}
 }
 
+
+
+
+
 TRACEPOINT_PROBE(syscall_exit_probe, struct pt_regs *regs, long ret)
 {
 	int id;
 	long table_index;
+	// non chiaro perchè usa dei puntatori e non direttamente le variabili globali.
 	const struct syscall_evt_pair *cur_g_syscall_table = g_syscall_table;
 	const enum ppm_syscall_code *cur_g_syscall_code_routing_table = g_syscall_code_routing_table;
 	bool compat = false;
@@ -1991,6 +2057,7 @@ TRACEPOINT_PROBE(syscall_exit_probe, struct pt_regs *regs, long ret)
 	int socketcall_syscall = -1;
 #endif
 
+	// numero della syscall in cui sono entrato.
 	id = syscall_get_nr(current, regs);
 
 #if defined(CONFIG_X86_64) && defined(CONFIG_IA32_EMULATION)
@@ -2284,6 +2351,7 @@ static void visit_tracepoint(struct tracepoint *tp, void *priv)
 static int get_tracepoint_handles(void)
 {
 	for_each_kernel_tracepoint(visit_tracepoint, NULL);
+	
 
 	if (!tp_sys_enter) {
 		pr_err("failed to find sys_enter tracepoint\n");
@@ -2434,6 +2502,9 @@ static struct notifier_block cpu_notifier = {
 };
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) */
 
+
+// si inizia da sysdig_init() per istanziare i tracepoint.
+// da capire se è il codice che parte quando viene caricato solo il kernel o anche la probe (?)
 int sysdig_init(void)
 {
 	dev_t dev;
@@ -2451,11 +2522,16 @@ int sysdig_init(void)
 #else
 	struct class_device *device = NULL;
 #endif
+
+
+    // Questo è il kernel module anche se si chiama probe.
 	pr_info("driver loading, " PROBE_NAME " " PROBE_VERSION "\n");
 
+	// prendo gli hanlder dei tracepoint sfogliando i tracepoint che il kernel mette a disposizione.
 	ret = get_tracepoint_handles();
 	if (ret < 0)
 		goto init_module_err;
+
 
 	num_cpus = 0;
 	for_each_possible_cpu(cpu) {
@@ -2466,6 +2542,9 @@ int sysdig_init(void)
 	 * Initialize the user I/O
 	 * ( + 1 for sysdig-events)
 	 */
+
+	// sembra un po' simile a quello che viene fatto quando si carica il probe eBPF da libscap. Ma vedremo...
+	// questa alloca solo i numeri per i device mi sa in dev mi ritrovo tipo 1:2 dove 1 è il major e 2 e il minor
 	acrret = alloc_chrdev_region(&dev, 0, num_cpus + 1, PROBE_DEVICE_NAME);
 	if (acrret < 0) {
 		pr_err("could not allocate major number for %s\n", PROBE_DEVICE_NAME);
@@ -2501,9 +2580,12 @@ int sysdig_init(void)
 	 * We create a unique user level device for each of the ring buffers
 	 */
 	for (j = 0; j < g_ppm_numdevs; ++j) {
+		// il secondo parametro sono le funzioni da associare al dispositivo
+		// l'applicazione user può manipolare il idspositivo a caraetteri tramite queste funzioni associate al dispositivo.
 		cdev_init(&g_ppm_devs[j].cdev, &g_ppm_fops);
 		g_ppm_devs[j].dev = MKDEV(g_ppm_major, j);
 
+		// aggiunge al sistema il dispositivo.
 		if (cdev_add(&g_ppm_devs[j].cdev, g_ppm_devs[j].dev, 1) < 0) {
 			pr_err("could not allocate chrdev for %s\n", PROBE_DEVICE_NAME);
 			ret = -EFAULT;
@@ -2531,6 +2613,11 @@ int sysdig_init(void)
 		init_waitqueue_head(&g_ppm_devs[j].read_queue);
 		n_created_devices++;
 	}
+
+
+
+//////////// da qui in poi dovrebbe essere più gestione di errori che altro.
+
 
 	/* create_proc_read_entry(PPM_DEVICE_NAME, 0, NULL, ppm_read_proc, NULL); */
 

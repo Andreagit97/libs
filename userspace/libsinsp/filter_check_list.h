@@ -40,11 +40,18 @@ public:
 	sinsp_filter_check* new_filter_check_from_fldname(const std::string& name, sinsp* inspector, bool do_exact_check);
 
 protected:
+    // è una lista di sisnsp_filter_check e non di filter_check (non sembra esistere la classe filter_check base)
+	// IL NOME INGANNA UN PO'
 	std::vector<sinsp_filter_check*> m_check_list;
 };
 
+
+
+
+
 //
 // This bakes in the "default" set of filterchecks that work with syscalls
+// Questo inserisce il set "predefinito" di filtri che funzionano con le systemcalls
 class sinsp_filter_check_list : public filter_check_list
 {
 public:

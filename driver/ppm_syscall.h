@@ -27,6 +27,20 @@
 typedef void (*sys_call_ptr_t)(void);
 extern const sys_call_ptr_t sys_call_table[];
 
+
+
+
+/*
+ * Permette di estrarre valore di ritorno e parametri della syscall.
+ */
+
+
+
+
+
+
+
+
 /*
  * Only the low 32 bits of orig_ax are meaningful, so we return int.
  * This importantly ignores the high bits on 64-bit, so comparisons

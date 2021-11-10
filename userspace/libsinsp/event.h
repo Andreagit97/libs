@@ -454,11 +454,14 @@ private:
 			uint32_t* lens32;
 		} lens;
 
+		// large payload perchè la lunghezza di alcuni parametri degli eventi può stare anche su su più di 16 bit se sono per esempio file json
 		const bool large_payload = get_info_flags() & EF_LARGE_PAYLOAD;
 
 		if (large_payload) {
+			// puntatore a dove inizia il vettore di lunghezze dei parametri dell'evento
 			lens.lens32 = (uint32_t *)((char *)m_pevt + sizeof(struct ppm_evt_hdr));
 			// The offset in the block is instead always based on the capture value.
+			// puntatore al vero e proprio primo parametro
 			valptr = (char *)lens.lens32 + m_pevt->nparams * sizeof(uint32_t);
 		} else
 		{
@@ -474,6 +477,8 @@ private:
 				par.init(valptr, lens.lens32[j]);
 				valptr += lens.lens32[j];
 			} else {
+				// valptr è il punatore all'inizio del parametro.
+				// lens.lens16[j] è la lunghezza del parametro numero j in byte.
 				par.init(valptr, lens.lens16[j]);
 				valptr += lens.lens16[j];
 			}

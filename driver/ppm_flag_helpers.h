@@ -22,6 +22,23 @@ or GPL2.txt for full copies of the license.
 #define PPM_MS_MGC_MSK 0xffff0000
 #define PPM_MS_MGC_VAL 0xC0ED0000
 
+
+
+
+
+
+/*
+ * Aiuta a parsificare i flag da rappresentazione esterna a rappresentazione interna.
+ */
+
+
+
+
+
+
+
+
+
 static __always_inline uint32_t open_flags_to_scap(unsigned long flags)
 {
 	uint32_t res = 0;

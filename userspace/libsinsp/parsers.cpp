@@ -114,9 +114,93 @@ void sinsp_parser::set_track_connection_status(bool enabled)
 	m_track_connection_status = enabled;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
 // PROCESSING ENTRY POINT
 ///////////////////////////////////////////////////////////////////////////////
+
+// qui vado appena ho tirato su evento da scap.
+// voglio capire come avviene l'output di questo evento nel caso in cui non ci sia nessun filtro.
+// e poi nel caso in cui il filtro ci sia.
 void sinsp_parser::process_event(sinsp_evt *evt)
 {
 	uint16_t etype = evt->m_pevt->type;
@@ -174,11 +258,15 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 	//
 	// Filtering
 	//
+	/// PRIMA FASE DI FILTERING: per eventi magari di cui non ci si vuole salvare nulla li filtro subito.	
 #if defined(HAS_FILTERING) && defined(HAS_CAPTURE_FILTERING)
 	bool do_filter_later = false;
 
+
 	if(m_inspector->m_filter || m_inspector->m_evttype_filter)
 	{
+		// quei flag che metto nella tabella event_table.
+		// quindi quei flag sono utili poi in fase di filtering.
 		ppm_event_flags eflags = evt->get_info_flags();
 
 		if(etype == PPME_SYSCALL_WRITE_X)
@@ -210,7 +298,8 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 				}
 			}
 		}
-
+		// per eventi che cambiano stato della macchina come clone, mi salvo comunque delle info senza filtrare evento
+		// quindi ne faccio il parsing di info e solo dopo filtrerò via l'evento.
 		if(eflags & EF_MODIFIES_STATE)
 		{
 			do_filter_later = true;
@@ -227,12 +316,14 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 					}
 				}
 
+				// evento filtrato via
 				evt->m_filtered_out = true;
 				return;
 			}
 		}
 	}
 
+	// se non ho filter_checks l'evento non viene sicuramente filtrato.
 	evt->m_filtered_out = false;
 #endif
 
@@ -523,6 +614,82 @@ void sinsp_parser::event_cleanup(sinsp_evt *evt)
 	}
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
 // HELPERS
 ///////////////////////////////////////////////////////////////////////////////
@@ -778,6 +945,7 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 
 void sinsp_parser::store_event(sinsp_evt *evt)
 {
+	// con la execve per esempio le thread info dovrebbe averla settata una clone o fork precedente.
 	if(!evt->m_tinfo)
 	{
 		//
@@ -798,6 +966,7 @@ void sinsp_parser::store_event(sinsp_evt *evt)
 	//
 	elen = scap_event_getlen(evt->m_pevt);
 
+	// c'è un event storage LIFO, eventi sopra i 4 KByte non vengono messi.
 	if(elen > SP_EVT_BUF_SIZE)
 	{
 		ASSERT(false);
@@ -812,6 +981,7 @@ void sinsp_parser::store_event(sinsp_evt *evt)
 	{
 		tinfo->m_lastevent_data = reserve_event_buffer();
 	}
+	// copio da una zona all'altra in memoria, in quello storage LIFO per eventi.
 	memcpy(tinfo->m_lastevent_data, evt->m_pevt, elen);
 	tinfo->m_lastevent_cpuid = evt->get_cpuid();
 
@@ -909,9 +1079,85 @@ void sinsp_parser::register_event_callback(sinsp_pd_callback_type etype, sinsp_p
 	return;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
 // PARSERS
 ///////////////////////////////////////////////////////////////////////////////
+
+// lo scopo qua è collezionare dei dati, in particolare alcune informazioni sul thread in una tabella.
+// Qui dal parser mi colleziono quei dati sull'evento poi non vedo come vengono printati i dati all'esterno
 void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 {
 	sinsp_evt_param* parinfo;
@@ -930,7 +1176,10 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 	//
 	parinfo = evt->get_param(0);
 	ASSERT(parinfo->m_len == sizeof(int64_t));
+	// il valore di ritorno e il pid del filgio ed è quello che mi serve ora
 	childtid = *(int64_t *)parinfo->m_val;
+	/// NOTE: paraminfo viene utilizzata come una variabile custom per catturare al volo per catturare parametri.
+
 
 	switch(evt->get_type())
 	{
@@ -956,6 +1205,7 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 		ASSERT(false);
 	}
 	ASSERT(parinfo->m_len == sizeof(int32_t));
+	// di nuovo usiamo paraminfo
 	uint32_t flags = *(int32_t *)parinfo->m_val;
 
 	if(childtid < 0)

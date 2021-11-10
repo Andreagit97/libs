@@ -59,9 +59,41 @@ void *memmem(const void *haystack, size_t haystacklen, const void *needle, size_
 #endif
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 // type-based comparison functions
 ///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
 bool flt_compare_uint64(cmpop op, uint64_t operand1, uint64_t operand2)
 {
 	switch(op)
@@ -183,6 +215,7 @@ bool flt_compare_buffer(cmpop op, char* operand1, char* operand2, uint32_t op1_l
 {
 	switch(op)
 	{
+    // si fanno tutte una serie di "compare" a basso livello.
 	case CO_EQ:
 		return op1_len == op2_len && (memcmp(operand1, operand2, op1_len) == 0);
 	case CO_NE:
@@ -530,9 +563,75 @@ bool flt_compare_avg(cmpop op,
 	}
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
-// sinsp_filter_check implementation
 ///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// sinsp_filter_check
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
 sinsp_filter_check::sinsp_filter_check()
 {
 	m_boolop = BO_NONE;
@@ -1075,6 +1174,8 @@ Json::Value sinsp_filter_check::tojson(sinsp_evt* evt)
 	return jsonval;
 }
 
+// prende quello che gli arriva come filter tipo "evt.category"
+// per questo sinsp_filter_check guarda se c'è qualche match, e se più di uno guarda il più lungo
 int32_t sinsp_filter_check::parse_field_name(const char* str, bool alloc_state, bool needed_for_filtering)
 {
 	int32_t j;
@@ -1090,9 +1191,14 @@ int32_t sinsp_filter_check::parse_field_name(const char* str, bool alloc_state, 
 
 	for(j = 0; j < m_info.m_nfields; j++)
 	{
+		// I nomi dei field sono tipo (lo si vede nei file filter_check_list.cpp):
+		// - evt.type
+		// - evt.category
+		// ...
 		string fldname = m_info.m_fields[j].m_name;
 		int32_t fldlen = (uint32_t)fldname.length();
 
+		// è un match con il field che è più lungo, quindi ci si segna l'indice e il field con il quale si è trovata una migliore corrispondenza, nel caso ce ne sia più di uno
 		if(val.compare(0, fldlen, fldname) == 0)
 		{
 			if(fldlen > max_fldlen)
@@ -1331,6 +1437,69 @@ bool sinsp_filter_check::compare(sinsp_evt *evt)
 			   m_val_storage_len);
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// sinsp_filter
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
 sinsp_filter::sinsp_filter(sinsp *inspector)
 {
 	m_inspector = inspector;
@@ -1340,26 +1509,107 @@ sinsp_filter::~sinsp_filter()
 {
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
-// sinsp_filter_compiler implementation
 ///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// sinsp_filter_compiler 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+// Costruttore analizza si salva solo i campi
 sinsp_filter_compiler::sinsp_filter_compiler(sinsp* inspector, const string& fltstr, bool ttable_only)
 {
-	m_inspector = inspector;
-	m_ttable_only = ttable_only;
-	m_scanpos = -1;
-	m_scansize = 0;
+	// sono tutti campi che servono ad analizzare il filtro ricevuto
+	m_inspector = inspector; ///< si prende oggetto di classe sinsp.
+	m_ttable_only = ttable_only; ///< di default è falso.
+	m_scanpos = -1; ///< carattere del filtro a cui sono arrivato.
+	m_scansize = 0; ///< lunghezza totale del filtro.
 	m_state = ST_NEED_EXPRESSION;
-	m_filter = new sinsp_filter(m_inspector);
+	m_filter = new sinsp_filter(m_inspector); // istanzia un sinsp_filter che poi verrà restituito.
 	m_last_boolop = BO_NONE;
-	m_nest_level = 0;
-	m_fltstr = fltstr;
+	m_nest_level = 0; /* quando ci sono parentesi cambio livello. */
+	m_fltstr = fltstr; // è il filtro così come arriva, può essere per esempio "evt.category=process or evt.category=net"
 }
 
+// distruttore vuoto.
 sinsp_filter_compiler::~sinsp_filter_compiler()
 {
 }
 
+// utility functions.
 bool sinsp_filter_compiler::isblank(char c)
 {
 	if(c == ' ' || c == '\t' || c == '\n' || c == '\r')
@@ -1371,7 +1621,6 @@ bool sinsp_filter_compiler::isblank(char c)
 		return false;
 	}
 }
-
 bool sinsp_filter_compiler::is_special_char(char c)
 {
 	if(c == '(' || c == ')' || c == '!' || c == '=' || c == '<' || c == '>')
@@ -1381,7 +1630,6 @@ bool sinsp_filter_compiler::is_special_char(char c)
 
 	return false;
 }
-
 bool sinsp_filter_compiler::is_bracket(char c)
 {
 	if(c == '(' || c == ')')
@@ -1392,6 +1640,7 @@ bool sinsp_filter_compiler::is_bracket(char c)
 	return false;
 }
 
+// prende un carattere alla volta.
 char sinsp_filter_compiler::next()
 {
 	while(true)
@@ -1410,6 +1659,7 @@ char sinsp_filter_compiler::next()
 	}
 }
 
+// dato un carattere mi permette di ottenere un intero operando (per esempio "e" diventa "evt.category")
 vector<char> sinsp_filter_compiler::next_operand(bool expecting_first_operand, bool in_or_pmatch_clause)
 {
 	vector<char> res;
@@ -1432,6 +1682,7 @@ vector<char> sinsp_filter_compiler::next_operand(bool expecting_first_operand, b
 	{
 		next();
 	}
+	// da qua esco sicuramente con qualcosa che non è uno spazio
 
 	//
 	// If there are quotes, don't stop on blank
@@ -1457,6 +1708,7 @@ vector<char> sinsp_filter_compiler::next_operand(bool expecting_first_operand, b
 
 		if(expecting_first_operand)
 		{
+			// finchè non incontra un carattere particolare continua ad allungare la stringa
 			is_end_of_word = (isblank(curchar) || is_special_char(curchar));
 		}
 		else
@@ -1483,6 +1735,7 @@ vector<char> sinsp_filter_compiler::next_operand(bool expecting_first_operand, b
 				m_scanpos--;
 			}
 
+			// mettere il terminatore di stringa perchè da vettore poi riconverto a stringa
 			res.push_back('\0');
 			return res;
 		}
@@ -1496,6 +1749,7 @@ vector<char> sinsp_filter_compiler::next_operand(bool expecting_first_operand, b
 			}
 			else
 			{
+				// allungo il vettore finchè non incontro spazio bianco o carattere speciale.
 				res.push_back(curchar);
 			}
 			break;
@@ -1564,6 +1818,7 @@ vector<char> sinsp_filter_compiler::next_operand(bool expecting_first_operand, b
 	return res;
 }
 
+// controlla che quale è l'operatore giusto.
 bool sinsp_filter_compiler::compare_no_consume(const string& str)
 {
 	//
@@ -1587,6 +1842,8 @@ bool sinsp_filter_compiler::compare_no_consume(const string& str)
 	}
 }
 
+
+// capisco quale è l'operazione che viene dopo il primo filter e incremento la posizione
 cmpop sinsp_filter_compiler::next_comparison_operator()
 {
 	int32_t start;
@@ -1594,6 +1851,7 @@ cmpop sinsp_filter_compiler::next_comparison_operator()
 	//
 	// Skip spaces
 	//
+	// spazi magari prima di un uguale
 	if(isblank(m_fltstr[m_scanpos]))
 	{
 		next();
@@ -1685,12 +1943,19 @@ cmpop sinsp_filter_compiler::next_comparison_operator()
 	}
 }
 
+// viene chiamata sicuramente su tutti i caratteri normali che non sono "and" "or" o "not" o "(" ")"
 void sinsp_filter_compiler::parse_check()
 {
+	// posizione iniziale a cui sono arrivato, per esempio la "e" di "evt.category=process or evt.category=net"
 	uint32_t startpos = m_scanpos;
+	// prendo tutta la stringa come vector<char> "evt.category".
 	vector<char> operand1 = next_operand(true, false);
+	// converto di nuovo in stringa.
 	string str_operand1 = string((char *)&operand1[0]);
+	// in genere è un filter_check specifico ma per questione di ereditarietà consideriamo un puntatore alla classe padre.
+	// quindi ho trovato il filter_check giusto per questo primo field "evt.category"
 	sinsp_filter_check* chk = g_filterlist.new_filter_check_from_fldname(str_operand1, m_inspector, true);
+    // inizialmente = BO_NONE;
 	boolop op = m_last_boolop;
 
 	if(chk == NULL)
@@ -1699,6 +1964,7 @@ void sinsp_filter_compiler::parse_check()
 			str_operand1 + " at pos " + to_string((long long) startpos));
 	}
 
+    // falso di default
 	if(m_ttable_only)
 	{
 		if(!(chk->get_fields()->m_flags & filter_check_info::FL_WORKS_ON_THREAD_TABLE))
@@ -1716,11 +1982,14 @@ void sinsp_filter_compiler::parse_check()
 		}
 	}
 
+    // trovo l'operatore che viene dopo (co= comparison operator)
 	cmpop co = next_comparison_operator();
 
+	// come fa vedere jason nella sua figura l'operatore booleano va nel secondo filter_check. (nel nostro caso "or").
 	chk->m_boolop = op;
 	chk->m_cmpop = co;
 
+    /// ATTENZIONE: sembra la stessa chiamata che facevo prima, non se ne capisce tanto il senso (?)
 	chk->parse_field_name((char *)&operand1[0], true, true);
 
 	if(co == CO_IN || co == CO_INTERSECTS || co == CO_PMATCH)
@@ -1865,15 +2134,21 @@ void sinsp_filter_compiler::parse_check()
 		// Otherwise we need a value for the operand
 		//
 		else
-		{
+		{ 
+			// devo andare a prendere quello che trovo dopo "=" in questo caso.
 			vector<char> operand2 = next_operand(false, false);
 			chk->add_filter_value((char *)&operand2[0], (uint32_t)operand2.size() - 1);
 		}
 
+		// sinsp_filter_compiler ha questo campo in cui sostanzialmente si aggiunge il filtercheck pronto, come diceva jason
+		// quindi si tiene questo vettore di filter check, in un caso semplice come: evt.category=process or evt.category=net nel secondo filter check ci sarà
+		// anche l'operatore or
+		// quindi in questo filtercheck ci sta scritto, il itpo di field, l'operatore e il valore con cui confrontare. 
 		m_filter->add_check(chk);
 	}
 }
 
+// wrapper di compile_() che
 sinsp_filter* sinsp_filter_compiler::compile()
 {
 	try
@@ -1892,16 +2167,24 @@ sinsp_filter* sinsp_filter_compiler::compile()
 	}
 }
 
+// verà funzione che detiene la logica e restituisce un sinsp_filter che ha quell'albero mostrato da jason al suo interno.
 sinsp_filter* sinsp_filter_compiler::compile_()
 {
+	// lunghezza del filtro specificato, può essere tipo questo "evt.category=process or evt.category=net"
+	// quindi questa è la lunghezza totale della filter expression
 	m_scansize = (uint32_t)m_fltstr.size();
 
+
+	// partendo da "evt.category=process or evt.category=net", dopo un primo giro:
+	// l'uguale è considerato un carattere speciale.
+	// 1. ottengo: evt.category
 	while(true)
 	{
 		char a = next();
 
 		switch(a)
 		{
+		// quando torna 0 effettivamente il filtro è finito
 		case 0:
 			//
 			// Finished parsing the filter string
@@ -1924,6 +2207,7 @@ sinsp_filter* sinsp_filter_compiler::compile_()
 			//
 			// Good filter
 			//
+			// questo è un sinsp_filter. che ha un vettore di filter check, quelli presi prima.
 			return m_filter;
 
 			break;
@@ -1947,6 +2231,8 @@ sinsp_filter* sinsp_filter_compiler::compile_()
 			{
 				if(next() == 'r')
 				{
+					// lo dico tramite questo field quale è l'operatore.
+					// questo nel nostro caso finirà nel secondo filter_check del vettore.
 					m_last_boolop = BO_OR;
 				}
 				else
@@ -1963,6 +2249,7 @@ sinsp_filter* sinsp_filter_compiler::compile_()
 			}
 			else
 			{
+				// se una parola inizia con o poi la si continua come prima, parsecheck è in grado di restituirmi un intera parte del filtro tipo "evt.category=process"
 				parse_check();
 				m_state = ST_EXPRESSION_DONE;
 			}
@@ -2031,6 +2318,86 @@ sinsp_filter* sinsp_filter_compiler::compile_()
 	vector<string> components = sinsp_split(m_fltstr, ' ');
 	return m_filter;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// sinsp_evttype_filter
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 sinsp_evttype_filter::sinsp_evttype_filter()
 {
@@ -2323,6 +2690,74 @@ void sinsp_evttype_filter::syscalls_for_ruleset(std::vector<bool> &syscalls, uin
 {
 	return m_rulesets[ruleset]->syscalls_for_ruleset(syscalls);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// sinsp_filter_factory 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 sinsp_filter_factory::sinsp_filter_factory(sinsp *inspector,
 					   filter_check_list &available_checks)

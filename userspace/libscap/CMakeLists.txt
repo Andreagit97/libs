@@ -17,6 +17,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../common")
 
 option(USE_BUNDLED_DEPS "Enable bundled dependencies instead of using the system ones" ON)
 
+# non basta metterlo una volta ?
 include(ExternalProject)
 
 if(WIN32 OR NOT MINIMAL_BUILD)
@@ -108,6 +109,7 @@ target_link_libraries(scap
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+	# vado a buildare il driver da qui
     add_subdirectory(../../driver ${PROJECT_BINARY_DIR}/driver)
 
     option(BUILD_LIBSCAP_EXAMPLES "Build libscap examples" ON)

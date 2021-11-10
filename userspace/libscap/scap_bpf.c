@@ -51,8 +51,13 @@ limitations under the License.
 // subset of features needed.
 //
 
+
+// si sono importati parecchio codice per fare il loader bpf
+
+
+// struttura che contiene tutte le info della mappa
 struct bpf_map_data {
-	int fd;
+	int fd; // il fd non viene riempito assieme agli altri due campi
 	size_t elf_offset;
 	struct bpf_map_def def;
 };
@@ -69,6 +74,7 @@ static const char *g_filler_names[PPM_FILLER_MAX] = {
 };
 #undef FILLER_NAME_FN
 
+// questa è la chiamata alla syscall bpf.
 static int sys_bpf(enum bpf_cmd cmd, union bpf_attr *attr, unsigned int size)
 {
 	return syscall(__NR_bpf, cmd, attr, size);
@@ -81,6 +87,8 @@ static int sys_perf_event_open(struct perf_event_attr *attr,
 	return syscall(__NR_perf_event_open, attr, pid, cpu, group_fd, flags);
 }
 
+
+// dato il nome del filler che si ottiene da `raw_tracepoint/filler/sys_chmod_x`, ovvero il nome della sezione 
 static int32_t lookup_filler_id(const char *filler_name)
 {
 	int j;
@@ -96,13 +104,17 @@ static int32_t lookup_filler_id(const char *filler_name)
 	return -1;
 }
 
+
+
+
+// richiamano poi tutte la syscall sys_bpf
 static int bpf_map_update_elem(int fd, const void *key, const void *value, uint64_t flags)
 {
 	union bpf_attr attr;
 
 	bzero(&attr, sizeof(attr));
 
-	attr.map_fd = fd;
+	attr.map_fd = fd; /// IMPORTANTE: questo stabilisce che mappa devo andare ad aggiornare.
 	attr.key = (unsigned long) key;
 	attr.value = (unsigned long) value;
 	attr.flags = flags;
@@ -137,9 +149,27 @@ static int bpf_map_create(enum bpf_map_type map_type,
 	attr.max_entries = max_entries;
 	attr.map_flags = map_flags;
 
+	// crea queste mappe nel kernel che hannp le info prese dall'elf, ma non hanno ancora nessuna entry.
 	return sys_bpf(BPF_MAP_CREATE, &attr, sizeof(attr));
 }
 
+
+
+
+
+
+
+
+
+
+
+//////////////////////////////////
+//////////////////////////////////
+// carico un programma bpf nel kernel e mi torna un file descriptor
+//////////////////////////////////
+//////////////////////////////////
+
+// carico un programma bpf nel kernel e mi torna un file descriptor
 static int bpf_load_program(const struct bpf_insn *insns,
 			    enum bpf_prog_type type,
 			    size_t insns_cnt,
@@ -173,6 +203,14 @@ static int bpf_load_program(const struct bpf_insn *insns,
 	return sys_bpf(BPF_PROG_LOAD, &attr, sizeof(attr));
 }
 
+
+
+
+
+
+
+
+
 static int bpf_raw_tracepoint_open(const char *name, int prog_fd)
 {
 	union bpf_attr attr;
@@ -183,6 +221,16 @@ static int bpf_raw_tracepoint_open(const char *name, int prog_fd)
 
 	return sys_bpf(BPF_RAW_TRACEPOINT_OPEN, &attr, sizeof(attr));
 }
+
+
+
+
+
+
+
+
+
+
 
 #ifndef MINIMAL_BUILD
 static int32_t get_elf_section(Elf *elf, int i, GElf_Ehdr *ehdr, char **shname, GElf_Shdr *shdr, Elf_Data **data)
@@ -232,6 +280,25 @@ static int cmp_symbols(const void *l, const void *r)
 	}
 }
 
+
+
+
+
+
+
+
+
+
+
+
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+// CARCIO LE MAPPE DALL'ELF FILE E POI LE POSIZIONO NEL KERNEL (LOAD PHASE)
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+
+
+
 static int32_t load_elf_maps_section(scap_t *handle, struct bpf_map_data *maps,
 				     int maps_shndx, Elf *elf, Elf_Data *symbols,
 				     int strtabidx, int *nr_maps)
@@ -253,7 +320,9 @@ static int32_t load_elf_maps_section(scap_t *handle, struct bpf_map_data *maps,
 		return SCAP_FAILURE;
 	}
 
+	// lo devo stabilire qua il numero di mappe.
 	*nr_maps = 0;
+	// non so quante sono quindi ne alloco al massimo
 	sym = calloc(BPF_MAPS_MAX + 1, sizeof(GElf_Sym));
 	for(i = 0; i < symbols->d_size / sizeof(GElf_Sym); i++)
 	{
@@ -273,15 +342,20 @@ static int32_t load_elf_maps_section(scap_t *handle, struct bpf_map_data *maps,
 
 	qsort(sym, *nr_maps, sizeof(GElf_Sym), cmp_symbols);
 
+	// controllo che le mappe che ho contato corrispondano con il numero di dati che trovo nell'elf
 	ASSERT(data_maps->d_size / *nr_maps == sizeof(struct bpf_map_def));
 
 	for(i = 0; i < *nr_maps; i++)
 	{
+		// struttura che contiene tutte le info sulle mappe
 		struct bpf_map_def *def;
 		size_t offset;
 
 		offset = sym[i].st_value;
+		// nell'elf ho letto un unico grande blocco che contiene tutte le info sulle mappe
+		// e adesso riempio quel vettore con tutte le info sulla mappa che ho scritto 
 		def = (struct bpf_map_def *)(data_maps->d_buf + offset);
+		// offset ll'interno del file elf.
 		maps[i].elf_offset = offset;
 		memcpy(&maps[i].def, def, sizeof(struct bpf_map_def));
 	}
@@ -291,20 +365,27 @@ static int32_t load_elf_maps_section(scap_t *handle, struct bpf_map_data *maps,
 }
 #endif // MINIMAL_BUILD
 
+
+
+
 static int32_t load_maps(scap_t *handle, struct bpf_map_data *maps, int nr_maps)
 {
 	int j;
 
+    /// IMPORTANTE: si ha un ordine nel caricamento del'elf si sa già che un particolare indice corrisponderà a un certo tipo di mappa bpf.
 	for(j = 0; j < nr_maps; ++j)
 	{
+		// questo sono le uniche che hanno una entry per ogni cpu.
 		if(j == SYSDIG_PERF_MAP ||
 		   j == SYSDIG_LOCAL_STATE_MAP ||
 		   j == SYSDIG_FRAME_SCRATCH_MAP ||
 		   j == SYSDIG_TMP_SCRATCH_MAP)
 		{
+			/// NOTE: una entry per ogni CPU, per queste mappe
 			maps[j].def.max_entries = handle->m_ncpus;
 		}
 
+		// ogni mappa ha un file descriptor quando viene creata.
 		handle->m_bpf_map_fds[j] = bpf_map_create(maps[j].def.type,
 							  maps[j].def.key_size,
 							  maps[j].def.value_size,
@@ -319,6 +400,7 @@ static int32_t load_maps(scap_t *handle, struct bpf_map_data *maps, int nr_maps)
 			return SCAP_FAILURE;
 		}
 
+		// Ne esiste solo una di questo tipo `tail_map`.
 		if(maps[j].def.type == BPF_MAP_TYPE_PROG_ARRAY)
 		{
 			handle->m_bpf_prog_array_map_idx = j;
@@ -327,6 +409,33 @@ static int32_t load_maps(scap_t *handle, struct bpf_map_data *maps, int nr_maps)
 
 	return SCAP_SUCCESS;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/////////////////////
+// non ben capito l'utilizzo
+////////////////////
 
 #ifndef MINIMAL_BUILD
 static int32_t parse_relocations(scap_t *handle, Elf_Data *data, Elf_Data *symbols,
@@ -384,6 +493,9 @@ static int32_t parse_relocations(scap_t *handle, Elf_Data *data, Elf_Data *symbo
 }
 #endif // MINIMAL_BUILD
 
+
+// Carico tracepoint e filler.
+// l'event come paramtero sarebbe il nome della sezione quindi per esempio `raw_tracepoint/filler/sys_chmod_x`
 static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_insn *prog, int size)
 {
 	struct perf_event_attr attr = {};
@@ -410,9 +522,12 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 		return SCAP_FAILURE;
 	}
 
+	///NOTA: raw_tracepoint è solo una nostra parola chiave
+	// guardo se è un evento di tipo raw oppure no e in ogni caso vado avanti con il nome della sezione quindi magari mi rimarrà solo `filler/sys_chmod_x`
 	if(memcmp(event, "raw_tracepoint/", sizeof("raw_tracepoint/") - 1) == 0)
 	{
 		raw_tp = true;
+		// il caricamento avviene in base al tipo di programma bpf
 		program_type = BPF_PROG_TYPE_RAW_TRACEPOINT;
 		event += sizeof("raw_tracepoint/") - 1;
 	}
@@ -429,6 +544,11 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 		return SCAP_FAILURE;
 	}
 
+
+
+
+
+
 	fd = bpf_load_program(prog, program_type, insns_cnt, error, BPF_LOG_SIZE);
 	if(fd < 0)
 	{
@@ -440,12 +560,18 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 
 	free(error);
 
+	// tabella che tiene i file descriptor di tutti i programmi bpf, compresi quelli per i filler, io carico tutti i programmi bpf sia dei filller sia quelli generici `sys_enter`, `sys_exit`, poi per quelli generici andrò a sovrascrivere questo fd con il fde di quando lo apro -> vedi dopo.
+	/// NOTA: io associo veramente ai tracepoint del kernel solo i programmi di alto livello non i filler, quelli verranno chiamati indirettamente poi da questi programmi
 	handle->m_bpf_prog_fds[handle->m_bpf_prog_cnt++] = fd;
 
+
+	///FILLER: se ho un filler
+	// ho caricato i programmi corrspondenti ai filler nel kernel e ho associato il codice del filler al file descriptor di quel programma per il fller, ho messo quesat mapping in una mappa bpf chiamata tail_map. fatto questo ritorno e passo alla prossima sezione nel file header
 	if(memcmp(event, "filler/", sizeof("filler/") - 1) == 0)
 	{
 		int prog_id;
 
+		//tolgo la parte del filler dal nome della sezione così mi rimane solo il nome della syscall.
 		event += sizeof("filler/") - 1;
 		if(*event == 0)
 		{
@@ -453,6 +579,7 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 			return SCAP_FAILURE;
 		}
 
+		// prendo l'id del filler in base a come li metto io in tabella, quando li aggiungo.
 		prog_id = lookup_filler_id(event);
 		if(prog_id == -1)
 		{
@@ -460,6 +587,8 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 			return SCAP_FAILURE;
 		}
 
+        // ho caricato il programma bpf ho ottenuto il fd e in una precisa mappa vdo a mettere questa info, ovvero associo il file descriptor del programma bpf a l'id del filler preso da quella tabella.
+		// in chiave metto l'id del filler mentre il valore è il file descriptor associato.
 		err = bpf_map_update_elem(handle->m_bpf_map_fds[handle->m_bpf_prog_array_map_idx], &prog_id, &fd, BPF_ANY);
 		if(err < 0)
 		{
@@ -472,8 +601,16 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 		return SCAP_SUCCESS;
 	}
 
+
+
+
+
+
+    /// ATTENZIONE: qui associo al giusto evento `sys_enter`, il programma bpf corretto che poi chiamerà tutti i filler necessari. 
 	if(raw_tp)
 	{
+		// in event è rimasto solo `sys_enter` per esempio
+		// quindi associo questo programma bpf al tracepoint `sys_enter`.
 		efd = bpf_raw_tracepoint_open(event, fd);
 		if(efd < 0)
 		{
@@ -529,10 +666,40 @@ static int32_t load_tracepoint(scap_t* handle, const char *event, struct bpf_ins
 		}
 	}
 
+	// aggiorno il fd del program bpf associato al raw_tracepoint
 	handle->m_bpf_event_fd[handle->m_bpf_prog_cnt - 1] = efd;
 
 	return SCAP_SUCCESS;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #ifndef MINIMAL_BUILD
 static int32_t load_bpf_file(scap_t *handle, const char *path)
@@ -548,10 +715,13 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 	char *shname;
 	char *shname_prog;
 	int nr_maps = 0;
+
+	// struttura che conterrà tutto quello che estraggo dall'elf sulle mappe e mi servirà per caricarle
 	struct bpf_map_data maps[BPF_MAPS_MAX];
 	struct utsname osname;
 	int32_t res = SCAP_FAILURE;
 
+	// prendo la versione del OS
 	if(uname(&osname))
 	{
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "can't call uname()");
@@ -564,6 +734,12 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		return SCAP_FAILURE;
 	}
 
+
+
+
+
+
+	// apro l'elf bpf passato con la variabile di ambiente BPF
 	int program_fd = open(path, O_RDONLY, 0);
 	if(program_fd < 0)
 	{
@@ -571,6 +747,8 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		return SCAP_FAILURE;
 	}
 
+
+	// è un file elf, "probe.o"
 	Elf *elf = elf_begin(program_fd, ELF_C_READ_MMAP_PRIVATE, NULL);
 	if(!elf)
 	{
@@ -585,6 +763,16 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		goto cleanup;
 	}
 
+
+
+
+
+
+
+
+
+    // analizzo elf headers del bpf probe e vedo se va tutto bene 
+	// l'header elf ha diverse info all'interno
 	for(j = 0; j < ehdr.e_shnum; ++j)
 	{
 		if(get_elf_section(elf, j, &ehdr, &shname, &shdr, &data) != SCAP_SUCCESS)
@@ -592,18 +780,22 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 			continue;
 		}
 
+		// trovo la sezione delle mappe e mi segno la posizione nell'header elf
 		if(strcmp(shname, "maps") == 0)
 		{
+			// indice a cui trovo le mappe
 			maps_shndx = j;
 		}
 		else if(shdr.sh_type == SHT_SYMTAB)
-		{
+		{   
+			// symbol table
 			strtabidx = shdr.sh_link;
 			symbols = data;
 		}
 		else if(strcmp(shname, "kernel_version") == 0) {
 			if(strcmp(osname.release, data->d_buf))
 			{
+				// questo è il problema che salta fuori ogni tanto, quando lo compilo in libs
 				snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "BPF probe is compiled for %s, but running version is %s",
 					 (char *) data->d_buf, osname.release);
 				goto cleanup;
@@ -624,25 +816,40 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		}
 	}
 
+
+
+
+
+	// se non ci sono simboli errore. sezione symbol table mancante
 	if(!symbols)
 	{
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "missing SHT_SYMTAB section");
 		goto cleanup;
 	}
 
+
+
+
+	/// MAPPE: ........
+	// se ho trovato l'indice prima
 	if(maps_shndx)
 	{
+		// finita questa funzione ho preso tutto il contenuto dall elf, quindi tutte le info sulle mappe, il tipo, il numeor di entry, l'offset che hanno nell'elf, ecc...
+		// e ho messo tutto in questo vettore di strutture maps che è sovraallocato a 32+1.
+		// da qui ritorno anche il vero numero di mappe inn nr_maps.
 		if(load_elf_maps_section(handle, maps, maps_shndx, elf, symbols, strtabidx, &nr_maps) != SCAP_SUCCESS)
 		{
 			goto cleanup;
 		}
 
+		// chiamo proprio la syscall bpf e carico le mappe nel kernel ora sono pronte per essere utilizzate.
 		if(load_maps(handle, maps, nr_maps) != SCAP_SUCCESS)
 		{
 			goto cleanup;
 		}
 	}
 
+    // INFO su relocation ma non so bene cosa sia (?).
 	for(j = 0; j < ehdr.e_shnum; ++j)
 	{
 		if(get_elf_section(elf, j, &ehdr, &shname, &shdr, &data) != SCAP_SUCCESS)
@@ -668,13 +875,21 @@ static int32_t load_bpf_file(scap_t *handle, const char *path)
 		}
 	}
 
+	
+	
+	
+	
+	// 
 	for(j = 0; j < ehdr.e_shnum; ++j)
 	{
+		// prendo una sezione per volta e ne vedo il nome
 		if(get_elf_section(elf, j, &ehdr, &shname, &shdr, &data) != SCAP_SUCCESS)
 		{
 			continue;
 		}
 
+		//shname sta per section name, cerca tutte le sezioni che iniziano per raw_tracepoint/
+		/// NOTA: anche i filler iniziano così. 
 		if(memcmp(shname, "tracepoint/", sizeof("tracepoint/") - 1) == 0 ||
 		   memcmp(shname, "raw_tracepoint/", sizeof("raw_tracepoint/") - 1) == 0)
 		{
@@ -693,17 +908,45 @@ cleanup:
 }
 #endif // MINIMAL_BUILD
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// mappo quel file descriptor con un buffer in memoria, il cosidetto ring buffer
 static void *perf_event_mmap(scap_t *handle, int fd)
 {
+	// The function getpagesize() returns the number of bytes in a memory page, where "page" is a fixed-length block, the unit for memory allocation and file mapping performed by mmap.
 	int page_size = getpagesize();
-	int ring_size = page_size * BUF_SIZE_PAGES;
-	int header_size = page_size;
+	int ring_size = page_size * BUF_SIZE_PAGES; //2048 pagine fi ram
+	int header_size = page_size; // l'header sat su una pagina
 	int total_size = ring_size * 2 + header_size;
 
 	//
 	// All this playing with MAP_FIXED might be very very wrong, revisit
 	//
 
+	// map or unmap files or devices into memory.
+	/// NOTA: il probe bpf probabilmente andrà a scrivere nel file e il programma che sta sopra, sysdig o falco si troverà in memoria ciò che è stato scritto. 
+	// in tmp ho l'indirizzo del primo mapping, ma questo mapping non è legato a nessun file.
 	void *tmp = mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	if(tmp == MAP_FAILED)
 	{
@@ -712,6 +955,7 @@ static void *perf_event_mmap(scap_t *handle, int fd)
 	}
 
 	// Map the second copy to allow us to handle the wrap case normally
+	/// NOTA: qui ho l'indirizzo di un secondo mapping a circa metà della dimensione non so perchè (?)
 	void *p1 = mmap(tmp + ring_size, ring_size + header_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
 	if(p1 == MAP_FAILED)
 	{
@@ -731,6 +975,11 @@ static void *perf_event_mmap(scap_t *handle, int fd)
 		return MAP_FAILED;
 	}
 
+	/// NOTA: fa 3 mapping.
+	// 1. non associa il mapping a un file preciso e infatti nonviene associato nessun file descriptor al mapping
+	// 2. fa un mapping principale ("main") di dimensione ring_size+header_size
+	// 3. e un secondo mapping se vogliamo sovrapposto che parte da tmp+ring_size e ha la stessa dimensione.
+
 	ASSERT(p2 == tmp);
 
 	return tmp;
@@ -743,6 +992,8 @@ static int32_t populate_syscall_routing_table_map(scap_t *handle)
 	for(j = 0; j < SYSCALL_TABLE_SIZE; ++j)
 	{
 		long code = g_syscall_code_routing_table[j];
+		// j contiene il numero della syscall del sistema e code contiene il numero relativo della nostra definizione interna.
+		// quindi riempio questa mappa bpf già caricata nel kernel
 		if(bpf_map_update_elem(handle->m_bpf_map_fds[SYSDIG_SYSCALL_CODE_ROUTING_TABLE], &j, &code, BPF_ANY) != 0)
 		{
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "SYSDIG_SYSCALL_CODE_ROUTING_TABLE bpf_map_update_elem < 0");
@@ -801,6 +1052,8 @@ static int32_t populate_fillers_table_map(scap_t *handle)
 		}
 	}
 
+
+	// è un check per vedere se li ho messi tutti.
 	for(j = 0; j < PPM_FILLER_MAX; ++j)
 	{
 		if(!handle->m_bpf_fillers[j])
@@ -831,6 +1084,8 @@ static int32_t calibrate_socket_file_ops()
 	return SCAP_SUCCESS;
 }
 
+
+
 int32_t scap_bpf_start_capture(scap_t *handle)
 {
 	struct sysdig_bpf_settings settings;
@@ -842,7 +1097,12 @@ int32_t scap_bpf_start_capture(scap_t *handle)
 		return SCAP_FAILURE;
 	}
 
+	// prendo il primo elemento della mappa con indice 0, e setto la cattura.
+	/// ATTENTION: da capire cosa significa questo flag abilitato. 
+	// aggiorno questo flag nella mappa bpf.
 	settings.capture_enabled = true;
+
+	// aggiorno lo stesso elemento
 	if(bpf_map_update_elem(handle->m_bpf_map_fds[SYSDIG_SETTINGS_MAP], &k, &settings, BPF_ANY) != 0)
 	{
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "SYSDIG_SETTINGS_MAP bpf_map_update_elem < 0");
@@ -1188,8 +1448,11 @@ static int32_t set_boot_time(scap_t *handle, uint64_t *boot_time)
 	return SCAP_SUCCESS;
 }
 
+
+/// È una funzione in cui setto dei valori in alcuni file di BPF, voglio che ci siano dei precisi valori.
 static int32_t set_runtime_params(scap_t *handle)
 {
+	// si settano questi limiti per non limitare cosa il processo BPF può fare
 	struct rlimit rl;
 	rl.rlim_max = RLIM_INFINITY;
 	rl.rlim_cur = rl.rlim_max;
@@ -1199,6 +1462,8 @@ static int32_t set_runtime_params(scap_t *handle)
 		return SCAP_FAILURE;
 	}
 
+
+	//  è un file per il just in time compile
 	FILE *f = fopen("/proc/sys/net/core/bpf_jit_enable", "w");
 	if(!f)
 	{
@@ -1225,6 +1490,7 @@ static int32_t set_runtime_params(scap_t *handle)
 		return SCAP_FAILURE;
 	}
 
+    // scrivo il carattere 0 e ritorno un carattere scritto(byte)
 	if(fprintf(f, "0") != 1)
 	{
 		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "Can't write to /proc/sys/net/core/bpf_jit_harden");
@@ -1252,6 +1518,10 @@ static int32_t set_runtime_params(scap_t *handle)
 
 	return SCAP_SUCCESS;
 }
+
+
+
+
 
 static int32_t set_default_settings(scap_t *handle)
 {
@@ -1285,6 +1555,15 @@ static int32_t set_default_settings(scap_t *handle)
 	return SCAP_SUCCESS;
 }
 
+
+
+
+
+
+
+
+
+///  NOTA: funzion principale che fa da loader BPF in scap.
 int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 {
 #ifdef MINIMAL_BUILD
@@ -1294,43 +1573,85 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 	int online_cpu;
 	int j;
 
+    /// È una funzione in cui setto dei valori in alcuni file di BPF, voglio che ci siano dei precisi valori.
 	if(set_runtime_params(handle) != SCAP_SUCCESS)
 	{
 		return SCAP_FAILURE;
 	}
-
+ 
+    // è l'indice dove inizia l'array di mappe del programma BPF.
 	handle->m_bpf_prog_array_map_idx = -1;
 
+    // se non c'è il path del bpf probe.
 	if(!bpf_probe)
 	{
 		ASSERT(false);
 		return SCAP_FAILURE;
 	}
 
+
+	// 1. Ho aprto l'elf probe.o
+	// 2. Ho caricato il contenuto dell'elf per quanto riguarda la sezione "maps", in un vettore di strutture bpm_map, con tutte le informazioni che ho scritto nel codice del probe.
+	// 3. modifico alcune informazioni in alcune mappe come il numeor massimo di entry che possono avere, una per cpu per esempio.
+	// 4. carico le mappe bpf nel kernel, ma tante devono essere ancora riempite, quasi tutte tranne tail map come vedremo.
+	// 5. analizzo tutte le sezioni che iniziano con /raw_tracepoint nel mio caso, carico tutti i programmi bpf associati a ogni sezione nel kernel e ottengo i file descriptor.
+	/// 6. se la sezione riguardava un filler nella tail map associo l'id di quel filler al file_descriptor del programma bpf. NOTA: non aggangio quel programma a nessun tracepoint, i filler vengono solo caricati come programmi bpf ma non saranno agganciati a niente
+	// 7. se la sezione riguardava un programma bpf associato a `sys_enter`, `sys_exit`, ... non solo lo carico nel kernel ma lo associo anche a il tracepoint giusto.
 	if(load_bpf_file(handle, bpf_probe) != SCAP_SUCCESS)
 	{
 		return SCAP_FAILURE;
 	}
 
+
+
+
+	// il loader bpf qui contenuto in scap, prima carica le mappe e poi in base alle informazioni le va a riempire
+	// 1. Riempio la tabella `syscall_code_routing_table', come chiave ho il codice di sistema della syscall, come valore ho il codice PPM_ stabilito dalla nostra rappresentazione interna.
 	if(populate_syscall_routing_table_map(handle) != SCAP_SUCCESS)
 	{
 		return SCAP_FAILURE;
 	}
 
+
+
+
+
+	// 1. Riempio la tabella `syscall_table`, come chiave ho il codice di sistema della syscall, come valore i due eventi di entry e di exit associati alla syscall.
 	if(populate_syscall_table_map(handle) != SCAP_SUCCESS)
 	{
 		return SCAP_FAILURE;
 	}
 
+
+
+
+
+
+
+	// 1. Riempio la tabella `event_info_table`, come chiave metto l'indice dell'evento nello tabella globale g_event e come valore le informazioni sul singolo evento tra cui i parametri.
 	if(populate_event_table_map(handle) != SCAP_SUCCESS)
 	{
 		return SCAP_FAILURE;
 	}
 
+
+
+
+	// 1. Riempio la tabella `fillers_table`, come chiave l'indice dell'evento di entry/exit e come valore una serie di info sul filler.
 	if(populate_fillers_table_map(handle) != SCAP_SUCCESS)
 	{
 		return SCAP_FAILURE;
 	}
+
+
+
+
+	
+
+
+
+	// Apre un perf_file dove venfono collezionati eventi, per ogni cpu e associa una zona di memoria (ring_buffer) a questo file, in modo che sysdig per ogni cpu abbia uno spazio virtuale nel suo address space dove accedere ai dati direttamente quando vengono scritti nel file, questa funzione la fornisce mmap.
+
 
 	//
 	// Open and initialize all the devices
@@ -1338,6 +1659,7 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 	online_cpu = 0;
 	for(j = 0; j < handle->m_ncpus; ++j)
 	{
+		//PERF_EVENT = Hardware event_id to monitor via a performance monitoring event.
 		struct perf_event_attr attr = {
 			.sample_type = PERF_SAMPLE_RAW,
 			.type = PERF_TYPE_SOFTWARE,
@@ -1345,6 +1667,7 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 		};
 		int pmu_fd;
 
+		// controllo se la cpu è veramente online.
 		if(j > 0)
 		{
 			char filename[SCAP_MAX_PATH_SIZE];
@@ -1353,6 +1676,7 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 
 			snprintf(filename, sizeof(filename), "/sys/devices/system/cpu/cpu%d/online", j);
 
+			// è un file dove se la cpu è online c'è scritto "1".
 			fp = fopen(filename, "r");
 			if(fp == NULL)
 			{
@@ -1370,18 +1694,27 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 
 			fclose(fp);
 
+			// se non è online passa alla prossima.
 			if(!online)
 			{
 				continue;
 			}
 		}
 
+		// io so già quante devono essere le cpu online, controllo solo che il numero sia giusto.
 		if(online_cpu >= handle->m_ndevs)
 		{
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "processors online: %d, expected: %d", online_cpu, handle->m_ndevs);
 			return SCAP_FAILURE;
 		}
 
+
+
+
+
+		// Chiamo una syscall `perf_event_open`, a cui passo anche il numero della cpu.
+		// se il pid = -1 come in questo caso, this measures all processes/threads on the specified CPU (j). 
+		// questa syscall mi apre un file descriptor dove poi andrò a leggere una serie di info tramite una read per esempio
 		pmu_fd = sys_perf_event_open(&attr, -1, j, -1, 0);
 		if(pmu_fd < 0)
 		{
@@ -1389,23 +1722,31 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 			return SCAP_FAILURE;
 		}
 
+		// il device è questo perf_file che ho aperto con la syscall
 		handle->m_devs[online_cpu].m_fd = pmu_fd;
 
+		// questo file descriptor lo mappo con il numero della cpu (j) e lo metto in una bpf table.
 		if(bpf_map_update_elem(handle->m_bpf_map_fds[SYSDIG_PERF_MAP], &j, &pmu_fd, BPF_ANY) != 0)
 		{
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "SYSDIG_PERF_MAP bpf_map_update_elem < 0: %s", scap_strerror(handle, errno));
 			return SCAP_FAILURE;
 		}
 
+		// This enables the individual event or event group specified by the file descriptor argument.
 		if(ioctl(pmu_fd, PERF_EVENT_IOC_ENABLE, 0))
 		{
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "PERF_EVENT_IOC_ENABLE");
 			return SCAP_FAILURE;
 		}
 
+
+
+
+
 		//
 		// Map the ring buffer
 		//
+		/// IMPORTANTE: da vedere la funzione interna, che tipo di mapping fa, in totale 3 mapping, qui nel buffer torna l'indirizzo iniziale del mapping
 		handle->m_devs[online_cpu].m_buffer = perf_event_mmap(handle, pmu_fd);
 		if(handle->m_devs[online_cpu].m_buffer == MAP_FAILED)
 		{
@@ -1421,6 +1762,9 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 		return SCAP_FAILURE;
 	}
 
+
+
+	// riempie la mappa bpf dei settings
 	if(set_default_settings(handle) != SCAP_SUCCESS)
 	{
 		return SCAP_FAILURE;
@@ -1430,6 +1774,18 @@ int32_t scap_bpf_load(scap_t *handle, const char *bpf_probe)
 #endif // MINIMAL_BUILD
 }
 
+
+
+
+
+
+
+
+
+
+
+
+// non è scap che la riempie ma è la probe bpf che ci mette dell info 
 int32_t scap_bpf_get_stats(scap_t* handle, OUT scap_stats* stats)
 {
 	int j;
@@ -1437,6 +1793,7 @@ int32_t scap_bpf_get_stats(scap_t* handle, OUT scap_stats* stats)
 	for(j = 0; j < handle->m_ncpus; j++)
 	{
 		struct sysdig_bpf_per_cpu_state v;
+		// qui tiro fuori questa mappa con le statistiche sugli eventi
 		if(bpf_map_lookup_elem(handle->m_bpf_map_fds[SYSDIG_LOCAL_STATE_MAP], &j, &v))
 		{
 			snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "Error looking up local state %d\n", j);
@@ -1455,6 +1812,11 @@ int32_t scap_bpf_get_stats(scap_t* handle, OUT scap_stats* stats)
 
 	return SCAP_SUCCESS;
 }
+
+
+
+
+
 
 int32_t scap_bpf_get_n_tracepoint_hit(scap_t* handle, long* ret)
 {

@@ -26,6 +26,7 @@ along with Falco.  If not, see <http://www.gnu.org/licenses/>.
 /*
  * Operators to compare events
  */
+//
 enum cmpop {
 	CO_NONE = 0,
 	CO_EQ = 1,
@@ -57,6 +58,8 @@ enum boolop
 	BO_ANDNOT = 5,
 };
 
+// sorgenti di eventi
+// questi dovrebbero essere estesi con plugin se non vado errato.
 enum evt_src
 {
 	ESRC_NONE = 0,
@@ -201,8 +204,6 @@ private:
 	void combine_evttypes(boolop op, const std::set<uint16_t> &evttypes);
 };
 
-
-
 class gen_event_filter
 {
 public:
@@ -228,7 +229,7 @@ public:
 	gen_event_filter_expression* m_filter;
 
 protected:
-	gen_event_filter_expression* m_curexpr;
+	gen_event_filter_expression* m_curexpr; ///< Sono le filter expression tipo "evt.category=process"
 
 	friend class sinsp_filter_compiler;
 	friend class sinsp_filter_optimizer;

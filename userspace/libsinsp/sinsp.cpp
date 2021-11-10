@@ -459,6 +459,8 @@ void sinsp::open_live_common(uint32_t timeout_ms, scap_mode_t mode)
 	// Start the capture
 	//
 	m_mode = mode;
+
+	// struttura per settare le modalità di cattura scap
 	scap_open_args oargs;
 	oargs.mode = mode;
 	oargs.fname = NULL;
@@ -475,6 +477,7 @@ void sinsp::open_live_common(uint32_t timeout_ms, scap_mode_t mode)
 
 	add_suppressed_comms(oargs);
 
+	// se si vuole usare bpf o no, e settato a zero con il costruttore di default di solito.
 	if(m_bpf)
 	{
 		oargs.bpf_probe = m_bpf_probe.c_str();
@@ -500,6 +503,8 @@ void sinsp::open_live_common(uint32_t timeout_ms, scap_mode_t mode)
 	}
 
 	int32_t scap_rc;
+
+	// è un wrapper di quella chiamata nell'esempio di scap, in cui si specifica anche la modalità.
 	m_h = scap_open(oargs, error, &scap_rc);
 
 	if(m_h == NULL)
@@ -509,6 +514,7 @@ void sinsp::open_live_common(uint32_t timeout_ms, scap_mode_t mode)
 
 	scap_set_refresh_proc_table_when_saving(m_h, !m_filter_proc_table_when_saving);
 
+	// l'init raccoglie un po' delle informazioni prese da scap, lista interfacce, processi, ecc...
 	init();
 }
 
@@ -1111,6 +1117,10 @@ void sinsp::get_procs_cpu_from_driver(uint64_t ts)
 	}
 }
 
+
+
+
+// doppio puntatore pechè devo indirizzo del punatore indietro.
 int32_t sinsp::next(OUT sinsp_evt **puevt)
 {
 	sinsp_evt* evt;
@@ -1158,6 +1168,9 @@ int32_t sinsp::next(OUT sinsp_evt **puevt)
 		//
 		// Get the event from libscap
 		//
+		// m_h è l'handler della cattura scap. quello che ottengo con scap open.
+		// 
+		// da qui posso accedere a tutto quello che voglio dell'evento.
 		res = scap_next(m_h, &(evt->m_pevt), &(evt->m_cpuid));
 
 		if(res != SCAP_SUCCESS)
@@ -1196,6 +1209,7 @@ int32_t sinsp::next(OUT sinsp_evt **puevt)
 
 	uint64_t ts = evt->get_ts();
 
+	// setto quale è il timestamp del primo evento che prendo.
 	if(m_firstevent_ts == 0 && evt->m_pevt->type != PPME_CONTAINER_JSON_E && evt->m_pevt->type != PPME_CONTAINER_JSON_2_E)
 	{
 		m_firstevent_ts = ts;
@@ -1212,6 +1226,9 @@ int32_t sinsp::next(OUT sinsp_evt **puevt)
 	//
 	// Store a couple of values that we'll need later inside the event.
 	//
+	// - l'inspector si segna quanti eventi ha processato
+	// - quale è il timestamp del primo evento processato
+	// - quale è il timestamp dell'ultimo evento processato
 	m_nevts++;
 	evt->m_evtnum = m_nevts;
 	m_lastevent_ts = ts;
@@ -1330,7 +1347,15 @@ int32_t sinsp::next(OUT sinsp_evt **puevt)
 		return SCAP_TIMEOUT;
 	}
 #else
+    
+	
+	// parte importante in cui ho un evento a disposizione e vedo cosa farne.
+	
+	// il parser è un campo dell'inspector
 	m_parser->process_event(evt);
+
+
+
 #endif
 
 	//
@@ -1389,11 +1414,16 @@ int32_t sinsp::next(OUT sinsp_evt **puevt)
 		// mode and the category of this event is internal.
 		if(!(m_isinternal_events_enabled && (cat & EC_INTERNAL)))
 		{
+			// ritorno evento filtrato, su cui in base all'evento non ho fatto manco la fase di parsing magari, tipo salvare info o altro...
 			*puevt = evt;
+			// ritorno questo SCAP_TIMEOUT, probabilmente per avvisare che l'evento non è utile quando torno da sinsp.next(), poi ovviamente sinsp fornisce tutti questi eventi, cosa farne sopra degli eventi lo decidono i vari falco, sysdig, ecc...
 			return SCAP_TIMEOUT;
 		}
 	}
 #endif
+
+	// ESEMPIO: poniamo di arrivare qui con il nostro evento di execveat di ingresso, lo ho memorizzato in quel buffer LIFO come visto. Ma adesso cosa ne faccio? come faccio a farlo vedere a utente ? quindi il filtering in questo esempio non c'è
+	
 
 	//
 	// Run the analysis engine
@@ -1722,6 +1752,7 @@ void sinsp::start_dropping_mode(uint32_t sampling_ratio)
 #endif // _WIN32
 
 #ifdef HAS_FILTERING
+// qui passo già un sinsp filter
 void sinsp::set_filter(sinsp_filter* filter)
 {
 	if(m_filter != NULL)
@@ -1740,7 +1771,7 @@ void sinsp::set_filter(const string& filter)
 		ASSERT(false);
 		throw sinsp_exception("filter can only be set once");
 	}
-
+	// costrttore della classe "sinsp_filter_compiler"
 	sinsp_filter_compiler compiler(this, filter);
 	m_filter = compiler.compile();
 	m_filterstring = filter;
@@ -1778,6 +1809,8 @@ bool sinsp::run_filters_on_evt(sinsp_evt *evt)
 
 	//
 	// Then run the evttype filter, if there is one.
+	// 
+	// deve essere un altro tipo di filtro base. (?)
 	if(m_evttype_filter && m_evttype_filter->run(evt) == true)
 	{
 		return true;

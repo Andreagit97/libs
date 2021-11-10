@@ -97,6 +97,7 @@ void gen_event_filter_expression::add_check(gen_event_filter_check* chk)
 bool gen_event_filter_expression::compare(gen_event *evt)
 {
 	uint32_t j;
+	// m:check = questo è il vettore con i filter check
 	uint32_t size = (uint32_t)m_checks.size();
 	bool res = true;
 	gen_event_filter_check* chk = NULL;
@@ -106,11 +107,15 @@ bool gen_event_filter_expression::compare(gen_event *evt)
 		chk = m_checks[j];
 		ASSERT(chk != NULL);
 
+		// primo filter check del vettore
 		if(j == 0)
 		{
+			// il primo filter check non può avere un operatore a meno che non sia NOT.
 			switch(chk->m_boolop)
 			{
 			case BO_NONE:
+			    // questa è la compare vera del filter check vero
+				// 1. si cerca di capire se evento a quel campo che sto cercando e poi in base al valore del campo (se intero,char, o altro) e all'operatore (=, !=, >,...) si decide se c'è il match, se c'è il match torna res=true.
 				res = chk->compare(evt);
 				if (res) {
 					evt->set_check_id(chk->get_check_id());
@@ -131,6 +136,7 @@ bool gen_event_filter_expression::compare(gen_event *evt)
 			case BO_OR:
 				if(res)
 				{
+					// se il filter check di prima era vero finisce li!
 					goto done;
 				}
 				res = chk->compare(evt);
@@ -347,6 +353,8 @@ void gen_event_filter::pop_expression()
 	m_curexpr = m_curexpr->m_parent;
 }
 
+
+// si chiama quel metodo "compare"
 bool gen_event_filter::run(gen_event *evt)
 {
 	return m_filter->compare(evt);

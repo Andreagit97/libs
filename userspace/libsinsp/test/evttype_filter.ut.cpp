@@ -41,6 +41,7 @@ protected:
 
 	void SetUp()
 	{
+		// qui uint32_t e poi nei set uint_16 (?)
 		for(uint32_t i = 2; i < PPM_EVENT_MAX; i++)
 		{
 			// Skip "old" event versions that have been replaced
@@ -50,6 +51,7 @@ protected:
 				continue;
 			}
 
+			// questi sono dei set di interi
 			all_events.insert(i);
 
 			if(openat_only.find(i) == openat_only.end())
@@ -75,6 +77,7 @@ protected:
 
 	sinsp_filter *compile(const string &fltstr)
 	{
+		// la stringa di filtro se la prende con il costruttore.
 		sinsp_filter_compiler compiler(NULL, fltstr);
 
 		return compiler.compile();

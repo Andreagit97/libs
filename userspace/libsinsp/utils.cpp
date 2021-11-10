@@ -68,6 +68,7 @@ sinsp_evttables g_infotables;
 sinsp_logger g_logger;
 sinsp_initializer g_initializer;
 #ifdef HAS_FILTERING
+// questa è una classe globale iniziallizata da qualcuno.
 sinsp_filter_check_list g_filterlist;
 #endif
 sinsp_protodecoder_list g_decoderlist;

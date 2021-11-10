@@ -6,16 +6,30 @@ This file is dual licensed under either the MIT or GPL 2. See MIT.txt
 or GPL2.txt for full copies of the license.
 
 */
+
+
+///NOTA: questi helper vengono poi definiti in libbpf devono essere eliminati.
+
 #ifndef __BPF_HELPERS_H
 #define __BPF_HELPERS_H
 
+
+// cerco qualcosa che c'è già
 static void *(*bpf_map_lookup_elem)(void *map, void *key) =
 	(void *)BPF_FUNC_map_lookup_elem;
+
+// aggiungo o aggiorno
 static int (*bpf_map_update_elem)(void *map, void *key, void *value,
 				  unsigned long long flags) =
 	(void *)BPF_FUNC_map_update_elem;
+
+// cancello
 static int (*bpf_map_delete_elem)(void *map, void *key) =
 	(void *)BPF_FUNC_map_delete_elem;
+
+
+
+
 static int (*bpf_probe_read)(void *dst, int size, void *unsafe_ptr) =
 	(void *)BPF_FUNC_probe_read;
 static unsigned long long (*bpf_ktime_get_ns)(void) =

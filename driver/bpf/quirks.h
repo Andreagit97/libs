@@ -9,8 +9,10 @@ or GPL2.txt for full copies of the license.
 #ifndef __QUIRKS_H
 #define __QUIRKS_H
 
+// qui prendo dai kernel header la versione del mio kernel
 #include <linux/version.h>
 
+// MIMINA VERSIONE SUPPORTATA DEL PROBE 4.14
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 #error Kernel version must be >= 4.14 with eBPF enabled
 #endif
@@ -23,6 +25,8 @@ or GPL2.txt for full copies of the license.
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 #define BPF_FORBIDS_ZERO_ACCESS
 #endif
+
+
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 #define BPF_SUPPORTS_RAW_TRACEPOINTS

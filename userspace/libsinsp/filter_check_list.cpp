@@ -25,13 +25,24 @@ limitations under the License.
 
 using namespace std;
 
+
+
 ///////////////////////////////////////////////////////////////////////////////
-// sinsp_filter_check_list implementation
 ///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// filter_check_list 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+// costruttore vuoto
 filter_check_list::filter_check_list()
 {
 }
 
+// viene richiamato anche quando il distruttore di sinsp_filter_check_list viene chiamato.
 filter_check_list::~filter_check_list()
 {
 	for(auto *chk : m_check_list)
@@ -40,8 +51,11 @@ filter_check_list::~filter_check_list()
 	}
 }
 
+// questi filter_check sono oggetti della classe sinsp_filter_check
+// si fa il giochetto dell'ereditarietà in realtà i filter check ereditano tutti dalla classe sinsp_filter_check 
 void filter_check_list::add_filter_check(sinsp_filter_check* filter_check)
 {
+	// pusha solo nel vector gli oggetti filter checks
 	m_check_list.push_back(filter_check);
 }
 
@@ -53,26 +67,37 @@ void filter_check_list::get_all_fields(vector<const filter_check_info*>& list)
 	}
 }
 
+// nuovo filtercheck dal nome che gli arriva (evt.category)
+// ritorna il filtercheck del tipo giusto se ovviamente è presente.
 sinsp_filter_check* filter_check_list::new_filter_check_from_fldname(const string& name,
 								     sinsp* inspector,
 								     bool do_exact_check)
 {
+	// per tutti i sinsp_filter_check presenti setto l'inspector
+	// nota che questi filter_check nel vector discendono da sinsp_filter_check quindi per esempio sono sinsp_filter_check_fd, ...
 	for(auto *chk : m_check_list)
 	{
 		chk->m_inspector = inspector;
 
+		// questa funzione parse_filed_name è una funzione che ereditano tutti i filter checks
+		// quindi chiamo quella specifica del filter_check che sto usando!!!
 		int32_t fldnamelen = chk->parse_field_name(name.c_str(), false, true);
 
+		// se ho trovato una corrispondenza in questo filter_check significa che era quello giusto
 		if(fldnamelen != -1)
 		{
+			// nel caso visto lo passo uguale a true
 			if(do_exact_check)
 			{
+				// si controlla che effetivamente il filed sia realmente uguale.
 				if((int32_t)name.size() != fldnamelen)
 				{
 					goto field_not_found;
 				}
 			}
 
+			// alloco un filter_check di quel tipo
+			// ho capito quale è il filtercheck giusto
 			sinsp_filter_check* newchk = chk->allocate_new();
 			newchk->set_inspector(inspector);
 			return newchk;
@@ -103,6 +128,32 @@ sinsp_filter_check* filter_check_list::new_filter_check_from_another(sinsp_filte
 	return newchk;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// sinsp_filter_check_list 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+// come costruttore base aggiunge una serie di filter_check
 sinsp_filter_check_list::sinsp_filter_check_list()
 {
 	//////////////////////////////////////////////////////////////////////////////

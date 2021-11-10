@@ -710,6 +710,20 @@ static __always_inline long bpf_fd_to_socktuple(struct filler_data *data,
 	return size;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 static __always_inline int __bpf_val_to_ring(struct filler_data *data,
 					     unsigned long val,
 					     unsigned long val_len,
@@ -721,7 +735,9 @@ static __always_inline int __bpf_val_to_ring(struct filler_data *data,
 	unsigned int len;
 	unsigned long curoff_bounded;
 
+	// nota che sono tutti 1, qundi controlla solo che non sfori e lascia il valore di curoff inalterato.
 	curoff_bounded = data->state->tail_ctx.curoff & SCRATCH_SIZE_HALF;
+	// sono necessari i due controlli, si per questione clang e verifier
 	if (data->state->tail_ctx.curoff > SCRATCH_SIZE_HALF)
 		return PPM_FAILURE_BUFFER_FULL;
 	if (dyn_idx != (u8)-1) {
@@ -863,6 +879,7 @@ static __always_inline int __bpf_val_to_ring(struct filler_data *data,
 	case PT_ERRNO:
 	case PT_FD:
 	case PT_PID:
+	    // curoff_bounded dice dove sono arrivato attualmente nel buffer a inserire argomenti
 		*((s64 *)&data->buf[curoff_bounded]) = val;
 		len = sizeof(s64);
 		break;
@@ -876,29 +893,73 @@ static __always_inline int __bpf_val_to_ring(struct filler_data *data,
 	if (len_dyn + len > PPM_MAX_ARG_SIZE)
 		return PPM_FAILURE_BUFFER_FULL;
 
+
 	fixup_evt_arg_len(data->buf, data->state->tail_ctx.curarg, len_dyn + len);
+	// sposto il puntatore dove devo inserire i parametri.
 	data->state->tail_ctx.curoff += len;
 	data->state->tail_ctx.len += len;
 	data->curarg_already_on_frame = false;
+	// sono al prossimo argomento
 	++data->state->tail_ctx.curarg;
 
 	return PPM_SUCCESS;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 static __always_inline int bpf_val_to_ring(struct filler_data *data,
 					   unsigned long val)
 {
+	// quelle info che scrivo per ogni evento, che tipo sono e quale è il formato di stampa.
 	const struct ppm_param_info *param_info;
 
+	// penso sia l'agomento a cui sono arrivato
+	// devono essere ritornati in ordine gli argomenti, come li ho indicati nella event table altrimenti ci sono dei problemi
 	if (data->state->tail_ctx.curarg >= PPM_MAX_EVENT_PARAMS) {
 		bpf_printk("invalid curarg: %d\n", data->state->tail_ctx.curarg);
 		return PPM_FAILURE_BUG;
 	}
 
+	// clang potrebbe togliere l'and perchè sopra c'è il controllo e quindi il verifier potrebbe lamentarsi.
 	param_info = &data->evt->params[data->state->tail_ctx.curarg & (PPM_MAX_EVENT_PARAMS - 1)];
 
 	return __bpf_val_to_ring(data, val, 0, param_info->type, -1, false);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 static __always_inline int bpf_val_to_ring_len(struct filler_data *data,
 					       unsigned long val,

@@ -50,6 +50,7 @@ Options:
 // 
 int main(int argc, char **argv)
 {
+    // oggetto di classe sinsp
     sinsp inspector;
 
     // Parse configuration options.
@@ -81,6 +82,8 @@ int main(int argc, char **argv)
     signal(SIGINT, sigint_handler);
     signal(SIGPIPE, sigint_handler);
 
+    // Inizio una cattura live.
+    // raccoglie info e fa partire una cattura scap.
     inspector.open();
 
     if(!filter_string.empty())
@@ -97,7 +100,16 @@ int main(int argc, char **argv)
     while(!g_interrupted)
     {
         sinsp_evt* ev = NULL;
+        // passo puntatore al puntatore
         int32_t res = inspector.next(&ev);
+        // in mano ho l'evento e posso farci tutto quello che voglio
+
+
+        // qui in mano ho tutto l'evento compreso l'hedear che se non sbaglio ha lunghezza totale dell'evento e il numero di parametri quindi si può tranquillamente stampare tutto l'evento. Ovvero tutti i parametri.
+        // penso che programmi come sysdig semplicemente filtrano gli eventi tramite filter checks come avviene qui e poi quando riceveno solo gli eventi non filtrati (non filtered_out) ne stampa tutti i campi grazie a quella tabella event_table, che tiene scritto per ogni parametro il tipo e come stamparlo.
+        // quindi si sa quanti sono i campi e quanti sono lunghi.
+        // Nel caso selezioni solo alcuni campi in output ci sarà una logica che ne prende solo alcuni dei campi possibili. tanto quella tabella event table indica il nome di tutti i campi. Quindi quella tabella event_table viene usata anche molto da sinsp.
+        // per esempio anche quella tabella di traduzione dei flag, dal valore numerico a una stringa, serve per la fase di stampa.
 
         if(SCAP_TIMEOUT == res)
         {

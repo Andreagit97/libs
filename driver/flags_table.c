@@ -7,6 +7,14 @@ or GPL2.txt for full copies of the license.
 
 */
 
+
+/*
+*   
+* Rappresentazione testuale dei flag servono per formattare output in falco quinid probabilmente tramite libscap.
+*
+*/
+
+
 #include "ppm_events_public.h"
 
 const struct ppm_name_value socket_families[] = {

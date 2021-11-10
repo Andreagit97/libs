@@ -191,14 +191,15 @@ const char *sinsp_evt::get_param_name(uint32_t id)
 
 const struct ppm_param_info* sinsp_evt::get_param_info(uint32_t id)
 {
+	// carica tutti i parametri, già in memoria se non è ancora stato fatto
 	if((m_flags & sinsp_evt::SINSP_EF_PARAMS_LOADED) == 0)
 	{
 		load_params();
 		m_flags |= (uint32_t)sinsp_evt::SINSP_EF_PARAMS_LOADED;
 	}
-
 	ASSERT(id < m_info->nparams);
 
+	// visto che i parametri sono stati caricati ritorna il parametro richiesto.
 	return &(m_info->params[id]);
 }
 
