@@ -1862,6 +1862,12 @@ static __always_inline u32 dup3_flags_to_scap(unsigned long flags)
 	return res;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+#define PPM_OVERLAYFS_SUPER_MAGIC OVERLAYFS_SUPER_MAGIC
+#else
+#define PPM_OVERLAYFS_SUPER_MAGIC 0x794c7630
+#endif
+
 #endif // !WDIG
 
 #endif /* PPM_FLAG_HELPERS_H_ */
