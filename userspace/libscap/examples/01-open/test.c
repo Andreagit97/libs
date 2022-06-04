@@ -79,6 +79,8 @@ void print_help()
 	printf("-----------------------------------------------------\n");
 }
 
+
+// test
 void print_configuration()
 {
 	printf("\n---------------------- CONFIG ----------------------\n");
