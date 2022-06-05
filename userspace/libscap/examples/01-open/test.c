@@ -27,6 +27,7 @@ scap_t* g_h = NULL;
 /* Configuration variables set through CLI. */
 uint64_t num_events = UINT64_MAX;
 bool bpf_probe = false;
+bool modern_bpf_probe = false;
 bool simple_consumer = false;
 uint16_t evt_type = -1;
 uint16_t* lens16 = NULL;
@@ -64,6 +65,7 @@ void print_help()
 {
 	printf("\n----------------------- MENU -----------------------\n");
 	printf("'--bpf <probe_path>': enable the BPF probe instead of the kernel module. (default: disabled)\n");
+	printf("'--modern_bpf': enable modern BPF probe. (default: disabled)\n");
 	printf("'--simple_consumer': enable the simple consumer mode. (default: disabled)\n");
 	printf("'--num_events <num_events>': number of events to catch before terminating. (default: UINT64_MAX)\n");
 	printf("'--evt_type <event_type>': every event of this type will be printed to console. (default: -1, no print)\n");
@@ -78,6 +80,10 @@ void print_configuration()
 	if(bpf_probe)
 	{
 		printf("* DRIVER: BPF probe\n");
+	} 
+	else if(modern_bpf_probe)
+	{
+		printf("* DRIVER: modern BPF probe\n");
 	}
 	else
 	{
@@ -363,6 +369,11 @@ int main(int argc, char** argv)
 		{
 			args.bpf_probe = argv[i];
 			bpf_probe = true;
+		}
+		if(!strcmp(argv[i], "--modern_bpf"))
+		{
+			args.mode = SCAP_MODE_MODERN_BPF;
+			modern_bpf_probe = true;
 		}
 		if(!strcmp(argv[i], "--simple_consumer"))
 		{
