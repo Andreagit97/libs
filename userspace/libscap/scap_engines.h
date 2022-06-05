@@ -30,3 +30,7 @@ extern const struct scap_vtable scap_source_plugin_engine;
 #ifdef HAS_ENGINE_UDIG
 extern const struct scap_vtable scap_udig_engine;
 #endif
+
+#ifdef HAS_ENGINE_MODERN_BPF
+extern const struct scap_vtable scap_modern_bpf_vtable;
+#endif
