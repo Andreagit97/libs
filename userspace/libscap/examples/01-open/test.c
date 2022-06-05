@@ -117,6 +117,10 @@ void print_load_success()
 	{
 		printf("\n * OK! BPF probe correctly loaded: NO VERIFIER ISSUES :)\n");
 	}
+	else if(modern_bpf_probe)
+	{
+		printf("\n * OK! modern BPF probe correctly loaded: NO VERIFIER ISSUES :)\n");
+	}
 	else
 	{
 		printf("\n * OK! Kernel module correctly loaded\n");
