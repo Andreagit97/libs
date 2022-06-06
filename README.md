@@ -90,6 +90,32 @@ cmake -DBUILD_BPF=true ../
 make bpf
 ```
 
+### Build modern eBPF probe
+
+To build the modern eBPF probe, you need:
+
+* a recent `clang` version (>=`12`).
+* a recent `bpftool` version, typing `bpftool gen` you should see at least these features:
+    ```
+    Usage: bpftool gen object OUTPUT_FILE INPUT_FILE [INPUT_FILE...]    <---
+           bpftool gen skeleton FILE [name OBJECT_NAME]                 <---
+           bpftool gen help
+    ``` 
+* BTF exposed by your kernel, you can check it through `ls /sys/kernel/btf/vmlinux`. You should see this line:
+
+    ```
+    /sys/kernel/btf/vmlinux
+    ```
+* A kernel version >=`5.8`.
+
+Then, issue:
+```bash
+cmake -DUSE_BUNDLED_DEPS=ON -DUSE_MODERN_BPF=ON -DBUILD_LIBSCAP_GVISOR=OFF .. 
+make ProbeSkeleton
+```
+
+> __Please note__: these are not the requiremtens to use the BPF probe but to build it from source!
+
 ### gVisor support
 
 Libscap contains additional library functions to allow integration with system call events coming from [gVisor](https://gvisor.dev).
@@ -110,11 +136,16 @@ Then, to execute it with the eBPF probe, issue:
 sudo ./libscap/examples/01-open/scap-open --bpf driver/bpf/probe.o
 ```
 
-To execute it with the kmod instead, issue:
+To execute it with the kmod, issue:
 ```bash
 sudo insmod driver/scap.ko
 sudo ./libscap/examples/01-open/scap-open
 sudo rmmod scap
+```
+
+To execute it with the modern bpf probe, issue:
+```bash
+sudo ./libscap/examples/01-open/scap-open --modern_bpf
 ```
 
 You can look at the other available options by using `--help`:
