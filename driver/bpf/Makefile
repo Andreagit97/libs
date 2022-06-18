@@ -9,10 +9,12 @@ always-y += probe.o
 # kept for compatibility with kernels < 5.11
 always = $(always-y)
 
-LLC ?= llc
+LLC ?= llc-13
 CLANG ?= clang
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+
+ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
 
 # DEBUG = -DBPF_DEBUG
 
@@ -56,6 +58,7 @@ $(obj)/probe.o: $(src)/probe.c \
 		$(DEBUG) \
 		-D__KERNEL__ \
 		-D__BPF_TRACING__ \
+		-D__TARGET_ARCH_$(ARCH) \
 		-Wno-gnu-variable-sized-type-not-at-end \
 		-Wno-address-of-packed-member \
 		-fno-jump-tables \
