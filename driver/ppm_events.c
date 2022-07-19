@@ -758,7 +758,6 @@ send_empty_param:
 						val_len);
 
 				if (unlikely(len != 0))
-					/* Probably we need to check also here!!!! */
 					return PPM_FAILURE_INVALID_USER_MEMORY;
 
 				len = val_len;
