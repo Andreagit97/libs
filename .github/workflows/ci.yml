@@ -73,6 +73,7 @@ jobs:
   #           KERNELDIR=/lib/modules/$(ls /lib/modules)/build make -j4
   #           make run-unit-tests
 
+  # Modern Probe BPF
   test-modern-bpf-arm64:
     name: test-modern-bpf-arm64 🧪
     runs-on: ubuntu-22.04
@@ -91,7 +92,7 @@ jobs:
 
           install: |
             apt update 
-            apt install -y --no-install-recommends ca-certificates cmake build-essential llvm clang gcc linux-tools-$(uname -r) git pkg-config autoconf automake libtool libelf-dev
+            apt install -y --no-install-recommends ca-certificates cmake build-essential llvm clang gcc linux-tools-$(uname -r) linux-tools-azure git pkg-config autoconf automake libtool libelf-dev
 
           run: |
             mkdir -p build
@@ -99,6 +100,7 @@ jobs:
             make bpf_test
             ./test/modern_bpf/bpf_test --gtest_list_tests
 
+  # Current probe BPF
   test-bpf-arm64:
     name: test-bpf-arm64 🧪
     runs-on: ubuntu-22.04
@@ -126,3 +128,51 @@ jobs:
             make scap-open
             make bpf
             ./libscap/examples/01-open/scap-open --bpf ./driver/bpf/probe.o --num_events 0
+
+  build-modern-bpf-x86:
+    name: build-modern-bpf-x86 🏗️
+    runs-on: ubuntu-22.04
+    steps:
+
+      - name: Checkout Libs ⤵️
+        uses: actions/checkout@v3
+
+      - name: Install deps ⛓️
+        run: |
+          sudo apt update 
+          sudo apt install -y --no-install-recommends ca-certificates cmake build-essential clang-14 git pkg-config autoconf automake libtool libelf-dev
+
+      - name: Build scap-open using BUNDLED_DEPS 🏗️
+        run: |
+          mkdir -p build
+          cd build && cmake -DUSE_BUNDLED_DEPS=ON -DUSE_MODERN_BPF=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
+          make scap-open
+
+      - name: Check no verifier issues 👀
+        run: |
+          cd build
+          sudo ./libscap/examples/01-open/scap-open --modern_bpf --num_events 0
+
+  test-modern-bpf-x86:
+    name: test-modern-bpf-x86 🧪
+    runs-on: ubuntu-22.04
+    steps:
+
+      - name: Checkout Libs ⤵️
+        uses: actions/checkout@v3
+
+      - name: Install deps ⛓️
+        run: |
+          sudo apt update 
+          sudo apt install -y --no-install-recommends ca-certificates cmake build-essential clang-14 git pkg-config autoconf automake libtool libelf-dev
+
+      - name: Build bpf_test using BUNDLED_DEPS 🏗️
+        run: |
+          mkdir -p build
+          cd build && cmake -DUSE_BUNDLED_DEPS=ON -DUSE_MODERN_BPF=ON -DBUILD_MODERN_BPF_TEST=ON -DMODERN_BPF_DEBUG_MODE=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
+          make bpf_test
+
+      - name: Check all test are passed 👀
+        run: |
+          cd build
+          sudo ./test/modern_bpf/bpf_test
