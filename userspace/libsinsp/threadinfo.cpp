@@ -594,6 +594,11 @@ void sinsp_threadinfo::set_args(const char* args, size_t len)
 {
 	m_args.clear();
 
+	if(args == NULL)
+	{
+		return;
+	}
+
 	size_t offset = 0;
 	while(offset < len)
 	{
@@ -712,6 +717,11 @@ string sinsp_threadinfo::get_env(const string& name)
 void sinsp_threadinfo::set_cgroups(const char* cgroups, size_t len)
 {
 	decltype(m_cgroups) tmp_cgroups(new cgroups_t);
+
+	if(cgroups == NULL)
+	{
+		return;
+	}
 
 	size_t offset = 0;
 	while(offset < len)

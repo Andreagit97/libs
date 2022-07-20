@@ -123,6 +123,31 @@ uint32_t scap_event_decode_params(const scap_evt *e, struct scap_sized_buffer *p
 
 		params[i].buf = param_buf;
 		param_buf += params[i].size;
+
+		/* Check here if the param is empty. */
+		if(params[i].size==0)
+		{
+			params[i].buf = NULL;
+		}
+
+		/* Backward compatibility:
+		 * Check here if the param is `<NA>` or `NULL`, and consider it as empty.
+		 * NOT SURE: we need to check it, it could be ok!
+		 */
+		int param_type = event_info->params[i].type;
+		if((param_type == PT_CHARBUF
+			|| param_type == PT_FSRELPATH
+			|| param_type == PT_BYTEBUF
+			|| param_type == PT_FSPATH)
+			&&
+			(strncmp(params[i].buf, "<NA>", 4) == 0
+			|| strncmp(params[i].buf, "(NULL)", 6) == 0))
+		{
+			params[i].buf = NULL;
+			/* if necessary we could also overwrite the len of this param and set it to `0`.
+			 * If we need to check something.
+			 */
+		}
 	}
 
 	return n;

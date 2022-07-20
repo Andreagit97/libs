@@ -1262,6 +1262,7 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 			return;
 		}
 
+		/* Here probably we need to check for NULL values of "" */
 		if(ptinfo->m_comm != "<NA>" && ptinfo->m_user.uid != 0xffffffff)
 		{
 			//
@@ -1283,12 +1284,21 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 		}
 		else
 		{
+
+			/* Not sure these are the right values to use.*/
+			tinfo->m_exe = "<NA>";
+			tinfo->m_comm = "<NA>";
+			
 			//
 			// Parent not found in proc, use the event data.
 			// (The session id will remain unset)
 			//
 			parinfo = evt->get_param(1);
-			tinfo->m_exe = (char*)parinfo->m_val;
+			if(parinfo->m_val != NULL)
+			{
+				tinfo->m_exe = (char*)parinfo->m_val;
+			}
+
 
 			switch(etype)
 			{
@@ -1306,14 +1316,20 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 			case PPME_SYSCALL_VFORK_20_X:
 			case PPME_SYSCALL_CLONE3_X:
 				parinfo = evt->get_param(13);
-				tinfo->m_comm = parinfo->m_val;
+				if(parinfo->m_val != NULL)
+				{
+					tinfo->m_comm = parinfo->m_val;
+				}
 				break;
 			default:
 				ASSERT(false);
 			}
 
 			parinfo = evt->get_param(2);
-			tinfo->set_args(parinfo->m_val, parinfo->m_len);
+			if(parinfo->m_val!=NULL)
+			{
+				tinfo->set_args(parinfo->m_val, parinfo->m_len);
+			}
 
 			//
 			// Also, propagate the same values to the parent
@@ -1378,9 +1394,9 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 		//
 		if(m_inspector->m_is_windows)
 		{
-			if(ptinfo->m_tid == 0 && ptinfo->m_pid == 0)
+			parinfo = evt->get_param(6);
+			if(ptinfo->m_tid == 0 && ptinfo->m_pid == 0 && parinfo->m_val != NULL)
 			{
-				parinfo = evt->get_param(6);
 				tinfo->m_cwd = parinfo->m_val;
 			}
 			else
@@ -1403,9 +1419,15 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 		tinfo->m_flags |= PPM_CL_CLONE_INVERTED;
 	}
 
+	tinfo->m_exe = "<NA>";
+	tinfo->m_comm = "<NA>";
+
 	// Copy the command name
 	parinfo = evt->get_param(1);
-	tinfo->m_exe = (char*)parinfo->m_val;
+	if(parinfo->m_val != NULL)
+	{
+		tinfo->m_exe = (char*)parinfo->m_val;
+	}
 
 	switch(etype)
 	{
@@ -1423,7 +1445,10 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 	case PPME_SYSCALL_VFORK_20_X:
 	case PPME_SYSCALL_CLONE3_X:
 		parinfo = evt->get_param(13);
-		tinfo->m_comm = parinfo->m_val;
+		if(parinfo->m_val != NULL)
+		{
+			tinfo->m_comm = parinfo->m_val;
+		}
 		break;
 	default:
 		ASSERT(false);
@@ -1640,15 +1665,18 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 		// No thread to update?
 		// We probably missed the start event, so we will just do nothing
 		//
-		//fprintf(stderr, "comm = %s, args = %s\n",evt->get_param(1)->m_val,evt->get_param(1)->m_val);
-		//ASSERT(false);
 		return;
 	}
 
+	evt->m_tinfo->m_exe = "<NA>";
+	evt->m_tinfo->m_comm = "<NA>";
+
 	// Get the exe
 	parinfo = evt->get_param(1);
-	evt->m_tinfo->m_exe = parinfo->m_val;
-
+	if(parinfo->m_val)
+	{
+		evt->m_tinfo->m_exe = parinfo->m_val;
+	}
 	switch(etype)
 	{
 	case PPME_SYSCALL_EXECVE_8_X:

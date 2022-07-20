@@ -767,7 +767,7 @@ Json::Value sinsp_evt::get_param_as_json(uint32_t id, OUT const char** resolved_
 	param_info = &(m_info->params[id]);
 
 	/* We have an empty parameter. */
-	if(payload_len==0)
+	if(payload == NULL)
 	{
 		*resolved_str = &m_resolved_paramstr_storage[0];
 		return ret;
@@ -1488,27 +1488,12 @@ const char* sinsp_evt::get_param_as_str(uint32_t id, OUT const char** resolved_s
 	payload_len = param->m_len;
 	param_info = &(m_info->params[id]);
 
-	if(payload_len == 0)
+	if(payload == NULL)
 	{
 		snprintf(&m_paramstr_storage[0], m_paramstr_storage.size(), "NULL");
 		*resolved_str = &m_resolved_paramstr_storage[0];
 		return &m_paramstr_storage[0];
 	}
-
-	/* `<NA>` and `(NULL)` parameters are treated as empty param */
-	if((param_info->type == PT_CHARBUF
-		|| param_info->type == PT_FSRELPATH
-		|| param_info->type == PT_BYTEBUF
-		|| param_info->type == PT_FSPATH)
-		&&
-	   (strncmp(payload, "<NA>", 4) == 0
-	    || strncmp(payload, "(NULL)", 6) == 0))
-	{
-		snprintf(&m_paramstr_storage[0], m_paramstr_storage.size(), "NULL");
-		*resolved_str = &m_resolved_paramstr_storage[0];
-		return &m_paramstr_storage[0];
-	}
-
 
 	//
 	// Get the parameter information

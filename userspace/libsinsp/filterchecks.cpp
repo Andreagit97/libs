@@ -233,6 +233,12 @@ bool sinsp_filter_check_fd::extract_fdname_from_creator(sinsp_evt *evt, OUT uint
 			name = parinfo->m_val;
 			namelen = parinfo->m_len;
 
+			/* If the `name` is NULL we are not able to recover any useful information. */
+			if(name == NULL)
+			{
+				break;
+			}
+
 			parinfo = etype == PPME_SYSCALL_OPENAT_X ? enter_evt.get_param(0) : evt->get_param(1);
 			ASSERT(parinfo->m_len == sizeof(int64_t));
 			int64_t dirfd = *(int64_t *)parinfo->m_val;
@@ -271,19 +277,23 @@ bool sinsp_filter_check_fd::extract_fdname_from_creator(sinsp_evt *evt, OUT uint
 
 			parinfo = evt->get_param(3);
 			fullpath = parinfo->m_val;
-			m_tstr = fullpath;
+			if(fullpath == NULL)
+			{
+				break;
+			} 
 
+			m_tstr = fullpath;
 			if(sanitize_strings)
 			{
 				sanitize_string(m_tstr);
 			}
-
 			return true;
 		}
 	default:
-		m_tstr = "";
-		return true;
+		break;
 	}
+	m_tstr = "";
+	return true;
 }
 
 uint8_t* sinsp_filter_check_fd::extract_from_null_fd(sinsp_evt *evt, OUT uint32_t* len, bool sanitize_strings)
@@ -3442,9 +3452,12 @@ uint8_t *sinsp_filter_check_event::extract_abspath(sinsp_evt *evt, OUT uint32_t 
 			// Get the file path directly from the ring buffer.
 			//
 			parinfo = evt->get_param(3);
-			strcpy(fullname, parinfo->m_val);
-			m_strstorage = fullname;
-			RETURN_EXTRACT_STRING(m_strstorage);
+			if(parinfo->m_val != NULL)
+			{
+				strcpy(fullname, parinfo->m_val);
+				m_strstorage = fullname;
+				RETURN_EXTRACT_STRING(m_strstorage);
+			}
 		}
 	}
 	else if(etype == PPME_SYSCALL_LINKAT_E || etype == PPME_SYSCALL_LINKAT_2_X)
@@ -3508,44 +3521,15 @@ uint8_t *sinsp_filter_check_event::extract_abspath(sinsp_evt *evt, OUT uint32_t 
 	parinfo = evt->get_param(pathargidx);
 	path = parinfo->m_val;
 	pathlen = parinfo->m_len;
+	
+	/* If the `path` is NULL we are not able to recover any useful information. */
+	if(path == NULL)
+	{
+		return 0;
+	}
 
 	string sdir;
-
-	bool is_absolute = (path[0] == '/');
-	if(is_absolute)
-	{
-		//
-		// The path is absolute.
-		// Some processes (e.g. irqbalance) actually do this: they pass an invalid fd and
-		// and absolute path, and openat succeeds.
-		//
-		sdir = ".";
-	}
-	else if(dirfd == PPM_AT_FDCWD)
-	{
-		sdir = evt->m_tinfo->get_cwd();
-	}
-	else
-	{
-		evt->m_fdinfo = evt->m_tinfo->get_fd(dirfd);
-
-		if(evt->m_fdinfo == NULL)
-		{
-			ASSERT(false);
-			sdir = "<UNKNOWN>/";
-		}
-		else
-		{
-			if(evt->m_fdinfo->m_name[evt->m_fdinfo->m_name.length()] == '/')
-			{
-				sdir = evt->m_fdinfo->m_name;
-			}
-			else
-			{
-				sdir = evt->m_fdinfo->m_name + '/';
-			}
-		}
-	}
+	sinsp_parser::parse_dirfd(evt, path, dirfd, &sdir);
 
 	char fullname[SCAP_MAX_PATH_SIZE];
 	sinsp_utils::concatenate_paths(fullname, SCAP_MAX_PATH_SIZE, sdir.c_str(),
@@ -4658,6 +4642,10 @@ uint8_t* sinsp_filter_check_event::extract(sinsp_evt *evt, OUT uint32_t* len, bo
 			{
 				sinsp_evt_param* parinfo = evt->get_param(2);
 				char* descstr = (char*)parinfo->m_val;
+				if(descstr == NULL)
+				{
+					break;
+				}
 				vector<string> elements = sinsp_split(descstr, ';');
 				for(string ute : elements)
 				{
