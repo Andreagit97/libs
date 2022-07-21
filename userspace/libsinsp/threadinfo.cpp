@@ -623,6 +623,12 @@ void sinsp_threadinfo::set_env(const char* env, size_t len)
 	}
 
 	m_env.clear();
+
+	if(env == NULL)
+	{
+		return;
+	}
+
 	size_t offset = 0;
 	while(offset < len)
 	{
@@ -878,6 +884,11 @@ void sinsp_threadinfo::set_cwd(const char* cwd, uint32_t cwdlen)
 {
 	char tpath[SCAP_MAX_PATH_SIZE];
 	sinsp_threadinfo* tinfo = get_main_thread();
+
+	if(cwd == NULL)
+	{
+		return;
+	}
 
 	if(tinfo)
 	{

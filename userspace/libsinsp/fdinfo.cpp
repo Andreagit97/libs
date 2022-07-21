@@ -137,12 +137,26 @@ template<> string sinsp_fdinfo_t::tostring_clean()
 
 template<> void sinsp_fdinfo_t::add_filename_raw(const char* rawpath)
 {
-	m_name_raw = rawpath;
+	if(rawpath!= NULL)
+	{
+		m_name_raw = rawpath;
+	}
+	else
+	{
+		m_name_raw = "<NA>";
+	}
 }
 
 template<> void sinsp_fdinfo_t::add_filename(const char* fullpath)
 {
-	m_name = fullpath;
+	if(fullpath!= NULL)
+	{
+		m_name = fullpath;
+	}
+	else
+	{
+		m_name = "<NA>";
+	}
 }
 
 template<> bool sinsp_fdinfo_t::set_net_role_by_guessing(sinsp* inspector,

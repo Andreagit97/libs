@@ -1288,7 +1288,7 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 			/* Not sure these are the right values to use.*/
 			tinfo->m_exe = "<NA>";
 			tinfo->m_comm = "<NA>";
-			
+
 			//
 			// Parent not found in proc, use the event data.
 			// (The session id will remain unset)
@@ -1693,7 +1693,10 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 	case PPME_SYSCALL_EXECVEAT_X:
 		// Get the comm
 		parinfo = evt->get_param(13);
-		evt->m_tinfo->m_comm = parinfo->m_val;
+		if(parinfo->m_val)
+		{
+			evt->m_tinfo->m_comm = parinfo->m_val;
+		}
 		break;
 	default:
 		ASSERT(false);
@@ -1849,7 +1852,7 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 		{
 			char fullpath[SCAP_MAX_PATH_SIZE];
 			parinfo = enter_evt->get_param(0);
-			if (strncmp(parinfo->m_val, "<NA>", 4) == 0)
+			if(parinfo->m_val == NULL)
 			{
 				evt->m_tinfo->m_exepath = "<NA>";
 			}
@@ -1877,7 +1880,7 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 			 * Get pathname
 			 */
 			parinfo = enter_evt->get_param(1);
-			if (strncmp(parinfo->m_val, "<NA>", 4) == 0)
+			if (parinfo->m_val == NULL)
 			{
 				evt->m_tinfo->m_exepath = "<NA>";
 				break;
@@ -1905,10 +1908,10 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 			}
 			char fullpath[SCAP_MAX_PATH_SIZE];
 			sinsp_utils::concatenate_paths(fullpath, SCAP_MAX_PATH_SIZE,
-										   sdir.c_str(), 
+										   sdir.c_str(),
 										   (uint32_t)sdir.length(),
-										   pathname, 
-										   namelen, 
+										   pathname,
+										   namelen,
 										   m_inspector->m_is_windows);
 			evt->m_tinfo->m_exepath = fullpath;
 		}
@@ -2032,8 +2035,16 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 
 void sinsp_parser::parse_dirfd(sinsp_evt *evt, char* name, int64_t dirfd, OUT string* sdir)
 {
-	bool is_absolute = (name[0] == '/');
+	bool is_absolute = false;
 	string tdirstr;
+
+	if(name==NULL)
+	{
+		*sdir = "<UNKNOWN>";
+		return;
+	}
+
+	is_absolute = (name[0] == '/');
 
 	if(is_absolute)
 	{
@@ -2265,7 +2276,7 @@ void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt)
 			ASSERT(parinfo->m_len == sizeof(uint32_t));
 			enter_evt_flags = *(uint32_t *)parinfo->m_val;
 
-			if(enter_evt_namelen != 0 && strcmp(enter_evt_name, "(NULL)") != 0)
+			if(enter_evt_namelen != NULL)
 			{
 				name = enter_evt_name;
 				namelen = enter_evt_namelen;
@@ -2304,7 +2315,7 @@ void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt)
 
 			enter_evt_flags = 0;
 
-			if(enter_evt_namelen != 0 && strcmp(enter_evt_name, "(NULL)") != 0)
+			if(enter_evt_name != NULL)
 			{
 				name = enter_evt_name;
 				namelen = enter_evt_namelen;
@@ -2374,7 +2385,7 @@ void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt)
 			ASSERT(parinfo->m_len == sizeof(int64_t));
 			int64_t enter_evt_dirfd = *(int64_t *)parinfo->m_val;
 
-			if(enter_evt_namelen != 0 && strcmp(enter_evt_name, "(NULL)") != 0)
+			if(enter_evt_name != NULL)
 			{
 				name = enter_evt_name;
 				namelen = enter_evt_namelen;
@@ -2406,20 +2417,19 @@ void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt)
 		return;
 	}
 
-	// XXX not implemented yet
-	//parinfo = evt->get_param(2);
-	//ASSERT(parinfo->m_len == sizeof(uint32_t));
-	//mode = *(uint32_t*)parinfo->m_val;
-
 	char fullpath[SCAP_MAX_PATH_SIZE];
-	if (etype != PPME_SYSCALL_OPEN_BY_HANDLE_AT_X)
+
+	if(name != NULL)
 	{
-		sinsp_utils::concatenate_paths(fullpath, SCAP_MAX_PATH_SIZE, sdir.c_str(), (uint32_t)sdir.length(), 
-			name, namelen, m_inspector->m_is_windows);
-	}
-	else
-	{
-		strcpy(fullpath, name);
+		if (etype != PPME_SYSCALL_OPEN_BY_HANDLE_AT_X)
+		{
+			sinsp_utils::concatenate_paths(fullpath, SCAP_MAX_PATH_SIZE, sdir.c_str(), (uint32_t)sdir.length(),
+				name, namelen, m_inspector->m_is_windows);
+		}
+		else
+		{
+			strcpy(fullpath, name);
+		}
 	}
 
 	if(fd >= 0)
@@ -2625,6 +2635,11 @@ inline void sinsp_parser::infer_sendto_fdinfo(sinsp_evt* const evt)
 
 	parinfo = evt->get_param(SOCKET_TUPLE_PARAM);
 	const char addr_family = *((char*) parinfo->m_val);
+
+	if(addr_family == NULL)
+	{
+		return;
+	}
 
 	if((addr_family == AF_INET) || (addr_family == AF_INET6))
 	{
@@ -3733,13 +3748,19 @@ uint32_t sinsp_parser::parse_tracer(sinsp_evt *evt, int64_t retval)
 {
 	sinsp_threadinfo* tinfo = evt->m_tinfo;
 	ASSERT(tinfo);
+	
+	char* data = "<NA>";
+	uint32_t datalen = 5; // We need also to count the `/0`
 
 	//
 	// Extract the data buffer
 	//
 	sinsp_evt_param *parinfo = evt->get_param(1);
-	char* data = parinfo->m_val;
-	uint32_t datalen = parinfo->m_len;
+	if(parinfo->m_val != NULL)
+	{
+		data = parinfo->m_val;
+		datalen = parinfo->m_len;
+	}
 	sinsp_tracerparser* p = tinfo->m_tracer_parser;
 
 	if(p == NULL)
@@ -3947,10 +3968,11 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 			evt->m_fdinfo->set_socket_connected();
 		}
 
+		char *data = "<NA>";
+		uint32_t datalen = 5;
+
 		if(eflags & EF_READS_FROM_FD)
 		{
-			char *data;
-			uint32_t datalen;
 			int32_t tupleparam = -1;
 
 			if(etype == PPME_SOCKET_RECVFROM_X)
@@ -4018,8 +4040,11 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 				parinfo = evt->get_param(1);
 			}
 
-			datalen = parinfo->m_len;
-			data = parinfo->m_val;
+			if(parinfo->m_val != NULL)
+			{
+				datalen = parinfo->m_len;
+				data = parinfo->m_val;
+			}
 
 			//
 			// If there's an fd listener, call it now
@@ -4045,8 +4070,6 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 		}
 		else
 		{
-			char *data;
-			uint32_t datalen;
 			int32_t tupleparam = -1;
 
 			if(etype == PPME_SOCKET_SENDTO_X || etype == PPME_SOCKET_SENDMSG_X)
@@ -4106,9 +4129,11 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt)
 			// Extract the data buffer
 			//
 			parinfo = evt->get_param(1);
-			datalen = parinfo->m_len;
-			data = parinfo->m_val;
-
+			if(parinfo->m_val != NULL)
+			{
+				datalen = parinfo->m_len;
+				data = parinfo->m_val;
+			}
 			//
 			// If there's an fd listener, call it now
 			//

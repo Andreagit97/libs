@@ -755,6 +755,13 @@ bool sinsp_utils::concatenate_paths(char* target,
 									uint32_t len2,
 									bool windows_paths)
 {
+
+	if(path1 == NULL || path2 == NULL)
+	{
+		strcpy(target, "/PATH_NOT_AVAILABLE");
+		return false;
+	}
+
 	if(targetlen < (len1 + len2 + 1))
 	{
 		strcpy(target, "/PATH_TOO_LONG");

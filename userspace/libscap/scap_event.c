@@ -144,9 +144,7 @@ uint32_t scap_event_decode_params(const scap_evt *e, struct scap_sized_buffer *p
 			|| strncmp(params[i].buf, "(NULL)", 6) == 0))
 		{
 			params[i].buf = NULL;
-			/* if necessary we could also overwrite the len of this param and set it to `0`.
-			 * If we need to check something.
-			 */
+			params[i].size = 0;
 		}
 	}
 
