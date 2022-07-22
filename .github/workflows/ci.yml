@@ -122,7 +122,7 @@ jobs:
           sudo ./test/modern_bpf/bpf_test
 
   build-modern-bpf-arm64:
-    name: build-modern-bpf-arm64 🏗️
+    name: build-modern-bpf-arm64 🏗️ 
     runs-on: ubuntu-22.04
     steps:
 
@@ -137,7 +137,7 @@ jobs:
           githubToken: ${{ github.token }}
 
           install: |
-            pacman -Sy --noconfirm git cmake make llvm clang pkgconf libelf zlib libffi libbpf linux-tools glibc gcc
+            pacman -Sy --noconfirm git cmake make llvm clang pkgconf libelf zlib libffi libbpf linux-tools glibc gcc gtest protobuf openssl tbb libb64 wget jq yaml-cpp curl c-ares grpc libyaml
 
           run: |
             mkdir -p build
