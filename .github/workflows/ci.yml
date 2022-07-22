@@ -141,5 +141,5 @@ jobs:
 
           run: |
             mkdir -p build
-            cd build && cmake -DUSE_BUNDLED_DEPS=OFF -DUSE_MODERN_BPF=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
+            cd build && cmake -DUSE_BUNDLED_DEPS=OFF -DUSE_MODERN_BPF=ON -DBUILD_LIBSCAP_GVISOR=OFF -DCREATE_TEST_TARGETS=OFF ../
             make scap-open
