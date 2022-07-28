@@ -6,21 +6,22 @@
  */
 
 #include <helpers/interfaces/fixed_size_event.h>
+#include <helpers/interfaces/variable_size_event.h>
 
 /*=============================== ENTER EVENT ===========================*/
 
 SEC("tp_btf/sys_enter")
-int BPF_PROG(fchmod_e,
+int BPF_PROG(fchmodat_e,
 	     struct pt_regs *regs,
 	     long id)
 {
 	struct ringbuf_struct ringbuf;
-	if(!ringbuf__reserve_space(&ringbuf, FCHMOD_E_SIZE))
+	if(!ringbuf__reserve_space(&ringbuf, FCHMODAT_E_SIZE))
 	{
 		return 0;
 	}
 
-	ringbuf__store_event_header(&ringbuf, PPME_SYSCALL_FCHMOD_E, FCHMOD_E_SIZE);
+	ringbuf__store_event_header(&ringbuf, PPME_SYSCALL_FCHMODAT_E, FCHMODAT_E_SIZE);
 
 	/*=============================== COLLECT PARAMETERS  ===========================*/
 
@@ -38,37 +39,47 @@ int BPF_PROG(fchmod_e,
 /*=============================== EXIT EVENT ===========================*/
 
 SEC("tp_btf/sys_exit")
-int BPF_PROG(fchmod_x,
+int BPF_PROG(fchmodat_x,
 	     struct pt_regs *regs,
 	     long ret)
 {
-
-	struct ringbuf_struct ringbuf;
-	if(!ringbuf__reserve_space(&ringbuf, FCHMOD_X_SIZE))
+	struct auxiliary_map *auxmap = auxmap__get();
+	if(!auxmap)
 	{
 		return 0;
 	}
 
-	ringbuf__store_event_header(&ringbuf, PPME_SYSCALL_FCHMOD_X, FCHMOD_X_SIZE);
+	auxmap__preload_event_header(auxmap, PPME_SYSCALL_FCHMODAT_X);
 
 	/*=============================== COLLECT PARAMETERS  ===========================*/
 
 	/* Parameter 1: res (type: PT_ERRNO) */
-	ringbuf__store_s64(&ringbuf, ret);
+	auxmap__store_s64_param(auxmap, ret);
 
-	/* Parameter 2: fd (type: PT_FD) */
-	s32 fd = (s32)extract__syscall_argument(regs, 0);
-	ringbuf__store_s64(&ringbuf, (s64)fd);
+	/* Parameter 2: dirfd (type: PT_FD) */
+	s32 dirfd = (s32)extract__syscall_argument(regs, 0);
+	if(dirfd == AT_FDCWD)
+	{
+		dirfd = PPM_AT_FDCWD;
+	}
+	auxmap__store_s64_param(auxmap, (s64)dirfd);
 
-	/* Parameter 3: mode (type: PT_MODE) */
-	unsigned long mode = extract__syscall_argument(regs, 1);
-	ringbuf__store_u32(&ringbuf, chmod_mode_to_scap(mode));
+	/* Parameter 3: filename (type: PT_FSRELPATH) */
+	unsigned long path_pointer = extract__syscall_argument(regs, 1);
+	auxmap__store_charbuf_param(auxmap, path_pointer, USER);
+
+	/* Parameter 4: mode (type: PT_MODE) */
+	unsigned long mode = extract__syscall_argument(regs, 2);
+	auxmap__store_u32_param(auxmap, chmod_mode_to_scap(mode));
 
 	/*=============================== COLLECT PARAMETERS  ===========================*/
 
-	ringbuf__submit_event(&ringbuf);
+	auxmap__finalize_event_header(auxmap);
+
+	auxmap__submit_event(auxmap);
 
 	return 0;
 }
+
 
 /*=============================== EXIT EVENT ===========================*/
