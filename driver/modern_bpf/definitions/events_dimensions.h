@@ -22,5 +22,7 @@
 #define OPEN_BY_HANDLE_AT_E_SIZE HEADER_LEN
 #define EVENTFD_E_SIZE HEADER_LEN + sizeof(uint64_t) + sizeof(uint32_t) + PARAM_LEN * 2
 #define EVENTFD_X_SIZE HEADER_LEN + sizeof(int64_t) + PARAM_LEN
+#define INOTIFY_INIT_E_SIZE HEADER_LEN + sizeof(uint8_t) + PARAM_LEN
+#define INOTIFY_INIT_X_SIZE HEADER_LEN + sizeof(int64_t) + PARAM_LEN
 
 #endif /* __EVENT_DIMENSIONS_H__ */
