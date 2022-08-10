@@ -685,7 +685,9 @@ static int32_t load_bpf_file(
 	struct bpf_engine *handle, const char *path,
 	uint64_t *api_version_p,
 	uint64_t *schema_version_p,
-	interesting_tp_set *tp_of_interest)
+	interesting_tp_set *tp_of_interest,
+	bool remove_syscall_fillers,
+	bool remove_all_fillers)
 {
 	int j;
 	int maps_shndx = 0;
@@ -843,6 +845,56 @@ static int32_t load_bpf_file(
 		if(memcmp(shname, "tracepoint/", sizeof("tracepoint/") - 1) == 0 ||
 		   memcmp(shname, "raw_tracepoint/", sizeof("raw_tracepoint/") - 1) == 0)
 		{
+
+			if(remove_all_fillers)
+			{
+				/* In this case, we don't send any event to userspace since we don't have any filler
+				 * Only these tracepoints will be loaded:
+				 * - raw_tracepoint/sys_enter
+				 * - raw_tracepoint/sys_exit
+				 * - raw_tracepoint/sched_process_exit
+				 * - raw_tracepoint/sched_switch
+				 * - raw_tracepoint/page_fault_user
+				 * - raw_tracepoint/page_fault_kernel
+				 * - raw_tracepoint/signal_deliver
+				 */
+				if(memcmp(shname, "raw_tracepoint/filler", sizeof("raw_tracepoint/filler") - 1) == 0)
+				{
+					continue;
+				}
+			}
+			else if(remove_syscall_fillers)
+			{
+				/* if it is a filler keep only the right ones
+				 * Only these tracepoints will be loaded:
+				 * - raw_tracepoint/sys_enter
+				 * - raw_tracepoint/sys_exit
+				 * - raw_tracepoint/sched_process_exit
+				 * - raw_tracepoint/sched_switch
+				 * - raw_tracepoint/page_fault_user
+				 * - raw_tracepoint/page_fault_kernel
+				 * - raw_tracepoint/signal_deliver
+				 * - raw_tracepoint/filler/sys_pagefault_e
+				 * - raw_tracepoint/filler/sys_signaldeliver_e
+				 * - raw_tracepoint/filler/sched_switch_e
+				 * - raw_tracepoint/filler/sys_procexit_e
+				 * - raw_tracepoint/filler/terminate_filler
+				 */
+				if(memcmp(shname, "raw_tracepoint/filler", sizeof("raw_tracepoint/filler") - 1) == 0)
+				{
+					if(memcmp(shname, "raw_tracepoint/filler/sys_pagefault_e", sizeof("raw_tracepoint/filler/sys_pagefault_e") - 1) != 0 &&
+					   memcmp(shname, "raw_tracepoint/filler/sys_signaldeliver_e", sizeof("raw_tracepoint/filler/sys_signaldeliver_e") - 1) != 0 &&
+					   memcmp(shname, "raw_tracepoint/filler/sched_switch_e", sizeof("raw_tracepoint/filler/sched_switch_e") - 1) != 0 &&
+					   memcmp(shname, "raw_tracepoint/filler/sys_procexit_e", sizeof("raw_tracepoint/filler/sys_procexit_e") - 1) != 0 &&
+					   memcmp(shname, "raw_tracepoint/filler/terminate_filler", sizeof("raw_tracepoint/filler/terminate_filler") - 1) != 0)
+					{
+						continue;
+					}
+
+				}
+
+			}
+
 			if (is_tp_enabled(tp_of_interest, shname))
 			{
 				if(load_tracepoint(handle, shname, data->d_buf, data->d_size) != SCAP_SUCCESS)
@@ -1446,7 +1498,9 @@ int32_t scap_bpf_load(
 	const char *bpf_probe,
 	uint64_t *api_version_p,
 	uint64_t *schema_version_p,
-	interesting_tp_set *tp_of_interest)
+	interesting_tp_set *tp_of_interest,
+	bool remove_syscall_fillers,
+	bool remove_all_fillers)
 {
 	int online_cpu;
 	int j;
@@ -1465,7 +1519,7 @@ int32_t scap_bpf_load(
 		return SCAP_FAILURE;
 	}
 
-	if(load_bpf_file(handle, bpf_probe, api_version_p, schema_version_p, tp_of_interest) != SCAP_SUCCESS)
+	if(load_bpf_file(handle, bpf_probe, api_version_p, schema_version_p, tp_of_interest, remove_syscall_fillers, remove_all_fillers) != SCAP_SUCCESS)
 	{
 		return SCAP_FAILURE;
 	}
@@ -1780,7 +1834,7 @@ static int32_t init(scap_t* handle, scap_open_args *open_args)
 		return rc;
 	}
 
-	rc = scap_bpf_load(engine.m_handle, bpf_probe, &handle->m_api_version, &handle->m_schema_version, open_args->tp_of_interest);
+	rc = scap_bpf_load(engine.m_handle, bpf_probe, &handle->m_api_version, &handle->m_schema_version, open_args->tp_of_interest, open_args->remove_syscall_fillers, open_args->remove_all_fillers);
 	if(rc != SCAP_SUCCESS)
 	{
 		return rc;
@@ -1872,4 +1926,3 @@ const struct scap_vtable scap_bpf_engine = {
 	.getpid_global = noop_getpid_global,
 };
 #endif // MINIMAL_BUILD
-

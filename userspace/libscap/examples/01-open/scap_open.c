@@ -30,6 +30,8 @@ limitations under the License.
 #define SCAP_FILE_OPTION "--scap_file"
 #define TP_OPTION "--tp"
 #define PPM_SC_OPTION "--ppm_sc"
+#define RM_ALL_OPTION "--rm_all"
+#define RM_SYSCALLS_OPTION "--rm_sys"
 #define NUM_EVENTS_OPTION "--num_events"
 #define EVENT_TYPE_OPTION "--evt_type"
 #define VALIDATION_OPTION "--validate_syscalls"
@@ -643,6 +645,15 @@ void print_configurations()
 	printf("---------------------- CONFIGURATIONS ----------------------\n");
 	printf("* Print single event type: %d (`-1` means no event to print).\n", evt_type);
 	printf("* Run until '%lu' events are catched.\n", num_events);
+	if(args.remove_all_fillers)
+	{
+		printf("* Remove all fillers!\n");
+	}
+	if(args.remove_syscall_fillers)
+	{
+		printf("* Remove only syscall fillers!\n");
+	}
+
 	printf("--------------------------------------------------------------\n\n");
 }
 
@@ -736,6 +747,16 @@ void parse_CLI_options(int argc, char** argv)
 				exit(EXIT_FAILURE);
 			}
 			enable_single_ppm_sc(atoi(argv[++i]));
+		}
+
+		if(!strcmp(argv[i], RM_ALL_OPTION))
+		{
+			args.remove_all_fillers = true;
+		}
+
+		if(!strcmp(argv[i], RM_SYSCALLS_OPTION))
+		{
+			args.remove_syscall_fillers = true;
 		}
 
 		if(!strcmp(argv[i], NUM_EVENTS_OPTION))
