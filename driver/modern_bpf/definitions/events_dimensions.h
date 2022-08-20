@@ -61,5 +61,6 @@
 #define PTRACE_E_SIZE HEADER_LEN + sizeof(int64_t) + sizeof(uint16_t) + PARAM_LEN * 2
 #define CAPSET_E_SIZE HEADER_LEN
 #define CAPSET_X_SIZE HEADER_LEN + sizeof(int64_t) + sizeof(uint64_t) * 3 + PARAM_LEN * 4
+#define CLONE_E_SIZE HEADER_LEN
 
 #endif /* __EVENT_DIMENSIONS_H__ */
