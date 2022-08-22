@@ -41,6 +41,9 @@ enum direction
 	DEST = 1,
 };
 
+/* Default snaplen that we use in the modern probe */
+#define DEFAULT_SNAPLEN 80
+
 /* Syscall return code assertions. */
 #define SYSCALL_FAILURE 0
 #define SYSCALL_SUCCESS 1
