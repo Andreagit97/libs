@@ -43,7 +43,7 @@ enum connection_direction
 	INBOUND = 1,
 };
 
-/* Concept of auxamp (auxiliary map):
+/* Concept of auxmap (auxiliary map):
  *
  * For variable size events we cannot directly reserve space into the ringbuf,
  * we need to use a bpf map as a temporary buffer to save our events. So every cpu
@@ -68,19 +68,19 @@ enum connection_direction
  * Please note: The auxiliary map can contain events of at most 64 KB,
  * but the `AUXILIARY_MAP_SIZE` is 128 KB. We have chosen this
  * size to make the verifier understand that there will always be
- * 64 KB free for a new event parameter. This allow us to easily
- * write data into the map without many extra checks.
+ * 64 KB free for a new event parameter. This allows us to easily
+ * write data into the map without any extra checks.
  *
  * Look at the macro `SAFE_ACCESS(x)` defined in `helpers/base/push_data.h`.
  * If `payload_pos` is lower than `MAX_PARAM_SIZE` we use this index to write
  * new bytes, otherwise we use `payload_pos & MAX_PARAM_SIZE` as index. So
  * the index will be always lower than `MAX_PARAM_SIZE`!
  *
- * Please note that in this last case we are actually overwriting our event!
+ * Please note that in this last case we are overwriting our event!
  * Using `payload_pos & MAX_PARAM_SIZE` as index means that we have already
  * written at least `MAX_PARAM_SIZE` so we are overwriting our data. This is
  * not an issue! If we have already written more than `MAX_PARAM_SIZE`, the
- * event size will be surely greather than 64 KB, so at the end of the collection
+ * event size will be surely greater than 64 KB, so at the end of the collection
  * phase the entire event will be discarded!
  */
 
@@ -312,6 +312,29 @@ static __always_inline u16 auxmap__store_charbuf_param(struct auxiliary_map *aux
 	 */
 	push__param_len(auxmap->data, &auxmap->lengths_pos, charbuf_len);
 	return charbuf_len;
+}
+
+/**
+ * @brief This helper stores the bytebuf pointed by `bytebuf_pointer`
+ * into the auxmap. The bytebuf has a fixed len `len_to_read`. If we
+ * are not able to read exactly `len_to_read` bytes we will push an
+ * empty param in the map, so param_len=0.
+ *
+ * @param auxmap pointer to the auxmap in which we are storing the param.
+ * @param bytebuf_pointer pointer to the bytebuf to store.
+ * @param len_to_read number of bytes to read.
+ * @param mem from which memory we need to read: user-space or kernel-space.
+ * @return number of bytes read.
+ */
+static __always_inline u16 auxmap__store_bytebuf_param(struct auxiliary_map *auxmap, unsigned long bytebuf_pointer, unsigned long len_to_read, enum read_memory mem)
+{
+	u16 bytebuf_len = push__bytebuf(auxmap->data, &auxmap->payload_pos, bytebuf_pointer, len_to_read, mem);
+	/* If we are not able to push anything with `push__bytebuf`
+	 * `bytebuf_len` will be equal to `0` so we will send an
+	 * empty param to userspace.
+	 */
+	push__param_len(auxmap->data, &auxmap->lengths_pos, bytebuf_len);
+	return bytebuf_len;
 }
 
 /**
