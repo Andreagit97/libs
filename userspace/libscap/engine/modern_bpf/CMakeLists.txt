@@ -19,6 +19,9 @@ set(SKEL_DIR "${CMAKE_BINARY_DIR}/skel_dir")
 file(MAKE_DIRECTORY ${SKEL_DIR})
 
 # Build the BPF skeleton as custom target.
+add_subdirectory(${LIBSCAP_DIR}/driver ${CMAKE_BINARY_DIR}/driver)
+
+# Build the BPF skeleton as custom target.
 add_subdirectory(${LIBSCAP_DIR}/driver/modern_bpf ${CMAKE_BINARY_DIR}/driver/modern_bpf)
 
 # Build `libpman` library.
