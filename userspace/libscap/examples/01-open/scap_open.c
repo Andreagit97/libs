@@ -36,6 +36,7 @@ limitations under the License.
 #define PPM_SC_OPTION "--ppm_sc"
 #define NUM_EVENTS_OPTION "--num_events"
 #define EVENT_TYPE_OPTION "--evt_type"
+#define SIMPLE_CONS_OPTION "--simple_cons"
 
 /* PRINT */
 #define VALIDATION_OPTION "--validate_syscalls"
@@ -50,12 +51,98 @@ extern const enum ppm_syscall_code g_syscall_code_routing_table[SYSCALL_TABLE_SI
 /* Engine params */
 struct scap_bpf_engine_params bpf_params = {0};
 struct scap_savefile_engine_params savefile_params = {0};
+struct scap_modern_bpf_engine_params modern_bpf_params = {0};
+struct scap_kmod_engine_params kmod_params = {0};
 
 /* Configuration variables set through CLI. */
 uint64_t num_events = UINT64_MAX; /* max number of events to catch. */
 int evt_type = -1;		  /* event type to print. */
 bool ppm_sc_is_set = 0;
 bool tp_is_set = 0;
+
+int simple_cons_set[] = {
+	PPM_SC_ACCEPT,
+	PPM_SC_ACCEPT4,
+	PPM_SC_BIND,
+	PPM_SC_BPF,
+	PPM_SC_CAPSET,
+	PPM_SC_CHDIR,
+	PPM_SC_CHMOD,
+	PPM_SC_CHROOT,
+	PPM_SC_CLONE,
+	PPM_SC_CLONE3,
+	PPM_SC_CLOSE,
+	PPM_SC_CONNECT,
+	PPM_SC_COPY_FILE_RANGE,
+	PPM_SC_CREAT,
+	PPM_SC_DUP,
+	PPM_SC_DUP2,
+	PPM_SC_DUP3,
+	PPM_SC_EVENTFD,
+	PPM_SC_EVENTFD2,
+	PPM_SC_EXECVE,
+	PPM_SC_EXECVEAT,
+	PPM_SC_FCHDIR,
+	PPM_SC_FCHMOD,
+	PPM_SC_FCHMODAT,
+	PPM_SC_FCNTL,
+	PPM_SC_FLOCK,
+	PPM_SC_FORK,
+	PPM_SC_INOTIFY_INIT,
+	PPM_SC_INOTIFY_INIT1,
+	PPM_SC_IOCTL,
+	PPM_SC_KILL,
+	PPM_SC_LINK,
+	PPM_SC_LINKAT,
+	PPM_SC_LISTEN,
+	PPM_SC_MKDIR,
+	PPM_SC_MKDIRAT,
+	PPM_SC_MOUNT,
+	PPM_SC_OPEN,
+	PPM_SC_OPEN_BY_HANDLE_AT,
+	PPM_SC_OPENAT,
+	PPM_SC_OPENAT2,
+	PPM_SC_PIPE,
+	PPM_SC_PIPE2,
+	PPM_SC_PRLIMIT64,
+	PPM_SC_PTRACE,
+	PPM_SC_QUOTACTL,
+	PPM_SC_RECVFROM,
+	PPM_SC_RECVMSG,
+	PPM_SC_RENAME,
+	PPM_SC_RENAMEAT,
+	PPM_SC_RENAMEAT2,
+	PPM_SC_RMDIR,
+	PPM_SC_SECCOMP,
+	PPM_SC_SENDMMSG,
+	PPM_SC_SENDTO,
+	PPM_SC_SETGID,
+	PPM_SC_SETNS,
+	PPM_SC_SETPGID,
+	PPM_SC_SETRESGID,
+	PPM_SC_SETRESUID,
+	PPM_SC_SETRLIMIT,
+	PPM_SC_SETSID,
+	PPM_SC_SETSOCKOPT,
+	PPM_SC_SETUID,
+	PPM_SC_SHUTDOWN,
+	PPM_SC_SIGNALFD,
+	PPM_SC_SIGNALFD4,
+	PPM_SC_SOCKET,
+	PPM_SC_SOCKETPAIR,
+	PPM_SC_SYMLINK,
+	PPM_SC_SYMLINKAT,
+	PPM_SC_TGKILL,
+	PPM_SC_TIMERFD_CREATE,
+	PPM_SC_TKILL,
+	PPM_SC_UMOUNT2,
+	PPM_SC_UNLINK,
+	PPM_SC_UNLINKAT,
+	PPM_SC_UNSHARE,
+	PPM_SC_USERFAULTFD,
+	PPM_SC_VFORK,
+	-1
+};
 
 /* Generic global variables. */
 scap_open_args oargs = {.engine_name = UNKNOWN_ENGINE};			    /* scap oargs used in `scap_open`. */
@@ -155,7 +242,7 @@ void print_sinsp_modifies_state_syscalls()
 
 	for(int ppm_sc = 0; ppm_sc < PPM_SC_MAX; ppm_sc++)
 	{
-		if (!ppm_scs[ppm_sc])
+		if(!ppm_scs[ppm_sc])
 		{
 			continue;
 		}
@@ -336,6 +423,23 @@ void enable_tracepoints_and_print()
 		}
 	}
 	printf("-----------------------------------------------------------------\n\n");
+}
+
+void enable_simple_cons()
+{
+	printf("[SCAP-OPEN]: start with the simple cons mode!\n");
+	/* Enable only sys_enter and sys_exit */
+	oargs.tp_of_interest.tp[SYS_ENTER] = true;
+	oargs.tp_of_interest.tp[SYS_EXIT] = true;
+
+	int i = 0;
+	for (i = 0; simple_cons_set[i] != -1; i++)
+	{
+		oargs.ppm_sc_of_interest.ppm_sc[simple_cons_set[i]] = true;
+	}
+	printf("[SCAP-OPEN]: num syscalls in simple cons mode: %d\n", i-1);
+	tp_is_set = true;
+	ppm_sc_is_set = true;
 }
 
 /*=============================== SYSCALLS/TRACEPOINTS ===========================*/
@@ -686,6 +790,7 @@ void parse_CLI_options(int argc, char** argv)
 		{
 			oargs.engine_name = KMOD_ENGINE;
 			oargs.mode = SCAP_MODE_LIVE;
+			oargs.engine_params = &kmod_params;
 		}
 		if(!strcmp(argv[i], BPF_OPTION))
 		{
@@ -704,6 +809,7 @@ void parse_CLI_options(int argc, char** argv)
 		{
 			oargs.engine_name = MODERN_BPF_ENGINE;
 			oargs.mode = SCAP_MODE_LIVE;
+			oargs.engine_params = &modern_bpf_params;
 		}
 		if(!strcmp(argv[i], SCAP_FILE_OPTION))
 		{
@@ -733,6 +839,12 @@ void parse_CLI_options(int argc, char** argv)
 			}
 			enable_single_tp(atoi(argv[++i]));
 		}
+
+		if(!strcmp(argv[i], SIMPLE_CONS_OPTION))
+		{
+			enable_simple_cons();
+		}
+
 		if(!strcmp(argv[i], PPM_SC_OPTION))
 		{
 			if(!(i + 1 < argc))
@@ -768,7 +880,7 @@ void parse_CLI_options(int argc, char** argv)
 
 		if(!strcmp(argv[i], VALIDATION_OPTION))
 		{
-			if (validate_syscalls())
+			if(validate_syscalls())
 			{
 				exit(EXIT_SUCCESS);
 			}
