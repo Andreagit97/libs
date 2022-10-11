@@ -11,12 +11,12 @@ jobs:
       matrix:
         name: [system_deps, bundled_deps, system_deps_w_chisels, system_deps_minimal]
         include:
-          - name: system_deps
-            cmake_opts: -DBUILD_BPF=On -DUSE_BUNDLED_DEPS=False
-          - name: bundled_deps
-            cmake_opts: -DBUILD_BPF=On -DUSE_BUNDLED_DEPS=True
-          - name: system_deps_w_chisels
-            cmake_opts: -DBUILD_BPF=On -DUSE_BUNDLED_DEPS=False -DWITH_CHISEL=True
+          # - name: system_deps
+          #   cmake_opts: -DBUILD_BPF=On -DUSE_BUNDLED_DEPS=False
+          # - name: bundled_deps
+          #   cmake_opts: -DBUILD_BPF=On -DUSE_BUNDLED_DEPS=True
+          # - name: system_deps_w_chisels
+          #   cmake_opts: -DBUILD_BPF=On -DUSE_BUNDLED_DEPS=False -DWITH_CHISEL=True
           - name: system_deps_minimal
             cmake_opts: -DUSE_BUNDLED_DEPS=False -DMINIMAL_BUILD=True
     runs-on: ubuntu-latest
@@ -43,49 +43,49 @@ jobs:
           KERNELDIR=/lib/modules/$(ls /lib/modules)/build make -j4
           make run-unit-tests
 
-  build-libs-linux-amd64-asan:
-    name: build-libs-linux-amd64-asan 🧐
-    runs-on: ubuntu-latest
-    container:
-      image: debian:buster
-    steps:
-      - name: Install deps ⛓️
-        run: |
-          apt update && apt install -y --no-install-recommends ca-certificates cmake build-essential git clang llvm pkg-config autoconf automake libtool libelf-dev wget libb64-dev libc-ares-dev libcurl4-openssl-dev libssl-dev libtbb-dev libjq-dev libjsoncpp-dev libgrpc++-dev protobuf-compiler-grpc libgtest-dev libprotobuf-dev liblua5.1-dev linux-headers-amd64
+  # build-libs-linux-amd64-asan:
+  #   name: build-libs-linux-amd64-asan 🧐
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: debian:buster
+  #   steps:
+  #     - name: Install deps ⛓️
+  #       run: |
+  #         apt update && apt install -y --no-install-recommends ca-certificates cmake build-essential git clang llvm pkg-config autoconf automake libtool libelf-dev wget libb64-dev libc-ares-dev libcurl4-openssl-dev libssl-dev libtbb-dev libjq-dev libjsoncpp-dev libgrpc++-dev protobuf-compiler-grpc libgtest-dev libprotobuf-dev liblua5.1-dev linux-headers-amd64
     
-      - name: Checkout Libs ⤵️
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+  #     - name: Checkout Libs ⤵️
+  #       uses: actions/checkout@v3
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Install deps ⛓️
-        run: |
-          .github/install-deps.sh
+  #     - name: Install deps ⛓️
+  #       run: |
+  #         .github/install-deps.sh
   
-      - name: Build and test 🏗️🧪
-        run: |
-          mkdir -p build
-          cd build && LDFLAGS="-lpthread" cmake -DCMAKE_C_FLAGS=-fsanitize=address -DCMAKE_CXX_FLAGS=-fsanitize=address -DUSE_BUNDLED_DEPS=False ../
-          KERNELDIR=/lib/modules/$(ls /lib/modules)/build make -j4
-          make run-unit-tests
+  #     - name: Build and test 🏗️🧪
+  #       run: |
+  #         mkdir -p build
+  #         cd build && LDFLAGS="-lpthread" cmake -DCMAKE_C_FLAGS=-fsanitize=address -DCMAKE_CXX_FLAGS=-fsanitize=address -DUSE_BUNDLED_DEPS=False ../
+  #         KERNELDIR=/lib/modules/$(ls /lib/modules)/build make -j4
+  #         make run-unit-tests
 
-  build-libs-others-amd64:
-    name: build-libs-others-amd64 😨
-    strategy:
-      matrix:
-        os: [windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout Libs ⤵️
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+  # build-libs-others-amd64:
+  #   name: build-libs-others-amd64 😨
+  #   strategy:
+  #     matrix:
+  #       os: [windows-latest, macos-latest]
+  #   runs-on: ${{ matrix.os }}
+  #   steps:
+  #     - name: Checkout Libs ⤵️
+  #       uses: actions/checkout@v3
+  #       with:
+  #         fetch-depth: 0
   
-      - name: Build and test 🏗️🧪
-        run: |
-          mkdir -p build
-          cd build && cmake -DCREATE_TEST_TARGETS=OFF -DMINIMAL_BUILD=true ..
-          cmake --build .
+  #     - name: Build and test 🏗️🧪
+  #       run: |
+  #         mkdir -p build
+  #         cd build && cmake -DCREATE_TEST_TARGETS=OFF -DMINIMAL_BUILD=true ..
+  #         cmake --build .
 
   build-libs-arm64:
     name: build-libs-arm64 🥶 (system_deps)
@@ -139,96 +139,96 @@ jobs:
             KERNELDIR=/lib/modules/$(ls /lib/modules)/build make -j4
             make run-unit-tests
 
-  build-and-test-modern-bpf-x86:
-    name: build-and-test-modern-bpf-x86 😇 (bundled_deps)
-    runs-on: ubuntu-22.04
-    steps:
+  # build-and-test-modern-bpf-x86:
+  #   name: build-and-test-modern-bpf-x86 😇 (bundled_deps)
+  #   runs-on: ubuntu-22.04
+  #   steps:
 
-      - name: Checkout Libs ⤵️
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+  #     - name: Checkout Libs ⤵️
+  #       uses: actions/checkout@v3
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Install deps ⛓️
-        run: |
-          sudo apt update 
-          sudo apt install -y --no-install-recommends ca-certificates cmake build-essential clang-14 git pkg-config autoconf automake libtool libelf-dev libcap-dev
+  #     - name: Install deps ⛓️
+  #       run: |
+  #         sudo apt update 
+  #         sudo apt install -y --no-install-recommends ca-certificates cmake build-essential clang-14 git pkg-config autoconf automake libtool libelf-dev libcap-dev
 
-      - name: Build scap-open 🏗️
-        run: |
-          mkdir -p build
-          cd build && cmake -DUSE_BUNDLED_DEPS=ON -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_MODERN_BPF_TEST=ON -DMODERN_BPF_DEBUG_MODE=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
-          make scap-open
+  #     - name: Build scap-open 🏗️
+  #       run: |
+  #         mkdir -p build
+  #         cd build && cmake -DUSE_BUNDLED_DEPS=ON -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_MODERN_BPF_TEST=ON -DMODERN_BPF_DEBUG_MODE=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
+  #         make scap-open
 
-      - name: Run scap-open 🏎️
-        run: |
-          cd build
-          sudo ./libscap/examples/01-open/scap-open --modern_bpf --num_events 0
+  #     - name: Run scap-open 🏎️
+  #       run: |
+  #         cd build
+  #         sudo ./libscap/examples/01-open/scap-open --modern_bpf --num_events 0
 
-      - name: Build bpf_test 🏗️
-        run: |
-          cd build 
-          make bpf_test
+  #     - name: Build bpf_test 🏗️
+  #       run: |
+  #         cd build 
+  #         make bpf_test
 
-      - name: Running tests 🧪
-        run: |
-          cd build 
-          sudo ./test/modern_bpf/bpf_test --verbose
+  #     - name: Running tests 🧪
+  #       run: |
+  #         cd build 
+  #         sudo ./test/modern_bpf/bpf_test --verbose
 
-  build-modern-bpf-arm64:
-    name: build-modern-bpf-arm64 🙃 (system_deps)
-    runs-on: ubuntu-22.04
-    steps:
+  # build-modern-bpf-arm64:
+  #   name: build-modern-bpf-arm64 🙃 (system_deps)
+  #   runs-on: ubuntu-22.04
+  #   steps:
 
-      - name: Checkout Libs ⤵️
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+  #     - name: Checkout Libs ⤵️
+  #       uses: actions/checkout@v3
+  #       with:
+  #         fetch-depth: 0
 
-      - uses: uraimo/run-on-arch-action@v2.2.0
-        name: Run aarch64 build 🏎️
-        with:
-          arch: aarch64
-          distro: archarm_latest
-          githubToken: ${{ github.token }}
+  #     - uses: uraimo/run-on-arch-action@v2.2.0
+  #       name: Run aarch64 build 🏎️
+  #       with:
+  #         arch: aarch64
+  #         distro: archarm_latest
+  #         githubToken: ${{ github.token }}
 
-          install: |
-            pacman -Syu --noconfirm git cmake make llvm clang pkgconf libelf zlib libffi libbpf linux-tools glibc gcc gtest protobuf openssl tbb libb64 wget jq yaml-cpp curl c-ares grpc libyaml libpcap
+  #         install: |
+  #           pacman -Syu --noconfirm git cmake make llvm clang pkgconf libelf zlib libffi libbpf linux-tools glibc gcc gtest protobuf openssl tbb libb64 wget jq yaml-cpp curl c-ares grpc libyaml libpcap
             
-          # Please note: we cannot inject the BPF probe inside QEMU, so right now, we only build it
-          run: |
-            git config --global --add safe.directory ${{ github.workspace }}
-            .github/install-deps.sh
-            mkdir -p build
-            cd build && cmake -DUSE_BUNDLED_DEPS=OFF -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_MODERN_BPF_TEST=ON -DMODERN_BPF_DEBUG_MODE=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
-            make scap-open
-            make bpf_test
+  #         # Please note: we cannot inject the BPF probe inside QEMU, so right now, we only build it
+  #         run: |
+  #           git config --global --add safe.directory ${{ github.workspace }}
+  #           .github/install-deps.sh
+  #           mkdir -p build
+  #           cd build && cmake -DUSE_BUNDLED_DEPS=OFF -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_MODERN_BPF_TEST=ON -DMODERN_BPF_DEBUG_MODE=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
+  #           make scap-open
+  #           make bpf_test
 
-  build-modern-bpf-s390x:
-    name: build-modern-bpf-s390x 😁 (system_deps)
-    runs-on: ubuntu-22.04
-    steps:
+  # build-modern-bpf-s390x:
+  #   name: build-modern-bpf-s390x 😁 (system_deps)
+  #   runs-on: ubuntu-22.04
+  #   steps:
 
-      - name: Checkout Libs ⤵️
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+  #     - name: Checkout Libs ⤵️
+  #       uses: actions/checkout@v3
+  #       with:
+  #         fetch-depth: 0
 
-      - uses: uraimo/run-on-arch-action@v2.2.0
-        name: Run s390x build 🏗️
-        with:
-          arch: s390x
-          distro: fedora_latest
-          githubToken: ${{ github.token }}
+  #     - uses: uraimo/run-on-arch-action@v2.2.0
+  #       name: Run s390x build 🏗️
+  #       with:
+  #         arch: s390x
+  #         distro: fedora_latest
+  #         githubToken: ${{ github.token }}
 
-          install: |
-            dnf install -y bpftool c-ares-devel clang cmake curl-devel git grpc-devel grpc-plugins gtest-devel jq-devel jsoncpp-devel libb64-devel libbpf-devel libcap-devel openssl-devel protobuf-devel tbb-devel wget
+  #         install: |
+  #           dnf install -y bpftool c-ares-devel clang cmake curl-devel git grpc-devel grpc-plugins gtest-devel jq-devel jsoncpp-devel libb64-devel libbpf-devel libcap-devel openssl-devel protobuf-devel tbb-devel wget
 
-          # Please note: we cannot inject the BPF probe inside QEMU, so right now, we only build it
-          run: |
-            git config --global --add safe.directory ${{ github.workspace }}
-            .github/install-deps.sh
-            mkdir -p build
-            cd build && cmake -DUSE_BUNDLED_DEPS=OFF -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_MODERN_BPF_TEST=ON -DMODERN_BPF_DEBUG_MODE=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
-            make scap-open
-            make bpf_test
+  #         # Please note: we cannot inject the BPF probe inside QEMU, so right now, we only build it
+  #         run: |
+  #           git config --global --add safe.directory ${{ github.workspace }}
+  #           .github/install-deps.sh
+  #           mkdir -p build
+  #           cd build && cmake -DUSE_BUNDLED_DEPS=OFF -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_MODERN_BPF_TEST=ON -DMODERN_BPF_DEBUG_MODE=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
+  #           make scap-open
+  #           make bpf_test
