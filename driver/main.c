@@ -2017,6 +2017,7 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 			args.child = event_datap->event_info.sched_proc_fork_data.child;
 			hdr->tid = args.child->pid;
 			cbres = f_sched_prog_fork(&args);
+			printk("called");
 			break;
 #endif
 
@@ -2413,6 +2414,8 @@ TRACEPOINT_PROBE(sched_proc_fork_probe, struct task_struct *parent, struct task_
 {
 	struct event_data_t event_data;
 
+	printk("first called");
+
 	g_n_tracepoint_hit_inc();
 
 	/* We are not interested in kernel threads. 
@@ -2422,6 +2425,8 @@ TRACEPOINT_PROBE(sched_proc_fork_probe, struct task_struct *parent, struct task_
 	{
     	return;
 	}
+
+	printk("called");
 
 	event_data.category = PPMC_SCHED_PROC_FORK;
 	event_data.event_info.sched_proc_fork_data.child = child;
