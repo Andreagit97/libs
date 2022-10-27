@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
+
+prefix=/usr
+libdir=/home/vagrant/libs/build/libelf-prefix/src/libelf/libelf/
+includedir=/home/vagrant/libs/build/libelf-prefix/src/libelf/libelf
+
+Name: libbpf
+Description: BPF library
+Version: 1.0.1
+Libs: -L${libdir} -lbpf
+Requires.private: libelf zlib
+Cflags: -I${includedir}

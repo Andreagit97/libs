@@ -12,6 +12,7 @@ set(PMAN_SOURCES
 set(PMAN_PRIVATE_INCLUDES
     "${ZLIB_INCLUDES}"
     "${LIBBPF_INCLUDE}"
+    "${LIBELF_INCLUDE}"
     "${SKEL_DIR}"
     "${LIBSCAP_DIR}/driver/" ## ppm_enum and tables
     "${LIBSCAP_DIR}/userspace/libscap" ## scap-stats struct
@@ -23,10 +24,10 @@ set(PMAN_PUBLIC_INCLUDES
 )
 
 set(PMAN_PRIVATE_LINK_LIBRARIES
+    "${LIBELF_LIB}"
     "${LIBBPF_LIB}"
     "${ZLIB_LIB}"
     scap_event_schema
-    ${LIBELF}
 )
 
 set(PMAN_DEPENDENCIES
@@ -40,12 +41,14 @@ if(USE_BUNDLED_LIBBPF)
     )
 endif()
 
-add_library(pman ${PMAN_SOURCES})
-
-# With `BUNDLED_DEPS`, we enforce the usage of a static library
 if(USE_BUNDLED_LIBELF)
-    add_dependencies(pman libelf)
+    list(APPEND
+        PMAN_DEPENDENCIES
+        libelf
+    )
 endif()
+
+add_library(pman ${PMAN_SOURCES})
 
 target_include_directories(pman
     INTERFACE
@@ -53,13 +56,11 @@ target_include_directories(pman
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${PMAN_PRIVATE_INCLUDES}
-    ${LIBELF_INCLUDE}
 )
 
 target_link_libraries(pman
     PRIVATE
     ${PMAN_PRIVATE_LINK_LIBRARIES}
-    ${LIBELF_LIB}
 )
 
 add_dependencies(pman ${PMAN_DEPENDENCIES})
