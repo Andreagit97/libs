@@ -30,8 +30,6 @@ endif()
 
 include(ExternalProject)
 
-include(find_static_library)
-
 if(WIN32 OR NOT MINIMAL_BUILD)
 	include(zlib)
 endif()
@@ -92,6 +90,7 @@ if(USE_BUNDLED_ZLIB AND NOT MINIMAL_BUILD)
 	add_dependencies(scap zlib)
 endif()
 
+
 if (CMAKE_SYSTEM_NAME MATCHES "SunOS")
 	target_link_libraries(scap
 		socket nsl)
@@ -106,7 +105,8 @@ endif()
 
 if(NOT MINIMAL_BUILD)
 target_link_libraries(scap
-	"${ZLIB_LIB}")
+	"${ZLIB_LIB}"
+	"${LIBELF_LIB}")
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")

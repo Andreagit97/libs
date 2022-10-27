@@ -1,5 +1,3 @@
-include(find_static_library)
-
 set(PMAN_SOURCES
     src/capture.c
     src/maps.c
@@ -24,12 +22,6 @@ set(PMAN_PUBLIC_INCLUDES
     "./include"
 )
 
-set(LIBELF "elf")
-# With `BUNDLED_DEPS`, we enforce the usage of a static library
-if(USE_BUNDLED_DEPS)
-    find_static_library("elf" LIBELF)
-endif()
-
 set(PMAN_PRIVATE_LINK_LIBRARIES
     "${LIBBPF_LIB}"
     "${ZLIB_LIB}"
@@ -50,17 +42,24 @@ endif()
 
 add_library(pman ${PMAN_SOURCES})
 
+# With `BUNDLED_DEPS`, we enforce the usage of a static library
+if(USE_BUNDLED_LIBELF)
+    add_dependencies(pman libelf)
+endif()
+
 target_include_directories(pman
     INTERFACE
     ${PMAN_PUBLIC_INCLUDES}
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${PMAN_PRIVATE_INCLUDES}
+    ${LIBELF_INCLUDE}
 )
 
 target_link_libraries(pman
     PRIVATE
     ${PMAN_PRIVATE_LINK_LIBRARIES}
+    ${LIBELF_LIB}
 )
 
 add_dependencies(pman ${PMAN_DEPENDENCIES})
