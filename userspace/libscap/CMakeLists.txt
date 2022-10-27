@@ -30,8 +30,6 @@ endif()
 
 include(ExternalProject)
 
-include(find_static_library)
-
 if(WIN32 OR NOT MINIMAL_BUILD)
 	include(zlib)
 endif()
@@ -188,9 +186,15 @@ add_subdirectory(engine/udig)
 target_link_libraries(scap scap_engine_udig)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-	add_definitions(-DHAS_ENGINE_BPF)
-	add_subdirectory(engine/bpf)
-	target_link_libraries(scap scap_engine_bpf)
+	if (NOT MINIMAL_BUILD OR BUILD_LIBSCAP_MODERN_BPF)
+		include(libelf)
+	endif()
+
+	if (NOT MINIMAL_BUILD)
+		add_definitions(-DHAS_ENGINE_BPF)
+		add_subdirectory(engine/bpf)
+		target_link_libraries(scap scap_engine_bpf)
+	endif()
 
 	add_definitions(-DHAS_ENGINE_KMOD)
 	add_subdirectory(engine/kmod)
