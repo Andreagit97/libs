@@ -10,7 +10,6 @@ set(PMAN_SOURCES
 )
 
 set(PMAN_PRIVATE_INCLUDES
-    "${ZLIB_INCLUDES}"
     "${LIBBPF_INCLUDE}"
     "${SKEL_DIR}"
     "${LIBSCAP_DIR}/driver/" ## ppm_enum and tables
@@ -24,9 +23,7 @@ set(PMAN_PUBLIC_INCLUDES
 
 set(PMAN_PRIVATE_LINK_LIBRARIES
     "${LIBBPF_LIB}"
-    "${ZLIB_LIB}"
     scap_event_schema
-    elf
 )
 
 set(PMAN_DEPENDENCIES

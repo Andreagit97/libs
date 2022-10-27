@@ -13,17 +13,20 @@ elseif(NOT USE_BUNDLED_LIBELF)
         message(FATAL_ERROR "Couldn't find system libelf")
     endif()
 else()
-    set(LIBELF_SRC "${PROJECT_BINARY_DIR}/libelf-prefix/src")
-    set(LIBELF_INCLUDE "${LIBELF_SRC}/libelf/libelf")
-    set(LIBELF_LIB "${LIBELF_SRC}/libelf/libelf/libelf.a")
+    set(LIBELF_SRC "${PROJECT_BINARY_DIR}/libelf-prefix/src/libelf")
+    set(LIBELF_INCLUDE "${PROJECT_BINARY_DIR}/libelf-prefix/src/libelf-include")
+    set(LIBELF_LIB "${LIBELF_SRC}/libelf/libelf.a")
     ExternalProject_Add(
             libelf
             PREFIX "${PROJECT_BINARY_DIR}/libelf-prefix"
             URL "https://sourceware.org/elfutils/ftp/0.187/elfutils-0.187.tar.bz2"
             #URL_HASH "SHA256=3d6afde67682c909e341bf194678a8969f17628705af25f900d5f68bd299cb03"
+            DEPENDS zlib
             CONFIGURE_COMMAND ./configure --prefix=/ --sysconfdir=/etc --program-prefix="eu-" --enable-deterministic-archives --disable-debuginfod --disable-libdebuginfod
             BUILD_IN_SOURCE 1
             BUILD_COMMAND ${CMD_MAKE}
+            COMMAND mkdir -p ${LIBELF_INCLUDE}
+            COMMAND mv -t ${LIBELF_INCLUDE} ./libelf/libelf.h ./libelf/elf.h ./libelf/gelf.h
             INSTALL_COMMAND ""
             UPDATE_COMMAND ""
     )

@@ -21,12 +21,11 @@ else()
     ExternalProject_Add(
         libbpf
         PREFIX "${PROJECT_BINARY_DIR}/libbpf-prefix"
-        DEPENDS zlib
+        DEPENDS zlib libelf
         URL "https://github.com/libbpf/libbpf/archive/refs/tags/v1.0.1.tar.gz"
-        URL_HASH
-        "SHA256=3d6afde67682c909e341bf194678a8969f17628705af25f900d5f68bd299cb03"
+        URL_HASH "SHA256=3d6afde67682c909e341bf194678a8969f17628705af25f900d5f68bd299cb03"
         CONFIGURE_COMMAND mkdir -p build root
-        BUILD_COMMAND BUILD_STATIC_ONLY=y OBJDIR=${LIBBPF_BUILD_DIR}/build DESTDIR=${LIBBPF_BUILD_DIR}/root make -C ${LIBBPF_SRC}/libbpf/src install
+        BUILD_COMMAND BUILD_STATIC_ONLY=y OBJDIR=${LIBBPF_BUILD_DIR}/build DESTDIR=${LIBBPF_BUILD_DIR}/root EXTRA_CFLAGS=${LIBELF_INCLUDE} make -C ${LIBBPF_SRC}/libbpf/src install V=1
         INSTALL_COMMAND ""
         UPDATE_COMMAND ""
     )
