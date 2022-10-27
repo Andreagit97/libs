@@ -105,8 +105,7 @@ endif()
 
 if(NOT MINIMAL_BUILD)
 target_link_libraries(scap
-	"${ZLIB_LIB}"
-	"${LIBELF_LIB}")
+	"${ZLIB_LIB}")
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
