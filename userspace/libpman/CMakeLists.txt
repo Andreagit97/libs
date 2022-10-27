@@ -1,5 +1,3 @@
-include(find_static_library)
-
 set(PMAN_SOURCES
     src/capture.c
     src/maps.c
@@ -24,17 +22,11 @@ set(PMAN_PUBLIC_INCLUDES
     "./include"
 )
 
-set(LIBELF "elf")
-# With `BUNDLED_DEPS`, we enforce the usage of a static library
-if(USE_BUNDLED_DEPS)
-    find_static_library("elf" LIBELF)
-endif()
-
 set(PMAN_PRIVATE_LINK_LIBRARIES
     "${LIBBPF_LIB}"
     "${ZLIB_LIB}"
     scap_event_schema
-    ${LIBELF}
+    elf
 )
 
 set(PMAN_DEPENDENCIES
