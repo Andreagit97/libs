@@ -22,7 +22,7 @@ else()
             PREFIX "${PROJECT_BINARY_DIR}/libelf-prefix"
             URL "https://sourceware.org/elfutils/ftp/0.187/elfutils-0.187.tar.bz2"
             #URL_HASH "SHA256=3d6afde67682c909e341bf194678a8969f17628705af25f900d5f68bd299cb03"
-            CONFIGURE_COMMAND ./configure --prefix=/ --sysconfdir=/etc --program-prefix="eu-" --enable-deterministic-archives
+            CONFIGURE_COMMAND ./configure --prefix=/ --sysconfdir=/etc --program-prefix="eu-" --enable-deterministic-archives --disable-debuginfod
             BUILD_IN_SOURCE 1
             BUILD_COMMAND ${CMD_MAKE}
             INSTALL_COMMAND ""
