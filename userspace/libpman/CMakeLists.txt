@@ -23,9 +23,10 @@ set(PMAN_PUBLIC_INCLUDES
     "./include"
 )
 
-set(PMAN_PRIVATE_LINK_LIBRARIES
+set(PMAN_LINK_LIBRARIES
     "${LIBBPF_LIB}"
     "${LIBELF_LIB}"
+    "${ZLIB_LIB}"
     scap_event_schema
 )
 
@@ -51,8 +52,8 @@ target_include_directories(pman
 )
 
 target_link_libraries(pman
-    PRIVATE
-    ${PMAN_PRIVATE_LINK_LIBRARIES}
+    PUBLIC
+    ${PMAN_LINK_LIBRARIES}
 )
 
 add_dependencies(pman ${PMAN_DEPENDENCIES})
