@@ -10,7 +10,7 @@ set(PMAN_SOURCES
 )
 
 set(PMAN_PRIVATE_INCLUDES
-    "${ZLIB_INCLUDES}"
+    "${ZLIB_INCLUDE}"
     "${LIBBPF_INCLUDE}"
     "${LIBELF_INCLUDE}"
     "${SKEL_DIR}"
@@ -24,9 +24,8 @@ set(PMAN_PUBLIC_INCLUDES
 )
 
 set(PMAN_PRIVATE_LINK_LIBRARIES
-    "${LIBELF_LIB}"
     "${LIBBPF_LIB}"
-    "${ZLIB_LIB}"
+    "${LIBELF_LIB}"
     scap_event_schema
 )
 
@@ -38,13 +37,6 @@ if(USE_BUNDLED_LIBBPF)
     list(APPEND
         PMAN_DEPENDENCIES
         libbpf
-    )
-endif()
-
-if(USE_BUNDLED_LIBELF)
-    list(APPEND
-        PMAN_DEPENDENCIES
-        libelf
     )
 endif()
 
