@@ -22,7 +22,7 @@ else()
             DEPENDS zlib
             URL "https://sourceware.org/elfutils/ftp/0.187/elfutils-0.187.tar.bz2"
             URL_HASH "SHA256=e70b0dfbe610f90c4d1fe0d71af142a4e25c3c4ef9ebab8d2d72b65159d454c8"
-            CONFIGURE_COMMAND LDFLAGS=-L${ZLIB_SRC} CFLAGS=-I${ZLIB_INCLUDE} ./configure --enable-deterministic-archives --disable-debuginfod --disable-libdebuginfod
+            CONFIGURE_COMMAND ./configure --includedir=${ZLIB_INCLUDE} --libdir=${ZLIB_SRC} --enable-deterministic-archives --disable-debuginfod --disable-libdebuginfod
             BUILD_IN_SOURCE 1
             BUILD_COMMAND ${CMD_MAKE}
             INSTALL_COMMAND ""
