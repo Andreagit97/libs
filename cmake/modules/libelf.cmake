@@ -21,8 +21,8 @@ else()
             PREFIX "${PROJECT_BINARY_DIR}/libelf-prefix"
             DEPENDS zlib
             URL "https://sourceware.org/elfutils/ftp/0.187/elfutils-0.187.tar.bz2"
-            #URL_HASH "SHA256=3d6afde67682c909e341bf194678a8969f17628705af25f900d5f68bd299cb03"
-            CONFIGURE_COMMAND ./configure --libdir=${LIBELF_LIB} --includedir=${LIBELF_INCLUDE} --sysconfdir=/etc --program-prefix="eu-" --enable-deterministic-archives --disable-debuginfod --disable-libdebuginfod
+            URL_HASH "SHA256=e70b0dfbe610f90c4d1fe0d71af142a4e25c3c4ef9ebab8d2d72b65159d454c8"
+            CONFIGURE_COMMAND LDFLAGS=-L${ZLIB_SRC} CFLAGS=-I${ZLIB_INCLUDE} ./configure --enable-deterministic-archives --disable-debuginfod --disable-libdebuginfod
             BUILD_IN_SOURCE 1
             BUILD_COMMAND ${CMD_MAKE}
             INSTALL_COMMAND ""
