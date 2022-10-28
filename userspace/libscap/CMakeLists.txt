@@ -86,10 +86,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_library(scap STATIC
 	${targetfiles})
 
-if(USE_BUNDLED_ZLIB AND NOT MINIMAL_BUILD)
-	add_dependencies(scap zlib)
-endif()
-
 if (CMAKE_SYSTEM_NAME MATCHES "SunOS")
 	target_link_libraries(scap
 		socket nsl)
@@ -161,6 +157,10 @@ add_library(scap_engine_util
 	scap_engine_util.c
 	ringbuffer/devset.c
 	ringbuffer/ringbuffer.c)
+
+if(USE_BUNDLED_ZLIB AND NOT MINIMAL_BUILD)
+	add_dependencies(scap_engine_util zlib)
+endif()
 
 target_link_libraries(scap scap_engine_util)
 
