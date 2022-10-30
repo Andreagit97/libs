@@ -54,3 +54,14 @@ add_executable(bpf_test ${MODERN_BPF_TEST_SOURCES})
 target_include_directories(bpf_test ${MODERN_BPF_TEST_INCLUDE})
 target_link_libraries(bpf_test ${MODERN_BPF_TEST_LINK_LIBRARIES})
 add_dependencies(bpf_test ${MODERN_BPF_TEST_DEPENDECIES})
+
+# Build a container with the bpf_test executable
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  add_custom_target(modern-bpf-tests-docker
+    COMMAND docker build
+      --tag modern-bpf-tests
+      -f ${CMAKE_CURRENT_SOURCE_DIR}/containers/Dockerfile
+      ${CMAKE_BINARY_DIR}/test/modern_bpf
+    DEPENDS bpf_test
+  )
+endif()
