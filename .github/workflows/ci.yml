@@ -85,12 +85,13 @@ jobs:
           mkdir -p build
           cd build && cmake -DUSE_BUNDLED_DEPS=ON -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_MODERN_BPF_TEST=ON -DMODERN_BPF_DEBUG_MODE=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
           make bpf_test
+          tar -czvf ./test/modern_bpf/bpf_test.tar.gz ./test/modern_bpf/bpf_test
 
-      - name: Upload bpf_test exe
+      - name: Upload bpf_test.tar.gz
         uses: Andreagit97/upload-artifact@v3
         with:
-          name: bpf_test
-          path: ./build/test/modern_bpf/bpf_*st
+          name: bpf_test.tar.gz
+          path: ./build/test/modern_bpf/bpf_test.tar.gz
 
       - name: Login to Docker Hub
         uses: Andreagit97/login-action@v2
