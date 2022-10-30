@@ -89,7 +89,7 @@ jobs:
       - name: Upload bpf_test exe
         uses: Andreagit97/upload-artifact@v3
         with:
-          name: falco-modern.deb
+          name: bpf_test
           path: ./build/test/modern_bpf/bpf_*st
 
       - name: Login to Docker Hub
