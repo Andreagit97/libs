@@ -75,23 +75,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install deps ⛓️
+      - name: Build the artifact from the docker image 🏗️
         run: |
-          sudo apt update
-          sudo apt install -y --no-install-recommends ca-certificates cmake build-essential clang-14 git libtool libelf-dev libcap-dev
+          DOCKER_BUILDKIT=1 docker build -f ./test/modern_bpf/containers/builder.Dockerfile --output type=local,dest=export-artifacts .
 
-      - name: Build bpf_test 🏗️
-        run: |
-          mkdir -p build
-          cd build && cmake -DUSE_BUNDLED_DEPS=ON -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_MODERN_BPF_TEST=ON -DMODERN_BPF_DEBUG_MODE=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
-          make bpf_test
-          tar -czvf ./test/modern_bpf/bpf_test.tar.gz ./test/modern_bpf/bpf_test
-
-      - name: Upload bpf_test.tar.gz
+      - name: Upload bpf_test
         uses: Andreagit97/upload-artifact@v3
         with:
-          name: bpf_test.tar.gz
-          path: ./build/test/modern_bpf/bpf_test.tar.gz
+          name: bpf_test-clang-12
+          path: ./export-artifacts/bpf_test
 
       - name: Login to Docker Hub
         uses: Andreagit97/login-action@v2
@@ -105,10 +97,69 @@ jobs:
       - name: Build and push
         uses: Andreagit97/build-push-action@v3
         with:
-          context: ./build/test/modern_bpf
-          file: ./test/modern_bpf/containers/Dockerfile
+          context: ./export-artifacts
+          file: ./test/modern_bpf/containers/runner.Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/modern-bpf-test:latest
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/modern-bpf-test:clang-12
+
+  build-and-test-modern-bpf-x86:
+    name: build-and-test-modern-bpf-x86 😇 (bundled_deps)
+    runs-on: ubuntu-22.04
+    steps:
+
+      - name: Checkout Libs ⤵️
+        uses: Andreagit97/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install deps ⛓️
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends ca-certificates cmake build-essential clang-14 git pkg-config autoconf automake libtool libelf-dev libcap-dev
+
+      - name: Build scap-open 🏗️
+        run: |
+          mkdir -p build
+          cd build && cmake -DUSE_BUNDLED_DEPS=ON -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_MODERN_BPF_TEST=ON -DMODERN_BPF_DEBUG_MODE=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
+          make scap-open
+
+      - name: Run scap-open 🏎️
+        run: |
+          cd build
+          sudo ./libscap/examples/01-open/scap-open --modern_bpf --num_events 0
+
+      - name: Build bpf_test 🏗️
+        run: |
+          cd build
+          make bpf_test
+
+      - name: Upload bpf_test
+        uses: Andreagit97/upload-artifact@v3
+        with:
+          name: bpf_test-clang-14
+          path: ./build/test/modern_bpf/bpf_test
+
+      - name: Running tests 🧪
+        run: |
+          cd build
+          sudo ./test/modern_bpf/bpf_test --verbose
+
+      - name: Login to Docker Hub
+        uses: Andreagit97/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: Andreagit97/setup-buildx-action@v2
+
+      - name: Build and push
+        uses: Andreagit97/build-push-action@v3
+        with:
+          context: ./build/test/modern_bpf/
+          file: ./test/modern_bpf/containers/runner.Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/modern-bpf-test:clang-14
 
   # build-libs-linux-amd64-asan:
   #   name: build-libs-linux-amd64-asan 🧐

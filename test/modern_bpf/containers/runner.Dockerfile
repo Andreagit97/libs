@@ -1,8 +1,5 @@
 FROM ubuntu:22.04 AS runner
 
-RUN apt update; \
-    apt install -y libelf-dev
-
 COPY ./bpf_test /usr/local/bin/bpf_test
 
 # This is put here to avoid running tests! The reason is that these tests cannot run inside a container
