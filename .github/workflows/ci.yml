@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - libs_modern_probe
+      - test_branch
       - 'release/**'
   workflow_dispatch:
 
