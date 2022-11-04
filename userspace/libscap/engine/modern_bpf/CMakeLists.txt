@@ -18,12 +18,15 @@ if(RESULT STREQUAL NOTFOUND)
   message(FATAL_ERROR "problem with libbpf.cmake in ${CMAKE_MODULE_PATH}")
 endif()
 
-# Directory in which the BPF skeleton will be built
-set(SKEL_DIR "${CMAKE_BINARY_DIR}/skel_dir")
-file(MAKE_DIRECTORY ${SKEL_DIR})
+if(NOT SKEL_DIR)
+  # Directory in which the BPF skeleton will be built
+  set(SKEL_DIR "${CMAKE_BINARY_DIR}/skel_dir")
+  file(MAKE_DIRECTORY ${SKEL_DIR})
 
-# Build the BPF skeleton as custom target.
-add_subdirectory(${LIBSCAP_DIR}/driver/modern_bpf ${CMAKE_BINARY_DIR}/driver/modern_bpf)
+  # Build the BPF skeleton as custom target.
+  add_subdirectory(${LIBSCAP_DIR}/driver/modern_bpf ${CMAKE_BINARY_DIR}/driver/modern_bpf)
+endif()
+message(STATUS "using skel_dir: ${SKEL_DIR}")
 
 # Build `libpman` library.
 add_subdirectory(${LIBSCAP_DIR}/userspace/libpman ${CMAKE_BINARY_DIR}/libpman)

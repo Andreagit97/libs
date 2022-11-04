@@ -1,7 +1,7 @@
 FROM centos:7 AS build-stage
 
-# we can pass a custom build directory, default is `build`
-ARG BUILD_DIR="build"
+# To build libs you need to pass the cmake option
+ARG CMAKE_OPTIONS=""
 
 # Install all the dependencies
 WORKDIR /
@@ -23,13 +23,10 @@ RUN curl -L -o /tmp/cmake.tar.gz https://github.com/Kitware/CMake/releases/downl
 COPY . /libs
 WORKDIR /libs
 
-RUN mkdir -p ${BUILD_DIR}; \
-    cd ${BUILD_DIR} && rm -f CMakeCache.txt && rm -rf CMakeFiles;
- 
-## TODO: we should set cmake options as an argument
 RUN source scl_source enable devtoolset-8; \
-    cd ${BUILD_DIR}; \
-    cmake -DUSE_BUNDLED_DEPS=On -DBUILD_LIBSCAP_GVISOR=Off -DBUILD_BPF=True -DBUILD_LIBSCAP_MODERN_BPF=On -DCREATE_TEST_TARGETS=Off ..; \
+    rm -rf build; \
+    mkdir build && cd build; \
+    cmake ${CMAKE_OPTIONS} ..; \
     make scap-open
 
 FROM scratch AS export-stage
