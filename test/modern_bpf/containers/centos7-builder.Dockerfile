@@ -1,5 +1,7 @@
 FROM centos:7 AS build-stage
 
+ARG skeleton_dir=""
+
 # Install all the dependencies
 WORKDIR /
 
@@ -21,15 +23,11 @@ RUN curl -L -o /tmp/cmake.tar.gz https://github.com/Kitware/CMake/releases/downl
 COPY . /libs
 WORKDIR /libs
 
-# Move the modern probe into the build directory
-RUN rm -rf build; \
-    mkdir build && cd build; \
-    mv ./../skel_dir ./
-
 ## TODO: we should set cmake options as an argument
 RUN source scl_source enable devtoolset-8; \
-    cd build; \
-    cmake -DUSE_BUNDLED_DEPS=On -DBUILD_LIBSCAP_GVISOR=Off -DBUILD_BPF=True -DBUILD_LIBSCAP_MODERN_BPF=On -DUSE_BUNDLED_MODERN_PROBE=Off -DCREATE_TEST_TARGETS=Off ..; \
+    rm -rf build; \
+    mkdir build && cd build; \
+    cmake -DUSE_BUNDLED_DEPS=On -DBUILD_LIBSCAP_GVISOR=Off -DBUILD_BPF=True -DBUILD_LIBSCAP_MODERN_BPF=On -DUSE_BUNDLED_MODERN_PROBE=Off -DCREATE_TEST_TARGETS=Off -DSKEL_DIR=${skeleton_dir} ..; \
     make scap-open
 
 FROM scratch AS export-stage

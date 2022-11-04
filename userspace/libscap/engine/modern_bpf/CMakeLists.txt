@@ -22,8 +22,11 @@ if(RESULT STREQUAL NOTFOUND)
 endif()
 
 # Directory in which the BPF skeleton will be built
-set(SKEL_DIR "${CMAKE_BINARY_DIR}/skel_dir")
-file(MAKE_DIRECTORY ${SKEL_DIR})
+if(NOT SKEL_DIR)
+  set(SKEL_DIR "${CMAKE_BINARY_DIR}/skel_dir")
+  file(MAKE_DIRECTORY ${SKEL_DIR})
+endif()
+message(STATUS "using skel_dir: ${SKEL_DIR}")
 
 # Build the BPF skeleton as custom target.
 if(USE_BUNDLED_MODERN_PROBE)
