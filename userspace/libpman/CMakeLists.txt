@@ -37,11 +37,9 @@ set(PMAN_PRIVATE_LINK_LIBRARIES
     ${LIBELF}
 )
 
-if(USE_BUNDLED_MODERN_PROBE)
-    set(PMAN_DEPENDENCIES
-        ProbeSkeleton
-    )
-endif()
+set(PMAN_DEPENDENCIES
+    ProbeSkeleton
+)
 
 if(USE_BUNDLED_LIBBPF)
     list(APPEND

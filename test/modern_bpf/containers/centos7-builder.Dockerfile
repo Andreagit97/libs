@@ -1,6 +1,7 @@
 FROM centos:7 AS build-stage
 
-ARG skeleton_dir=""
+# we can pass a custom build directory, default is `build`
+ARG BUILD_DIR="build"
 
 # Install all the dependencies
 WORKDIR /
@@ -19,15 +20,16 @@ RUN curl -L -o /tmp/cmake.tar.gz https://github.com/Kitware/CMake/releases/downl
     cp -R /tmp/cmake-3.22.5-linux-x86_64/* /usr; \
     rm -rf /tmp/cmake-3.22.5-linux-x86_64/
 
-# Copy the build context under root. The checkout of the repo is made outside of this container
 COPY . /libs
 WORKDIR /libs
 
+RUN mkdir -p ${BUILD_DIR}; \
+    cd ${BUILD_DIR} && rm -f CMakeCache.txt && rm -rf CMakeFiles;
+ 
 ## TODO: we should set cmake options as an argument
 RUN source scl_source enable devtoolset-8; \
-    rm -rf build; \
-    mkdir build && cd build; \
-    cmake -DUSE_BUNDLED_DEPS=On -DBUILD_LIBSCAP_GVISOR=Off -DBUILD_BPF=True -DBUILD_LIBSCAP_MODERN_BPF=On -DUSE_BUNDLED_MODERN_PROBE=Off -DCREATE_TEST_TARGETS=Off -DSKEL_DIR=${skeleton_dir} ..; \
+    cd ${BUILD_DIR}; \
+    cmake -DUSE_BUNDLED_DEPS=On -DBUILD_LIBSCAP_GVISOR=Off -DBUILD_BPF=True -DBUILD_LIBSCAP_MODERN_BPF=On -DCREATE_TEST_TARGETS=Off ..; \
     make scap-open
 
 FROM scratch AS export-stage

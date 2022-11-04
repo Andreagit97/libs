@@ -80,15 +80,16 @@ jobs:
         with:
           fetch-depth: 0
 
+# Build the modern probe skeleton on Ubuntu 22.04 machine
       - name: Build modern BPF skeleton 🏗️
         run: |
-          mkdir -p modern-bpf-skeleton
-          cd modern-bpf-skeleton && cmake -DUSE_BUNDLED_DEPS=ON -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
+          mkdir -p build
+          cd build && cmake -DUSE_BUNDLED_DEPS=ON -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
           make ProbeSkeleton
 
       - name: Build the artifact from the docker image 🏗️
         run: |
-          DOCKER_BUILDKIT=1 docker build -f ./test/modern_bpf/containers/centos7-builder.Dockerfile --output type=local,dest=export-artifacts --build-arg skeleton_dir=./modern-bpf-skeleton/skel_dir .
+          DOCKER_BUILDKIT=1 docker build -f ./test/modern_bpf/containers/centos7-builder.Dockerfile --output type=local,dest=export-artifacts .
 
       - name: Upload scap-open
         uses: Andreagit97/upload-artifact@v3
@@ -107,7 +108,7 @@ jobs:
 
       - name: Build the artifact from the docker image 🏗️
         run: |
-          DOCKER_BUILDKIT=1 docker build -f ./test/modern_bpf/containers/builder.Dockerfile --output type=local,dest=export-artifacts .
+          DOCKER_BUILDKIT=1 docker build -f ./test/modern_bpf/containers/ubuntu1804-builder.Dockerfile --output type=local,dest=export-artifacts .
 
       - name: Upload bpf_test
         uses: Andreagit97/upload-artifact@v3
