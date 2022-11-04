@@ -66,6 +66,38 @@ jobs:
   #         KERNELDIR=/lib/modules/$(ls /lib/modules)/build make -j4
   #         make run-unit-tests
 
+  publish-modern-bpf-tests-artifacts-centos7:
+    runs-on: ubuntu-22.04
+    steps:
+
+      - name: Install deps ⛓️
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends ca-certificates cmake build-essential clang-14 git pkg-config autoconf automake libtool libelf-dev libcap-dev
+
+      - name: Checkout Libs ⤵️
+        uses: Andreagit97/checkout@v3
+        with:
+          fetch-depth: 0
+
+## Compile the modern BPF probe skeleton and move the directort /skel_dir under /falco
+      - name: Build BPF skeleton 🏗️
+        run: |
+          mkdir -p build
+          cd build && cmake -DUSE_BUNDLED_DEPS=ON -DBUILD_LIBSCAP_MODERN_BPF=ON -DBUILD_LIBSCAP_GVISOR=OFF ../
+          make ProbeSkeleton
+          mv ./skel_dir ./..
+
+      - name: Build the artifact from the docker image 🏗️
+        run: |
+          DOCKER_BUILDKIT=1 docker build -f ./test/modern_bpf/containers/centos7-builder.Dockerfile --output type=local,dest=export-artifacts .
+
+      - name: Upload scap-open
+        uses: Andreagit97/upload-artifact@v3
+        with:
+          name: scap-open
+          path: ./export-artifacts/scap-open
+
   publish-modern-bpf-tests-artifacts:
     runs-on: ubuntu-22.04
     steps:

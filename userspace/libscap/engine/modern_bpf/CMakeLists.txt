@@ -1,5 +1,8 @@
 include_directories(${LIBSCAP_INCLUDE_DIRS} ../noop)
 
+# Option to build the modern BPF probe from scratch
+option(USE_BUNDLED_MODERN_PROBE "Build tests for modern BPF" ON)
+
 # Option to build bpf tests
 option(BUILD_MODERN_BPF_TEST "Build tests for modern BPF" OFF)
 
@@ -23,7 +26,9 @@ set(SKEL_DIR "${CMAKE_BINARY_DIR}/skel_dir")
 file(MAKE_DIRECTORY ${SKEL_DIR})
 
 # Build the BPF skeleton as custom target.
-add_subdirectory(${LIBSCAP_DIR}/driver/modern_bpf ${CMAKE_BINARY_DIR}/driver/modern_bpf)
+if(USE_BUNDLED_MODERN_PROBE)
+  add_subdirectory(${LIBSCAP_DIR}/driver/modern_bpf ${CMAKE_BINARY_DIR}/driver/modern_bpf)
+endif()
 
 # Build `libpman` library.
 add_subdirectory(${LIBSCAP_DIR}/userspace/libpman ${CMAKE_BINARY_DIR}/libpman)
