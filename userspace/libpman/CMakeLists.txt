@@ -14,7 +14,7 @@ set(PMAN_SOURCES
 set(PMAN_PRIVATE_INCLUDES
     "${ZLIB_INCLUDES}"
     "${LIBBPF_INCLUDE}"
-    "${SKEL_DIR}"
+    "${MODERN_BPF_SKEL_DIR}"
     "${LIBSCAP_DIR}/driver/" ## ppm_enum and tables
     "${LIBSCAP_DIR}/userspace/libscap" ## scap-stats struct
     "${LIBSCAP_DIR}/driver/modern_bpf/" ## bpf-shared structs
@@ -37,9 +37,11 @@ set(PMAN_PRIVATE_LINK_LIBRARIES
     ${LIBELF}
 )
 
-set(PMAN_DEPENDENCIES
-    ProbeSkeleton
-)
+if(USE_BUNDLED_MODERN_BPF)
+    set(PMAN_DEPENDENCIES
+        ProbeSkeleton
+    )
+endif()
 
 if(USE_BUNDLED_LIBBPF)
     list(APPEND

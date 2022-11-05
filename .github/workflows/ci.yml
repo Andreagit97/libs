@@ -89,7 +89,7 @@ jobs:
 
       - name: Build the artifact from the docker image 🏗️
         run: |
-          DOCKER_BUILDKIT=1 docker build -f ./test/modern_bpf/containers/centos7-builder.Dockerfile --output type=local,dest=export-artifacts --build-arg CMAKE_OPTIONS="-DUSE_BUNDLED_DEPS=On -DBUILD_LIBSCAP_GVISOR=Off -DBUILD_BPF=True -DBUILD_LIBSCAP_MODERN_BPF=On -DCREATE_TEST_TARGETS=Off -DSKEL_DIR=/libs/skeleton-build/skel_dir" .
+          DOCKER_BUILDKIT=1 docker build -f ./test/modern_bpf/containers/centos7-builder.Dockerfile --output type=local,dest=export-artifacts --build-arg CMAKE_OPTIONS="-DUSE_BUNDLED_DEPS=On -DBUILD_LIBSCAP_GVISOR=Off -DBUILD_BPF=True -DBUILD_LIBSCAP_MODERN_BPF=On -DCREATE_TEST_TARGETS=Off -DMODERN_BPF_SKEL_DIR=/libs/skeleton-build/skel_dir" .
 
       - name: Upload scap-open
         uses: Andreagit97/upload-artifact@v3
