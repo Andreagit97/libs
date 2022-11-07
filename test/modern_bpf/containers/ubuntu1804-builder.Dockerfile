@@ -3,7 +3,7 @@ FROM ubuntu:18.04 AS build-stage
 WORKDIR /
 
 RUN apt update; \
-    apt install -y --no-install-recommends ca-certificates cmake build-essential git libelf-dev wget lsb-release software-properties-common gnupg libcap-dev
+    apt install -y --no-install-recommends ca-certificates cmake build-essential git wget lsb-release software-properties-common gnupg libcap-dev m4 libelf-dev
 
 RUN wget https://apt.llvm.org/llvm.sh; \
     chmod +x llvm.sh; \
