@@ -29,6 +29,8 @@ struct iovec {
 };
 #endif
 
+#define SCAP_HANDLE_T struct savefile_engine
+
 #include "savefile.h"
 #include "scap.h"
 #include "scap-int.h"
