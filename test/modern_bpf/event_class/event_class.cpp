@@ -105,17 +105,26 @@ event_test::event_test(ppm_event_type event_type)
 {
 	m_current_param = 0;
 	m_event_type = event_type;
-	m_event_direction = BOTH_EVENT;
+
 	switch(m_event_type)
 	{
 	case PPME_PROCEXIT_1_E:
+		m_tp_set[SCHED_PROC_EXIT] = 1;
 		break;
 	case PPME_SCHEDSWITCH_6_E:
+		m_tp_set[SCHED_SWITCH] = 1;
 		break;
 	case PPME_SYSCALL_EXECVE_19_X:
+#ifdef CAPTURE_SCHED_PROC_EXEC
+		m_tp_set[SCHED_PROC_EXEC] = 1;
+#endif
 		break;
 	case PPME_SYSCALL_CLONE_20_X:
+#ifdef CAPTURE_SCHED_PROC_FORK
+		m_tp_set[SCHED_PROC_FORK] = 1;
+#endif
 		break;
+
 	default:
 		std::cout << " Unable to find the correct BPF program to attach" << std::endl;
 		break;
@@ -125,13 +134,14 @@ event_test::event_test(ppm_event_type event_type)
 /* This constructor must be used with syscalls events */
 event_test::event_test(int syscall_id, int event_direction)
 {
-	m_event_direction = event_direction;
-	if(m_event_direction == ENTER_EVENT)
+	if(event_direction == ENTER_EVENT)
 	{
+		m_tp_set[SYS_ENTER] = 1;
 		m_event_type = g_syscall_table[syscall_id].enter_event_type;
 	}
 	else
 	{
+		m_tp_set[SYS_EXIT] = 1;
 		m_event_type = g_syscall_table[syscall_id].exit_event_type;
 	}
 
@@ -147,8 +157,10 @@ event_test::event_test(int syscall_id, int event_direction)
 event_test::event_test()
 {
 	m_current_param = 0;
-	m_event_type = PPM_EVENT_MAX;
-	m_event_direction = BOTH_EVENT;
+
+	/* Enable only syscall tracepoints */
+	m_tp_set[SYS_ENTER] = 1;
+	m_tp_set[SYS_EXIT] = 1;
 
 	for(int sys_num = 0; sys_num < SYSCALL_TABLE_SIZE; sys_num++)
 	{
@@ -168,43 +180,7 @@ void event_test::mark_all_64bit_syscalls_as_uninteresting()
 
 void event_test::enable_capture()
 {
-	bool tp_set[TP_VAL_MAX] = {0};
-	switch(m_event_type)
-	{
-	case PPME_PROCEXIT_1_E:
-		tp_set[SCHED_PROC_EXIT] = 1;
-		break;
-	case PPME_SCHEDSWITCH_6_E:
-		tp_set[SCHED_SWITCH] = 1;
-		break;
-	case PPME_SYSCALL_EXECVE_19_X:
-		// If event direction is BOTH, we are coming from a
-		// generic event_test::event_test(ppm_event_type event_type)
-		if (m_event_direction == BOTH_EVENT)
-		{
-			tp_set[SCHED_PROC_EXEC] = 1;
-			break;
-		}
-	case PPME_SYSCALL_CLONE_20_X:
-		// If event direction is BOTH, we are coming from a
-		// generic event_test::event_test(ppm_event_type event_type)
-		if (m_event_direction == BOTH_EVENT)
-		{
-			tp_set[SCHED_PROC_FORK] = 1;
-			break;
-		}
-	default:
-		if (m_event_direction & ENTER_EVENT)
-		{
-			tp_set[SYS_ENTER] = 1;
-		}
-		if (m_event_direction & EXIT_EVENT)
-		{
-			tp_set[SYS_EXIT] = 1;
-		}
-		break;
-	}
-	pman_enable_capture(tp_set);
+	pman_enable_capture(m_tp_set);
 	clear_ring_buffers();
 }
 
