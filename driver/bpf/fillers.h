@@ -2153,19 +2153,9 @@ static __always_inline bool bpf_kgid_has_mapping(struct user_namespace *targ, kg
 
 static __always_inline struct inode *get_exe_inode(struct task_struct *task)
 {
-	struct file *exe_file;
-	struct mm_struct *mm;
-	
-	mm = _READ(task->mm);
-	exe_file = _READ(mm->exe_file);
-	if (!exe_file) 
-	{
-		return NULL;
-	}
-
-	struct inode *inode = _READ(exe_file->f_inode);
-
-	return inode;
+	struct mm_struct *mm = _READ(task->mm);
+	struct file *exe_file = _READ(mm->exe_file);
+	return _READ(exe_file->f_inode);
 }
 
 static __always_inline bool get_exe_writable(struct task_struct *task, struct inode *inode)
@@ -2173,10 +2163,6 @@ static __always_inline bool get_exe_writable(struct task_struct *task, struct in
 	umode_t i_mode = _READ(inode->i_mode);
 	unsigned i_flags = _READ(inode->i_flags);
 	struct super_block *sb = _READ(inode->i_sb);
-	if(sb == NULL)
-	{
-		return false;
-	}
 	kuid_t i_uid = _READ(inode->i_uid);
 	kgid_t i_gid = _READ(inode->i_gid);
 
@@ -2254,27 +2240,24 @@ static __always_inline bool get_exe_writable(struct task_struct *task, struct in
 static __always_inline bool get_exe_upper_layer(struct inode *inode)
 {
 	struct super_block *sb = _READ(inode->i_sb);
-	if(sb == NULL)
-	{
-		return false;
-	}
-
 	unsigned long sb_magic = _READ(sb->s_magic);
 	if(sb_magic == PPM_OVERLAYFS_SUPER_MAGIC)
 	{
+		struct ovl_inode* ovl_inode = container_of(inode, struct ovl_inode, vfs_inode);
 		struct dentry *upper_dentry = NULL;
+		bpf_probe_read(&upper_dentry, sizeof(upper_dentry), ovl_inode->__upperdentry);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 19, 0)
 		struct inode *lower_inode = NULL;
-		char *vfs_inode = (char *)inode;
-		
-		bpf_probe_read(&upper_dentry, sizeof(upper_dentry), vfs_inode + sizeof(struct inode));
-		bpf_probe_read(&lower_inode, sizeof(lower_inode), vfs_inode + sizeof(struct inode) + sizeof(struct dentry *));
-
+		bpf_probe_read(&lower_inode, sizeof(lower_inode), ovl_inode->lower);
 		if(!lower_inode && upper_dentry)
 		{
 			return true;
 		}
+#else
+		struct ovl_path lowerpath;
+		bpf_probe_read(&lowerpath, sizeof(lower_inode), ovl_inode->lowerpath);
+#endif
 	}
-
 	return false;
 }
 
