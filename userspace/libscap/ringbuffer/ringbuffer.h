@@ -159,6 +159,8 @@ static inline int32_t refill_read_buffers(struct scap_device_set *devset)
 		devset->m_buffer_empty_wait_time_us = BUFFER_EMPTY_WAIT_TIME_US_START;
 	}
 
+	printf("REFILLING\n");
+
 	/* In any case (potentially also after a `sleep`) we refill our buffers */
 	for(j = 0; j < ndevs; j++)
 	{
@@ -173,6 +175,9 @@ static inline int32_t refill_read_buffers(struct scap_device_set *devset)
 			return res;
 		}
 	}
+
+	printf("REFILLING after timeout\n");
+
 
 	/* Return `SCAP_TIMEOUT` after a refill so we can start consuming the new events. */
 	return SCAP_TIMEOUT;

@@ -184,17 +184,20 @@ void event_test::mark_all_64bit_syscalls_as_uninteresting()
 void event_test::enable_capture()
 {
 	/* Here I should enable the necessary tracepoints */
-	for(int i=0; i< TP_VAL_MAX; i++)
+	for(int i = 0; i < TP_VAL_MAX; i++)
 	{
 		if(m_tp_set[i])
 		{
+			printf("evt_type %d, preso %d\n", m_event_type, i);
 			scap_set_tpmask(scap_handle, i, true);
 		}
 	}
 	/* We need to clear all the `ring-buffers` because maybe during
-	 * the tracepoint attachment we triggered some syscalls 
+	 * the tracepoint attachment we triggered some syscalls
 	 */
+	printf("before cleared\n");
 	clear_ring_buffers();
+	printf("cleared\n");
 }
 
 void event_test::disable_capture()
@@ -205,9 +208,11 @@ void event_test::disable_capture()
 void event_test::clear_ring_buffers()
 {
 	uint16_t cpu_id = 0;
-	while(get_event_from_ringbuffer(&cpu_id) != NULL)
+	/* First timeout means that all the buffers are empty */
+	while(scap_next(scap_handle, (scap_evt**)&m_event_header, &cpu_id) != SCAP_TIMEOUT)
 	{
-	};
+		printf("ciaooo\n");
+	}
 }
 
 bool event_test::are_all_ringbuffers_full(unsigned long threshold)
@@ -225,7 +230,7 @@ struct ppm_evt_hdr* event_test::get_event_from_ringbuffer(uint16_t* cpu_id)
 	while(attempts <= 1)
 	{
 		res = scap_next(scap_handle, (scap_evt**)&m_event_header, cpu_id);
-		if(res == SCAP_SUCCESS)
+		if(res == SCAP_SUCCESS && m_event_header != NULL)
 		{
 			return m_event_header;
 		}

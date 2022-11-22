@@ -652,7 +652,7 @@ static int32_t load_tracepoint(struct bpf_engine* handle, const char *event, str
 	// by this point m_bpf_prog_cnt has already been checked for
 	// being inbounds, so this is safe.
 	handle->m_bpf_progs[handle->m_bpf_prog_cnt - 1].efd = efd;
-
+	printf("success: %s\n", event);
 	return SCAP_SUCCESS;
 }
 
@@ -860,6 +860,7 @@ static int load_tracepoints(struct bpf_engine *handle,
 
 				if (!already_attached)
 				{
+					printf("attached: %s\n", shname);
 					if(load_tracepoint(handle, shname, data->d_buf, data->d_size) != SCAP_SUCCESS)
 					{
 						goto end;
@@ -1678,6 +1679,8 @@ static int32_t unsupported_config(struct scap_engine_handle engine, const char* 
 static int32_t scap_bpf_handle_tp_mask(struct scap_engine_handle engine, uint32_t op, uint32_t tp)
 {
 	struct bpf_engine *handle = engine.m_handle;
+
+	printf("tracepoint: %d, %d\n", op, tp);
 
 	int prg_idx = -1;
 	for (int i = 0; i < handle->m_bpf_prog_cnt; i++)
