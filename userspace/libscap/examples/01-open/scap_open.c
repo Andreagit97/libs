@@ -984,6 +984,7 @@ int main(int argc, char** argv)
 	int32_t res = 0;
 	scap_evt* ev = NULL;
 	uint16_t cpuid = 0;
+	oargs.import_users = false;
 
 	printf("\n[SCAP-OPEN]: Hello!\n");
 	if(signal(SIGINT, signal_callback) == SIG_ERR)

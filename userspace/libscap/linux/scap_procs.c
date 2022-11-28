@@ -694,40 +694,11 @@ static int32_t scap_proc_add_from_proc(scap_t* handle, uint32_t tid, char* procd
 	//
 	target_res = readlink(filename, target_name, sizeof(target_name) - 1);			// Getting the target of the exe, i.e. to which binary it points to
 
-	if(target_res <= 0)
-	{
-		//
-		// No exe. This either
-		//  - a kernel thread (if there is no cmdline). In that case we skip it.
-		//  - a process that has been containerized or has some weird thing going on. In that case
-		//    we accept it.
-		//
-		snprintf(filename, sizeof(filename), "%scmdline", dir_name);
-		f = fopen(filename, "r");
-		if(f == NULL)
-		{
-			return SCAP_SUCCESS;
-		}
+	// null-terminate target_name (readlink() does not append a null byte)
+	target_name[target_res] = 0;
 
-		ASSERT(sizeof(line) >= SCAP_MAX_PATH_SIZE);
-
-		if(fgets(line, SCAP_MAX_PATH_SIZE, f) == NULL)
-		{
-			fclose(f);
-			return SCAP_SUCCESS;
-		}
-		else
-		{
-			fclose(f);
-		}
-
-		target_name[0] = 0;
-	}
-	else
-	{
-		// null-terminate target_name (readlink() does not append a null byte)
-		target_name[target_res] = 0;
-	}
+	printf("target name: %s\n", target_name);
+	printf("cgroup version: %d\n", handle->m_cgroup_version);
 
 	//
 	// This is a real user level process. Allocate the procinfo structure.
@@ -741,6 +712,7 @@ static int32_t scap_proc_add_from_proc(scap_t* handle, uint32_t tid, char* procd
 	tinfo->tid = tid;
 
 	tinfo->fdlist = NULL;
+	/* No leakage here */
 
 	//
 	// Gathers the exepath
@@ -774,7 +746,9 @@ static int32_t scap_proc_add_from_proc(scap_t* handle, uint32_t tid, char* procd
 		fclose(f);
 	}
 
-	bool suppressed;
+	printf("line: %s\n", line);
+
+	bool suppressed =false;
 	if ((res = scap_update_suppressed(handle, tinfo->comm, tid, 0, &suppressed)) != SCAP_SUCCESS)
 	{
 		free(tinfo);
@@ -786,6 +760,9 @@ static int32_t scap_proc_add_from_proc(scap_t* handle, uint32_t tid, char* procd
 		free(tinfo);
 		return SCAP_SUCCESS;
 	}
+
+// printf("here!\n");
+// 	return SCAP_SUCCESS;
 
 	//
 	// Gather the command line
@@ -873,6 +850,11 @@ static int32_t scap_proc_add_from_proc(scap_t* handle, uint32_t tid, char* procd
 			 dir_name, handle->m_lasterr);
 	}
 
+// printf("--------------------------------here!\n");
+// 	return SCAP_SUCCESS;
+
+
+
 	//
 	// extract the user id and ppid from /proc/pid/status
 	//
@@ -899,6 +881,9 @@ static int32_t scap_proc_add_from_proc(scap_t* handle, uint32_t tid, char* procd
 		return scap_errprintf(error, 0, "can't fill cgroups for %s (%s)",
 			 dir_name, handle->m_lasterr);
 	}
+
+// printf("--------------------------------here!\n");
+// 	return SCAP_SUCCESS;
 
 	// These values should be read already from /status file, leave these
 	// fallback functions for older kernels < 4.1
@@ -958,10 +943,15 @@ static int32_t scap_proc_add_from_proc(scap_t* handle, uint32_t tid, char* procd
 			 dir_name, handle->m_lasterr);
 	}
 
+	// printf("--------------------------------here!\n");
+	// return SCAP_SUCCESS;
+
 	//
 	// if procinfo is set we assume this is a runtime lookup so no
 	// need to use the table
 	//
+
+	/* procinfo è sempre NULL al primo giro */
 	if(!procinfo)
 	{
 		//
@@ -989,18 +979,27 @@ static int32_t scap_proc_add_from_proc(scap_t* handle, uint32_t tid, char* procd
 		*procinfo = tinfo;
 	}
 
+
+	/* This is the culprit */
+
 	//
 	// Only add fds for processes, not threads
 	//
 	if(tinfo->pid == tinfo->tid)
 	{
+		printf("dir_name: %s\n", dir_name);
 		res = scap_fd_scan_fd_dir(handle, dir_name, tinfo, sockets_by_ns, error);
 	}
+
 
 	if(free_tinfo)
 	{
 		free(tinfo);
 	}
+
+	// printf("--------------------------------here!\n");
+	// return SCAP_SUCCESS;
+
 
 	return res;
 }
@@ -1039,17 +1038,17 @@ int32_t scap_proc_read_thread(scap_t* handle, char* procdirname, uint64_t tid, s
 //
 static int32_t _scap_proc_scan_proc_dir_impl(scap_t* handle, char* procdirname, int parenttid, char *error)
 {
-	DIR *dir_p;
-	struct dirent *dir_entry_p;
-	scap_threadinfo* tinfo;
-	uint64_t tid;
+	DIR *dir_p = NULL;
+	struct dirent *dir_entry_p = NULL;
+	scap_threadinfo* tinfo = NULL;
+	uint64_t tid = 0;
 	int32_t res = SCAP_SUCCESS;
-	char childdir[SCAP_MAX_PATH_SIZE];
-
+	char childdir[SCAP_MAX_PATH_SIZE] = {0};
 	struct scap_ns_socket_list* sockets_by_ns = NULL;
+	int cycles = 0;
 
+	printf("/PROC: %s\n", procdirname);
 	dir_p = opendir(procdirname);
-
 	if(dir_p == NULL)
 	{
 		scap_errprintf(error, errno, "error opening the %s directory", procdirname);
@@ -1058,23 +1057,26 @@ static int32_t _scap_proc_scan_proc_dir_impl(scap_t* handle, char* procdirname, 
 
 	while((dir_entry_p = readdir(dir_p)) != NULL)
 	{
+		cycles++;
 		if(strspn(dir_entry_p->d_name, "0123456789") != strlen(dir_entry_p->d_name))
 		{
 			continue;
 		}
+		printf("dir name: %s, cycle: %d\n", dir_entry_p->d_name, cycles);
 
 		//
 		// Gather the process TID, which is the directory name
 		//
 		tid = atoi(dir_entry_p->d_name);
+		printf("tid: %d\n", tid);
 
-		//
-		// Skip the main thread entry
-		//
-		if(parenttid != -1 && tid == parenttid)
-		{
-			continue;
-		}
+		// //
+		// // Skip the main thread entry
+		// //
+		// if(parenttid != -1 && tid == parenttid)
+		// {
+		// 	continue;
+		// }
 
 		//
 		// This is the initial /proc scan so duplicate threads
@@ -1082,12 +1084,13 @@ static int32_t _scap_proc_scan_proc_dir_impl(scap_t* handle, char* procdirname, 
 		// list to see if we've encountered this tid already
 		//
 		HASH_FIND_INT64(handle->m_proclist.m_proclist, &tid, tinfo);
-		if(tinfo != NULL)
-		{
-			ASSERT(false);
-			res = scap_errprintf(error, 0, "duplicate process %"PRIu64, tid);
-			break;
-		}
+		// if(tinfo != NULL)
+		// {
+		// 	ASSERT(false);
+		// 	printf("errorrrrrrrr\n");
+		// 	res = scap_errprintf(error, 0, "duplicate process %"PRIu64, tid);
+		// 	break;
+		// }
 
 		char add_error[SCAP_LASTERR_SIZE];
 
@@ -1095,42 +1098,34 @@ static int32_t _scap_proc_scan_proc_dir_impl(scap_t* handle, char* procdirname, 
 		// We have a process that needs to be explored
 		//
 		res = scap_proc_add_from_proc(handle, tid, procdirname, &sockets_by_ns, NULL, add_error);
-		if(res != SCAP_SUCCESS)
-		{
-			//
-			// When a /proc lookup fails (while scanning the whole directory,
-			// not just while looking up a single tid),
-			// we should drop this thread/process completely.
-			// We will fill the gap later, when the first event
-			// for that process arrives.
-			//
-			//
-			res = SCAP_SUCCESS;
-			//
-			// Continue because if we failed to read details of pid=1234,
-			// it doesn’t say anything about pid=1235
-			//
-			continue;
-		}
+		// if(res != SCAP_SUCCESS)
+		// {
+		// 	//
+		// 	// When a /proc lookup fails (while scanning the whole directory,
+		// 	// not just while looking up a single tid),
+		// 	// we should drop this thread/process completely.
+		// 	// We will fill the gap later, when the first event
+		// 	// for that process arrives.
+		// 	//
+		// 	//
+		// 	res = SCAP_SUCCESS;
+		// 	//
+		// 	// Continue because if we failed to read details of pid=1234,
+		// 	// it doesn’t say anything about pid=1235
+		// 	//
+		// 	continue;
+		// }
 
-		//
-		// See if this process includes tasks that need to be added
-		// Note the use of recursion will re-enter this function for the childdir.
-		//
-		if(parenttid == -1 && handle->m_mode != SCAP_MODE_NODRIVER)
-		{
-			snprintf(childdir, sizeof(childdir), "%s/%u/task", procdirname, (int)tid);
-			if(_scap_proc_scan_proc_dir_impl(handle, childdir, tid, error) == SCAP_FAILURE)
-			{
-				res = SCAP_FAILURE;
-				break;
-			}
-		}
+		/* Break immediately after the `1` process */
+		break;
 	}
+
+	printf("Cycles: %d\n", cycles);
 
 	closedir(dir_p);
 	if(sockets_by_ns != NULL && sockets_by_ns != (void*)-1)
 	{
+		printf("sockettttttttttttttt!\n");
 		scap_fd_free_ns_sockets_list(&sockets_by_ns);
 	}
 	return res;

@@ -225,16 +225,20 @@ void scap_fd_free_table(scap_fdinfo **fds)
 {
 	struct scap_fdinfo *fdi;
 	struct scap_fdinfo *tfdi;
-
+	int i = 0;
 	if(*fds)
 	{
 		HASH_ITER(hh, *fds, fdi, tfdi)
 		{
 			HASH_DEL(*fds, fdi);
 			free(fdi);
+			i++;
 		}
 		*fds = NULL;
 	}
+
+	printf("count free: %d\n", i);
+
 }
 
 void scap_fd_free_proc_fd_table(scap_threadinfo *tinfo)

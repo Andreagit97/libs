@@ -39,7 +39,7 @@ int main(int argc, char** argv)
 {
 	int ret;
 	bool libbpf_verbosity = false;
-	unsigned long buffer_dim = 8 * 1024; /* Should be enough */
+	unsigned long buffer_dim = 8 * 1024*1024; /* Should be enough */
 
 	for(int i = 0; i < argc; i++)
 	{
@@ -81,6 +81,10 @@ int main(int argc, char** argv)
 	pman_clean_all_64bit_interesting_syscalls();
 
 	print_start_test_message();
+
+while(1){
+	printf("ciaooooooo\n");
+}
 
 	ret = RUN_ALL_TESTS();
 

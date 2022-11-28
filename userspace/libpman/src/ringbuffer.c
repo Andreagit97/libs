@@ -48,7 +48,7 @@ static int ringbuf_array_set_inner_map()
 		return errno;
 	}
 
-	/* Save to close it after the loading phase. */
+	/* Save the inner_map fd to close it after the loading phase. */
 	g_state.inner_ringbuf_map_fd = inner_map_fd;
 	return 0;
 }
@@ -81,7 +81,7 @@ int pman_prepare_ringbuf_array_before_loading()
 	int err;
 	err = ringbuf_array_set_inner_map();
 	err = err ?: ringbuf_array_set_max_entries();
-	/* Allocate consumer positions and producer positions for the ringbuffer. */
+	/* Allocate consumer positions and producer positions for every CPU. */
 	err = err ?: allocate_consumer_producer_positions();
 	return err;
 }
@@ -89,100 +89,67 @@ int pman_prepare_ringbuf_array_before_loading()
 static int create_first_ringbuffer_map()
 {
 	int ringubuf_array_fd = -1;
-	int ringbuf_map_fd = -1;
+	int ringbuf_map_fd_1 = -1;
 	int index = 0;
+	char name[20];
 
 	/* We don't need anymore the inner map, close it. */
 	close(g_state.inner_ringbuf_map_fd);
+	g_state.inner_ringbuf_map_fd = -1;
 
-	/* `ringbuf_array` is a maps array, every map inside it is a `BPF_MAP_TYPE_RINGBUF`. */
-	ringubuf_array_fd = bpf_map__fd(g_state.skel->maps.ringbuf_maps);
-	if(ringubuf_array_fd <= 0)
-	{
-		pman_print_error("failed to get the ringubuf_array");
-		return errno;
-	}
 
 	/* create the first ringbuf map. */
-	ringbuf_map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, g_state.buffer_bytes_dim, NULL);
-	if(ringbuf_map_fd <= 0)
+	ringbuf_map_fd_1 = bpf_map_create(BPF_MAP_TYPE_RINGBUF, "map0", 0, 0, g_state.buffer_bytes_dim, NULL);
+	if(ringbuf_map_fd_1 <= 0)
 	{
 		pman_print_error("failed to create the first ringbuf map");
 		goto clean_create_first_ringbuffer_map;
 	}
 
 	/* add the first ringbuf map into the array. */
-	if(bpf_map_update_elem(ringubuf_array_fd, &index, &ringbuf_map_fd, BPF_ANY))
+	if(bpf_map_update_elem(bpf_map__fd(g_state.skel->maps.ringbuf_maps), &index, &ringbuf_map_fd_1, BPF_ANY))
 	{
 		pman_print_error("failed to add the first ringbuf map into the array");
 		goto clean_create_first_ringbuffer_map;
 	}
 
-	g_state.rb_manager = ring_buffer__new(ringbuf_map_fd, NULL, NULL, NULL);
+	g_state.rb_manager = ring_buffer__new(ringbuf_map_fd_1, NULL, NULL, NULL);
 	if(!g_state.rb_manager)
 	{
 		pman_print_error("failed to instantiate the ringbuf manager. (If you get memory allocation errors try to reduce the buffer dimension)");
 		goto clean_create_first_ringbuffer_map;
 	}
-	return 0;
 
-clean_create_first_ringbuffer_map:
-	close(ringbuf_map_fd);
-	close(ringubuf_array_fd);
-	return errno;
-}
+	/* PER CPU stuff */
+	int ringbuf_map_fd = 0;
 
-static int create_remaining_ringbuffer_maps()
-{
-	int ringubuf_array_fd = -1;
-	int ringbuf_map_fd = -1;
-	char error_message[MAX_ERROR_MESSAGE_LEN];
-
-	/* the first ringbuf map is already inserted into the array.
-	 * See `create_first_ringbuffer_map()` function.
-	 */
-	int index = 1;
-
-	/* get the ringbuf_array with a map already in it. */
-	ringubuf_array_fd = bpf_map__fd(g_state.skel->maps.ringbuf_maps);
-	if(ringubuf_array_fd <= 0)
+	for(int i = 1; i < libbpf_num_possible_cpus(); i++)
 	{
-		pman_print_error("failed to get a not empty ringubuf_array");
-		return errno;
-	}
-
-	/* for all CPUs add the rinugbuf map into the array and add it also
-	 * into the ringbuf manager. Please note: we have already initialized the
-	 * the ringbuf_array and the manager with the map for the CPU `0`.
-	 */
-	for(index = 1; index < g_state.n_cpus; index++)
-	{
-		ringbuf_map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, g_state.buffer_bytes_dim, NULL);
+		snprintf(name, 20, "map%d", i);
+		ringbuf_map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, name, 0, 0, g_state.buffer_bytes_dim, NULL);
 		if(ringbuf_map_fd <= 0)
 		{
-			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to create the ringbuf map for CPU %d", index);
-			pman_print_error((const char *)error_message);
-			goto clean_create_remaining_ringbuffer_maps;
+			printf("failed to create the ringbuf map for CPU %d", i);
+			goto clean_create_first_ringbuffer_map;
 		}
 
-		if(bpf_map_update_elem(ringubuf_array_fd, &index, &ringbuf_map_fd, BPF_ANY))
+		if(bpf_map_update_elem(bpf_map__fd(g_state.skel->maps.ringbuf_maps), &i, &ringbuf_map_fd, BPF_ANY))
 		{
-			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to add the ringbuf map for CPU %d into the array", index);
-			pman_print_error((const char *)error_message);
-			goto clean_create_remaining_ringbuffer_maps;
+			printf("failed to add the ringbuf map for CPU %d into the array", i);
+			goto clean_create_first_ringbuffer_map;
 		}
 
 		/* add the new ringbuf map into the manager. */
 		if(ring_buffer__add(g_state.rb_manager, ringbuf_map_fd, NULL, NULL))
 		{
-			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to add the ringbuf map for CPU %d into the manager", index);
-			pman_print_error((const char *)error_message);
-			goto clean_create_remaining_ringbuffer_maps;
+			printf("failed to add the ringbuf map for CPU %d into the manager", i);
+			goto clean_create_first_ringbuffer_map;
 		}
 	}
+
 	return 0;
 
-clean_create_remaining_ringbuffer_maps:
+clean_create_first_ringbuffer_map:
 	close(ringbuf_map_fd);
 	close(ringubuf_array_fd);
 	return errno;
@@ -198,7 +165,6 @@ int pman_finalize_ringbuf_array_after_loading()
 {
 	int err;
 	err = create_first_ringbuffer_map();
-	err = err ?: create_remaining_ringbuffer_maps();
 	return err;
 }
 

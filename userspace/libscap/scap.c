@@ -192,6 +192,9 @@ scap_t* scap_open_live_int(char *error, int32_t *rc, scap_open_args* oargs, cons
 		snprintf(error, SCAP_LASTERR_SIZE, "scap_open_live_int() error creating the process list: %s. Make sure you have root credentials.", proc_scan_err);
 		return NULL;
 	}
+
+	// scap_proc_print(handle->m_proclist.m_proclist);
+
 	return handle;
 }
 #endif // HAS_LIVE_CAPTURE

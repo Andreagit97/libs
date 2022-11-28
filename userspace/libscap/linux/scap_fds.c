@@ -351,36 +351,22 @@ int32_t scap_fd_handle_socket(struct scap_proclist *proclist, char *fname, scap_
 	struct scap_ns_socket_list* sockets = NULL;
 	int32_t uth_status = SCAP_SUCCESS;
 
-	if(*sockets_by_ns == (void*)-1)
-	{
-		return SCAP_SUCCESS;
-	}
-	else
-	{
-		HASH_FIND_INT64(*sockets_by_ns, &net_ns, sockets);
-		if(sockets == NULL)
-		{
-			sockets = malloc(sizeof(struct scap_ns_socket_list));
-			sockets->net_ns = net_ns;
-			sockets->sockets = NULL;
-			char fd_error[SCAP_LASTERR_SIZE];
 
-			HASH_ADD_INT64(*sockets_by_ns, net_ns, sockets);
-			if(uth_status != SCAP_SUCCESS)
-			{
-				snprintf(error, SCAP_LASTERR_SIZE, "socket list allocation error");
-				free(sockets);
-				return SCAP_FAILURE;
-			}
+	HASH_FIND_INT64(*sockets_by_ns, &net_ns, sockets);
+	if(sockets == NULL)
+	{
+		sockets = malloc(sizeof(struct scap_ns_socket_list));
+		sockets->net_ns = net_ns;
+		sockets->sockets = NULL;
+		char fd_error[SCAP_LASTERR_SIZE];
 
-			if(scap_fd_read_sockets(procdir, sockets, fd_error) == SCAP_FAILURE)
-			{
-				snprintf(error, SCAP_LASTERR_SIZE, "Cannot read sockets (%s)", fd_error);
-				sockets->sockets = NULL;
-				return SCAP_FAILURE;
-			}
-		}
+		HASH_ADD_INT64(*sockets_by_ns, net_ns, sockets);
+		scap_fd_read_sockets(procdir, sockets, fd_error);
 	}
+
+
+	/* Before here !!!!!!!!!!!!!!!!!!!!1 */
+	// return SCAP_SUCCESS;
 
 	r = readlink(fname, link_name, SCAP_MAX_PATH_SIZE);
 	if(r <= 0)
@@ -416,6 +402,7 @@ int32_t scap_fd_handle_socket(struct scap_proclist *proclist, char *fname, scap_
 		return SCAP_SUCCESS;
 	}
 }
+////////////////////////////////
 
 int32_t scap_fd_read_unix_sockets_from_proc_fs(const char* filename, scap_fdinfo **sockets, char *error)
 {
@@ -425,6 +412,8 @@ int32_t scap_fd_read_unix_sockets_from_proc_fs(const char* filename, scap_fdinfo
 	char *delimiters = " \t";
 	char *token;
 	int32_t uth_status = SCAP_SUCCESS;
+	uint64_t sum = 0;
+	uint64_t fdinfo_num = 0;
 
 	f = fopen(filename, "r");
 	if(NULL == f)
@@ -442,9 +431,9 @@ int32_t scap_fd_read_unix_sockets_from_proc_fs(const char* filename, scap_fdinfo
 			first_line = true;
 			continue;
 		}
+		
 		scap_fdinfo *fdinfo = malloc(sizeof(scap_fdinfo));
 		fdinfo->type = SCAP_FD_UNIX_SOCK;
-
 
 		//
 		// parse the fields
@@ -528,6 +517,9 @@ int32_t scap_fd_read_unix_sockets_from_proc_fs(const char* filename, scap_fdinfo
 			fdinfo->info.unix_socket_info.fname[0] = '\0';
 		}
 
+		sum += sizeof(*fdinfo);
+		fdinfo_num++;
+		// free(fdinfo);
 		HASH_ADD_INT64((*sockets), ino, fdinfo);
 		if(uth_status != SCAP_SUCCESS)
 		{
@@ -538,6 +530,23 @@ int32_t scap_fd_read_unix_sockets_from_proc_fs(const char* filename, scap_fdinfo
 		}
 	}
 	fclose(f);
+
+	struct scap_fdinfo *fdi;
+	struct scap_fdinfo *tfdi;
+	int i = 0;
+	HASH_ITER(hh, *sockets, fdi, tfdi)
+	{
+		i++;
+		printf("fd: %ld, ino: %lu\n", fdi->fd, fdi->ino);
+	}
+
+
+// while(1){
+// 	printf("i: %d\n", i);
+// 	printf("sum: %lu\n", sum);
+// 	printf("fdinfo: %lu\n", fdinfo_num);
+// }
+
 	return uth_status;
 }
 
@@ -1075,6 +1084,8 @@ int32_t scap_fd_read_ipv6_sockets_from_proc_fs(char *dir, int l4proto, scap_fdin
 	return uth_status;
 }
 
+
+
 int32_t scap_fd_read_sockets(char* procdir, struct scap_ns_socket_list *sockets, char *error)
 {
 	char filename[SCAP_MAX_PATH_SIZE];
@@ -1096,31 +1107,32 @@ int32_t scap_fd_read_sockets(char* procdir, struct scap_ns_socket_list *sockets,
 		snprintf(netroot, sizeof(netroot), "%s/proc/net/", scap_get_host_root());
 	}
 
-	snprintf(filename, sizeof(filename), "%stcp", netroot);
-	if(scap_fd_read_ipv4_sockets_from_proc_fs(filename, SCAP_L4_TCP, &sockets->sockets, err_buf) == SCAP_FAILURE)
-	{
-		scap_fd_free_table(&sockets->sockets);
-		snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv4 tcp sockets (%s)", err_buf);
-		return SCAP_FAILURE;
-	}
+	// snprintf(filename, sizeof(filename), "%stcp", netroot);
+	// if(scap_fd_read_ipv4_sockets_from_proc_fs(filename, SCAP_L4_TCP, &sockets->sockets, err_buf) == SCAP_FAILURE)
+	// {
+	// 	scap_fd_free_table(&sockets->sockets);
+	// 	snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv4 tcp sockets (%s)", err_buf);
+	// 	return SCAP_FAILURE;
+	// }
 
-	snprintf(filename, sizeof(filename), "%sudp", netroot);
-	if(scap_fd_read_ipv4_sockets_from_proc_fs(filename, SCAP_L4_UDP, &sockets->sockets, err_buf) == SCAP_FAILURE)
-	{
-		scap_fd_free_table(&sockets->sockets);
-		snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv4 udp sockets (%s)", err_buf);
-		return SCAP_FAILURE;
-	}
+	// snprintf(filename, sizeof(filename), "%sudp", netroot);
+	// if(scap_fd_read_ipv4_sockets_from_proc_fs(filename, SCAP_L4_UDP, &sockets->sockets, err_buf) == SCAP_FAILURE)
+	// {
+	// 	scap_fd_free_table(&sockets->sockets);
+	// 	snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv4 udp sockets (%s)", err_buf);
+	// 	return SCAP_FAILURE;
+	// }
 
-	snprintf(filename, sizeof(filename), "%sraw", netroot);
-	if(scap_fd_read_ipv4_sockets_from_proc_fs(filename, SCAP_L4_RAW, &sockets->sockets, err_buf) == SCAP_FAILURE)
-	{
-		scap_fd_free_table(&sockets->sockets);
-		snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv4 raw sockets (%s)", err_buf);
-		return SCAP_FAILURE;
-	}
+	// snprintf(filename, sizeof(filename), "%sraw", netroot);
+	// if(scap_fd_read_ipv4_sockets_from_proc_fs(filename, SCAP_L4_RAW, &sockets->sockets, err_buf) == SCAP_FAILURE)
+	// {
+	// 	scap_fd_free_table(&sockets->sockets);
+	// 	snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv4 raw sockets (%s)", err_buf);
+	// 	return SCAP_FAILURE;
+	// }
 
 	snprintf(filename, sizeof(filename), "%sunix", netroot);
+	printf("filename net: %s\n", filename);
 	if(scap_fd_read_unix_sockets_from_proc_fs(filename, &sockets->sockets, err_buf) == SCAP_FAILURE)
 	{
 		scap_fd_free_table(&sockets->sockets);
@@ -1128,41 +1140,41 @@ int32_t scap_fd_read_sockets(char* procdir, struct scap_ns_socket_list *sockets,
 		return SCAP_FAILURE;
 	}
 
-	snprintf(filename, sizeof(filename), "%snetlink", netroot);
-	if(scap_fd_read_netlink_sockets_from_proc_fs(filename, &sockets->sockets, err_buf) == SCAP_FAILURE)
-	{
-		scap_fd_free_table(&sockets->sockets);
-		snprintf(error, SCAP_LASTERR_SIZE, "Could not read netlink sockets (%s)", err_buf);
-		return SCAP_FAILURE;
-	}
+	// snprintf(filename, sizeof(filename), "%snetlink", netroot);
+	// if(scap_fd_read_netlink_sockets_from_proc_fs(filename, &sockets->sockets, err_buf) == SCAP_FAILURE)
+	// {
+	// 	scap_fd_free_table(&sockets->sockets);
+	// 	snprintf(error, SCAP_LASTERR_SIZE, "Could not read netlink sockets (%s)", err_buf);
+	// 	return SCAP_FAILURE;
+	// }
 
-	snprintf(filename, sizeof(filename), "%stcp6", netroot);
+	// snprintf(filename, sizeof(filename), "%stcp6", netroot);
     /* We assume if there is /proc/net/tcp6 that ipv6 is available */
-    if(access(filename, R_OK) == 0)
-    {
-		if(scap_fd_read_ipv6_sockets_from_proc_fs(filename, SCAP_L4_TCP, &sockets->sockets, err_buf) == SCAP_FAILURE)
-		{
-			scap_fd_free_table(&sockets->sockets);
-			snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv6 tcp sockets (%s)", err_buf);
-			return SCAP_FAILURE;
-		}
+    // if(access(filename, R_OK) == 0)
+    // {
+	// 	if(scap_fd_read_ipv6_sockets_from_proc_fs(filename, SCAP_L4_TCP, &sockets->sockets, err_buf) == SCAP_FAILURE)
+	// 	{
+	// 		scap_fd_free_table(&sockets->sockets);
+	// 		snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv6 tcp sockets (%s)", err_buf);
+	// 		return SCAP_FAILURE;
+	// 	}
 
-		snprintf(filename, sizeof(filename), "%sudp6", netroot);
-		if(scap_fd_read_ipv6_sockets_from_proc_fs(filename, SCAP_L4_UDP, &sockets->sockets, err_buf) == SCAP_FAILURE)
-		{
-			scap_fd_free_table(&sockets->sockets);
-			snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv6 udp sockets (%s)", err_buf);
-			return SCAP_FAILURE;
-		}
+	// 	snprintf(filename, sizeof(filename), "%sudp6", netroot);
+	// 	if(scap_fd_read_ipv6_sockets_from_proc_fs(filename, SCAP_L4_UDP, &sockets->sockets, err_buf) == SCAP_FAILURE)
+	// 	{
+	// 		scap_fd_free_table(&sockets->sockets);
+	// 		snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv6 udp sockets (%s)", err_buf);
+	// 		return SCAP_FAILURE;
+	// 	}
 
-		snprintf(filename, sizeof(filename), "%sraw6", netroot);
-		if(scap_fd_read_ipv6_sockets_from_proc_fs(filename, SCAP_L4_RAW, &sockets->sockets, err_buf) == SCAP_FAILURE)
-		{
-			scap_fd_free_table(&sockets->sockets);
-			snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv6 raw sockets (%s)", err_buf);
-			return SCAP_FAILURE;
-		}
-    }
+	// 	snprintf(filename, sizeof(filename), "%sraw6", netroot);
+	// 	if(scap_fd_read_ipv6_sockets_from_proc_fs(filename, SCAP_L4_RAW, &sockets->sockets, err_buf) == SCAP_FAILURE)
+	// 	{
+	// 		scap_fd_free_table(&sockets->sockets);
+	// 		snprintf(error, SCAP_LASTERR_SIZE, "Could not read ipv6 raw sockets (%s)", err_buf);
+	// 		return SCAP_FAILURE;
+	// 	}
+    // }
 
 	return SCAP_SUCCESS;
 }
@@ -1214,7 +1226,9 @@ int32_t scap_fd_scan_fd_dir(scap_t *handle, char *procdir, scap_threadinfo *tinf
 	uint64_t net_ns;
 	ssize_t r;
 	uint32_t fd_added = 0;
+	int cycles = 0;
 
+	/* fd_dir_name = proc/1/fd */
 	snprintf(fd_dir_name, SCAP_MAX_PATH_SIZE, "%sfd", procdir);
 	dir_p = opendir(fd_dir_name);
 	if(dir_p == NULL)
@@ -1228,33 +1242,20 @@ int32_t scap_fd_scan_fd_dir(scap_t *handle, char *procdir, scap_threadinfo *tinf
 	//
 	snprintf(f_name, sizeof(f_name), "%sns/net", procdir);
 	r = readlink(f_name, link_name, sizeof(link_name));
-	if(r <= 0)
-	{
-		//
-		// No network namespace available. Assume global
-		//
-		net_ns = 0;
-	}
-	else
-	{
-		link_name[r] = '\0';
-		sscanf(link_name, "net:[%"PRIi64"]", &net_ns);
-	}
+
+	link_name[r] = '\0';
+	sscanf(link_name, "net:[%"PRIi64"]", &net_ns);
 
 	while((dir_entry_p = readdir(dir_p)) != NULL &&
 		(handle->m_fd_lookup_limit == 0 || fd_added < handle->m_fd_lookup_limit))
 	{
+		cycles++;
 		fdi = NULL;
 		snprintf(f_name, SCAP_MAX_PATH_SIZE, "%s/%s", fd_dir_name, dir_entry_p->d_name);
 
-		if(-1 == stat(f_name, &sb) || 1 != sscanf(dir_entry_p->d_name, "%"PRIu64, &fd))
-		{
-			continue;
-		}
+		printf("FILENAME: %s\n", f_name);
 
-		// In no driver mode to limit cpu usage we just parse sockets
-		// because we are interested only on them
-		if(handle->m_mode == SCAP_MODE_NODRIVER && !S_ISSOCK(sb.st_mode))
+		if(-1 == stat(f_name, &sb) || 1 != sscanf(dir_entry_p->d_name, "%"PRIu64, &fd))
 		{
 			continue;
 		}
@@ -1262,44 +1263,30 @@ int32_t scap_fd_scan_fd_dir(scap_t *handle, char *procdir, scap_threadinfo *tinf
 		switch(sb.st_mode & S_IFMT)
 		{
 		case S_IFIFO:
+			printf("S_IFIFO\n");
 			res = scap_fd_allocate_fdinfo(&fdi, fd, SCAP_FD_FIFO);
-			if(SCAP_FAILURE == res)
-			{
-				snprintf(error, SCAP_LASTERR_SIZE, "can't allocate scap fd handle for fifo fd %" PRIu64, fd);
-				break;
-			}
 			res = scap_fd_handle_pipe(&handle->m_proclist, f_name, tinfo, fdi, error);
 			break;
 		case S_IFREG:
 		case S_IFBLK:
 		case S_IFCHR:
 		case S_IFLNK:
+			printf("S_IFREG\n");
 			res = scap_fd_allocate_fdinfo(&fdi, fd, SCAP_FD_FILE_V2);
-			if(SCAP_FAILURE == res)
-			{
-				snprintf(error, SCAP_LASTERR_SIZE, "can't allocate scap fd handle for file fd %" PRIu64, fd);
-				break;
-			}
 			fdi->ino = sb.st_ino;
 			res = scap_fd_handle_regular_file(&handle->m_proclist, f_name, tinfo, fdi, procdir, error);
 			break;
 		case S_IFDIR:
+			printf("S_IFDIR\n");
 			res = scap_fd_allocate_fdinfo(&fdi, fd, SCAP_FD_DIRECTORY);
-			if(SCAP_FAILURE == res)
-			{
-				snprintf(error, SCAP_LASTERR_SIZE, "can't allocate scap fd handle for dir fd %" PRIu64, fd);
-				break;
-			}
 			fdi->ino = sb.st_ino;
 			res = scap_fd_handle_regular_file(&handle->m_proclist, f_name, tinfo, fdi, procdir, error);
 			break;
 		case S_IFSOCK:
+			printf("S_IFSOCK\n");
+			/* Create an unknown filedescriptor */
 			res = scap_fd_allocate_fdinfo(&fdi, fd, SCAP_FD_UNKNOWN);
-			if(SCAP_FAILURE == res)
-			{
-				snprintf(error, SCAP_LASTERR_SIZE, "can't allocate scap fd handle for sock fd %" PRIu64, fd);
-				break;
-			}
+
 			res = scap_fd_handle_socket(&handle->m_proclist, f_name, tinfo, fdi, procdir, net_ns, sockets_by_ns, error);
 			if(handle->m_proclist.m_proc_callback == NULL)
 			{
@@ -1311,32 +1298,20 @@ int32_t scap_fd_scan_fd_dir(scap_t *handle, char *procdir, scap_threadinfo *tinf
 			}
 			break;
 		default:
+			printf("DEFAULT\n");
 			res = scap_fd_allocate_fdinfo(&fdi, fd, SCAP_FD_UNSUPPORTED);
-			if(SCAP_FAILURE == res)
-			{
-				snprintf(error, SCAP_LASTERR_SIZE, "can't allocate scap fd handle for unsupported fd %" PRIu64, fd);
-				break;
-			}
 			fdi->ino = sb.st_ino;
 			res = scap_fd_handle_regular_file(&handle->m_proclist, f_name, tinfo, fdi, procdir, error);
 			break;
 		}
 
-		if(handle->m_proclist.m_proc_callback != NULL)
-		{
-			if(fdi)
-			{
-				scap_fd_free_fdinfo(&fdi);
-			}
-		}
-
-		if(SCAP_SUCCESS != res)
-		{
+		++fd_added;
+		if(cycles==12){
 			break;
-		} else {
-			++fd_added;
 		}
 	}
+	printf("INTERNAL CYCLES: %d, res: %d\n", cycles, res);
+
 	closedir(dir_p);
 	return res;
 }

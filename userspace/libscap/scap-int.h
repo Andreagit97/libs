@@ -149,6 +149,10 @@ int32_t scap_proc_scan_proc_dir(scap_t* handle, char* procdirname, char *error);
 int32_t scap_proc_scan_vtable(char *error, scap_t *handle);
 // Free the process table
 void scap_proc_free_table(scap_threadinfo* proclist);
+
+// print
+void scap_proc_print(scap_threadinfo* proclist);
+
 // Return the process info entry given a tid
 // Free an fd table and set it to NULL when done
 void scap_fd_free_table(scap_fdinfo** fds);

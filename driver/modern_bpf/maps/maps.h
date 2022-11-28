@@ -165,7 +165,6 @@ struct
 {
 	__uint(type, BPF_MAP_TYPE_ARRAY_OF_MAPS);
 	__type(key, u32);
-	__type(value, u32);
 	__array(values, struct ringbuf_map);
 } ringbuf_maps __weak SEC(".maps");
 

@@ -70,6 +70,17 @@ void scap_proc_free_table(scap_threadinfo* proclist)
 	}
 }
 
+void scap_proc_print(scap_threadinfo* proclist)
+{
+	struct scap_threadinfo* tinfo;
+	struct scap_threadinfo* ttinfo;
+
+	HASH_ITER(hh, proclist, tinfo, ttinfo)
+	{
+		printf("exe name: %s\n", tinfo->exe);
+	}
+}
+
 struct scap_threadinfo *scap_proc_alloc(scap_t *handle)
 {
 	struct scap_threadinfo *tinfo = (struct scap_threadinfo*) calloc(1, sizeof(scap_threadinfo));
