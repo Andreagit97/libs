@@ -182,13 +182,6 @@ static __always_inline void auxmap__finalize_event_header(struct auxiliary_map *
  */
 static __always_inline void auxmap__submit_event(struct auxiliary_map *auxmap)
 {
-
-	struct ringbuf_map *rb = maps__get_ringbuf_map();
-	if(!rb)
-	{
-		return;
-	}
-
 	struct counter_map *counter = maps__get_counter_map();
 	if(!counter)
 	{
@@ -207,7 +200,7 @@ static __always_inline void auxmap__submit_event(struct auxiliary_map *auxmap)
 	/* `BPF_RB_NO_WAKEUP` means that we don't send to userspace a notification
 	 *  when a new event is in the buffer.
 	 */
-	int err = bpf_ringbuf_output(rb, auxmap->data, auxmap->payload_pos, BPF_RB_NO_WAKEUP);
+	int err = bpf_ringbuf_output(&single_ringbuffer, auxmap->data, auxmap->payload_pos, BPF_RB_NO_WAKEUP);
 	if(err)
 	{
 		counter->n_drops_buffer++;

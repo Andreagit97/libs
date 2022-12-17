@@ -74,8 +74,7 @@ struct ringbuf_struct
 
 /**
  * @brief This helper is used to reserve some space inside the ringbuf
- * for that particular CPU. The number of CPU is taken directly inside
- * `maps__get_ringbuf_map()`.
+ * for that particular CPU.
  *
  * Please note: we need to pass the exact size to reserve, so we need
  * to know the event dimension at compile time.
@@ -86,12 +85,6 @@ struct ringbuf_struct
  */
 static __always_inline u32 ringbuf__reserve_space(struct ringbuf_struct *ringbuf, u32 event_size)
 {
-
-	struct ringbuf_map *rb = maps__get_ringbuf_map();
-	if(!rb)
-	{
-		return 0;
-	}
 
 	struct counter_map *counter = maps__get_counter_map();
 	if(!counter)
@@ -105,7 +98,7 @@ static __always_inline u32 ringbuf__reserve_space(struct ringbuf_struct *ringbuf
 	/* If we are not able to reserve space we stop here
 	 * the event collection.
 	 */
-	u8 *space = bpf_ringbuf_reserve(rb, event_size, 0);
+	u8 *space = bpf_ringbuf_reserve(&single_ringbuffer, event_size, 0);
 	if(!space)
 	{
 		counter->n_drops_buffer++;

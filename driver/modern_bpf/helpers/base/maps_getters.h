@@ -69,13 +69,3 @@ static __always_inline struct counter_map *maps__get_counter_map()
 }
 
 /*=============================== COUNTER MAPS ===========================*/
-
-/*=============================== RINGBUF MAPS ===========================*/
-
-static __always_inline struct ringbuf_map *maps__get_ringbuf_map()
-{
-	u32 cpu_id = (u32)bpf_get_smp_processor_id();
-	return (struct ringbuf_map *)bpf_map_lookup_elem(&ringbuf_maps, &cpu_id);
-}
-
-/*=============================== RINGBUF MAPS ===========================*/

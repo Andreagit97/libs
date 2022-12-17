@@ -147,26 +147,12 @@ struct
 
 /*=============================== RINGBUF MAP ===============================*/
 
-/**
- * @brief We will have a ringbuf map for every CPU on the system.
- * The dimension of the single ringbuf and the number of
- * ringbuf maps are set in userspace.
- */
-struct ringbuf_map
-{
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-};
+#define MAX_BUF_DIM 64 * 1024 * 1024
 
-/**
- * @brief This array of maps will contain a ringbuf map for every CPU
- * on the system.
- */
 struct
 {
-	__uint(type, BPF_MAP_TYPE_ARRAY_OF_MAPS);
-	__type(key, u32);
-	__type(value, u32);
-	__array(values, struct ringbuf_map);
-} ringbuf_maps __weak SEC(".maps");
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, MAX_BUF_DIM);
+} single_ringbuffer __weak SEC(".maps");
 
 /*=============================== RINGBUF MAP ===============================*/
