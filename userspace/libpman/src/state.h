@@ -31,12 +31,14 @@ struct internal_state
 	struct ring_buffer* rb_manager; /* ring_buffer manager with all per-CPU ringbufs. */
 	int16_t n_cpus;			/* number of system available CPUs. */
 	int ringbuf_pos;		/* actual ringbuf we are considering. */
-	unsigned long* cons_pos;	/* every ringbuf has a consumer position. */
-	unsigned long* prod_pos;	/* every ringbuf has a producer position. */
+	// unsigned long* cons_pos;	/* every ringbuf has a consumer position. */
+	// unsigned long* prod_pos;	/* every ringbuf has a producer position. */
 	int32_t inner_ringbuf_map_fd;	/* inner map used to configure the ringbuf array before loading phase. */
 	unsigned long buffer_bytes_dim; /* dimension of a single per-CPU ringbuffer in bytes. */
 	int last_ring_read; /* Last ring from which we have correctly read an event. Could be `-1` if there were no successful reads. */
 	unsigned long last_event_size; /* Last event correctly read. Could be `0` if there were no successful reads. */
+	unsigned long cons_pos;
+	unsigned long prod_pos;
 };
 
 extern struct internal_state g_state;

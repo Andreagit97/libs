@@ -130,6 +130,8 @@ static void scap_modern_bpf__free_engine(struct scap_engine_handle engine)
 
 static int32_t scap_modern_bpf__next(struct scap_engine_handle engine, OUT scap_evt** pevent, OUT uint16_t* pcpuid)
 {
+	/* we have no context for the cpu */
+	*pcpuid = 0;
 	pman_consume_first_from_buffers((void**)pevent, pcpuid);
 	if((*pevent) == NULL)
 	{
@@ -241,8 +243,8 @@ int32_t scap_modern_bpf__init(scap_t* handle, scap_open_args* oargs)
 
 	/* Load and attach */
 	ret = pman_open_probe();
-	ret = ret ?: pman_prepare_ringbuf_array_before_loading();
 	ret = ret ?: pman_prepare_maps_before_loading();
+	ret = ret ?: pman_prepare_ringbuf_array_before_loading();
 	ret = ret ?: pman_load_probe();
 	ret = ret ?: pman_finalize_maps_after_loading();
 	ret = ret ?: pman_finalize_ringbuf_array_after_loading();
