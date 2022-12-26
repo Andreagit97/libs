@@ -39,6 +39,7 @@ option(MINIMAL_BUILD "Produce a minimal build with only the essential features (
 option(MUSL_OPTIMIZED_BUILD "Enable if you want a musl optimized build" OFF)
 option(USE_BUNDLED_DRIVER "Use the driver/ subdirectory in the build process (only available in Linux)" ON)
 option(ENABLE_DRIVERS_TESTS "Enable driver tests (bpf, kernel module, modern bpf)" OFF)
+option(ENABLE_LIBS_EXAMPLES "Enable libs examples like `scap-example`" OFF)
 
 include(GNUInstallDirs)
 
@@ -85,6 +86,7 @@ endif()
 include(libscap)
 include(libsinsp)
 
+# Build tests
 if(CREATE_TEST_TARGETS AND NOT WIN32)
 	# Add command to run all unit tests at once via the make system.
 	# This is preferred vs using ctest's add_test because it will build
@@ -99,4 +101,9 @@ if(CREATE_TEST_TARGETS AND NOT WIN32)
 	if(ENABLE_DRIVERS_TESTS)
 		add_subdirectory(test/drivers)
 	endif()
+endif()
+
+# Build examples
+if(ENABLE_LIBS_EXAMPLES)
+	add_subdirectory(examples)
 endif()
