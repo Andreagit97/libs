@@ -380,6 +380,12 @@ scap_t* open_engine(int argc, char** argv)
 
 		case 'd':
 			buffer_bytes_dim = strtoul(optarg, NULL, 10);
+			/* We need to refresh the dimension in all engines, we don't know
+			 * which one has been selected.
+			 */
+			kmod_params.buffer_bytes_dim = buffer_bytes_dim;
+			bpf_params.buffer_bytes_dim = buffer_bytes_dim;
+			modern_bpf_params.buffer_bytes_dim = buffer_bytes_dim;
 			break;
 
 		case 'h':
