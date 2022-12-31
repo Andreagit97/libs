@@ -46,7 +46,6 @@ static void setup_libbpf_logging(bool verbosity)
 
 int pman_init_state(bool verbosity, unsigned long buf_bytes_dim)
 {
-
 	/* `LIBBPF_STRICT_ALL` turns on all supported strict features
 	 * of libbpf to simulate libbpf v1.0 behavior.
 	 * `libbpf_set_strict_mode` returns always 0.
@@ -76,4 +75,9 @@ int pman_init_state(bool verbosity, unsigned long buf_bytes_dim)
 int pman_get_cpus_number()
 {
 	return g_state.n_cpus;
+}
+
+int pman_get_allocated_buffers()
+{
+	return g_state.n_allocated_buffers;
 }

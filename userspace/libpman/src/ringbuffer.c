@@ -26,13 +26,17 @@ limitations under the License.
 
 #include "ringbuffer_definitions.h"
 
+/*
+ * Utility functions before object loading 
+ */
+
 /* This must be done to please the verifier! At load-time, the verifier must know the
  * size of a map inside the array.
  */
-static int ringbuf_array_set_inner_map()
+static int ringbuf_array_set_inner_map(unsigned long ringbuf_dim)
 {
 	int err = 0;
-	int inner_map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, g_state.buffer_bytes_dim, NULL);
+	int inner_map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, ringbuf_dim, NULL);
 	if(inner_map_fd < 0)
 	{
 		pman_print_error("failed to create the dummy inner map");
@@ -63,11 +67,11 @@ static int ringbuf_array_set_max_entries(int16_t max_entries)
 	return 0;
 }
 
-static int allocate_consumer_producer_positions(int16_t max_entries)
+static int allocate_consumer_producer_positions()
 {
 	g_state.ringbuf_pos = 0;
-	g_state.cons_pos = (unsigned long *)calloc(max_entries, sizeof(unsigned long));
-	g_state.prod_pos = (unsigned long *)calloc(max_entries, sizeof(unsigned long));
+	g_state.cons_pos = (unsigned long *)calloc(g_state.n_allocated_buffers, sizeof(unsigned long));
+	g_state.prod_pos = (unsigned long *)calloc(g_state.n_allocated_buffers, sizeof(unsigned long));
 	if(g_state.cons_pos == NULL || g_state.prod_pos == NULL)
 	{
 		pman_print_error("failed to alloc memory for cons_pos and prod_pos");
@@ -76,57 +80,79 @@ static int allocate_consumer_producer_positions(int16_t max_entries)
 	return 0;
 }
 
-/* Before loading */
+/*
+ * Before loading functions for the 3 different modes
+ */
 
 int pman_prepare_percpu_ringbuf_before_loading()
 {
-	int err;
+	/* Here we want a ring buffer for every CPU, the size of each buffer
+	 * is the one chosen by users: `g_state.buffer_bytes_dim` 
+	 */
 	g_state.skel->rodata->ring_buffer_mode = BPF_PER_CPU_BUFFER;
-	err = ringbuf_array_set_inner_map();
-	/* Here we want a ring buffer for every CPU */
+	g_state.n_allocated_buffers = g_state.n_cpus;
+	int err = 0;
+	err = ringbuf_array_set_inner_map(g_state.buffer_bytes_dim);
 	err = err ?: ringbuf_array_set_max_entries(g_state.n_cpus);
-	/* Allocate consumer positions and producer positions for ring buffers. */
-	err = err ?: allocate_consumer_producer_positions(g_state.n_cpus);
+	/* We need a consumer and a producer for every ring buffer so in this case
+	 * we need `n_cpus` producers/consumers.
+	 */
+	err = err ?: allocate_consumer_producer_positions();
 	return err;
 }
 
 int pman_prepare_paired_ringbuf_before_loading()
 {
-	int err;
-	g_state.skel->rodata->ring_buffer_mode = BPF_PAIRED_BUFFER;
-	err = ringbuf_array_set_inner_map();
-	/* Here we want a ring buffer for every CPU pair.
-	 * Adding the division rest allows us to manage an odd number of CPUs.
-	 * Please note that here we are allocating a ring buffer for every pair of
-	 * possible CPUs, not available CPUs:
-	 *
+	/* Here we want a ring buffer for every CPU pair, the size of each buffer
+	 * is the one chosen by users: `g_state.buffer_bytes_dim`
+     *
 	 * CPU 0 \
-	 * 		  > RING BUFFER 0
+	 * 		  > RING BUFFER 0 (g_state.buffer_bytes_dim)
 	 * CPU 1 /
 	 *
 	 * CPU 2 \
-	 * 		  > RING BUFFER 1
+	 * 		  > RING BUFFER 1 (g_state.buffer_bytes_dim)
 	 * CPU 3 /
 	 *
-	 * Right now we allocate a ring buffer also for a pair of not available CPUs,
-	 * this should be a corner case but we can change the behavior in case of issues
+	 * As in the `percpu` approach we allocate a ring buffer even if the CPU is not 
+	 * available at that moment, in this case, we can easily manage CPU hot plugs cases.
+	 * This should be a corner case but we can change the behavior in case of issues
+	 */
+	g_state.skel->rodata->ring_buffer_mode = BPF_PAIRED_BUFFER;
+	g_state.n_allocated_buffers = g_state.n_cpus / 2 + g_state.n_cpus % 2;
+
+	int err = 0;
+	err = ringbuf_array_set_inner_map(g_state.buffer_bytes_dim);
+	/* Please note: here we always need `n_cpus` entries, even if 
+	 * we don't have `n_cpus` different buffers, this is because
+	 * 2 consecutive CPUs will point to the same ring buffer.
 	 */
 	err = err ?: ringbuf_array_set_max_entries(g_state.n_cpus);
-	/* Allocate consumer positions and producer positions for ring buffers. */
-	err = err ?: allocate_consumer_producer_positions(g_state.n_cpus / 2 + g_state.n_cpus % 2);
+	/* We need a consumer and a producer for every ring buffer so in this case
+	 * we need `g_state.n_allocated_buffers` producers/consumers.
+	 * Adding the division rest should allow us to manage odd CPUs numbers.
+	 */
+	err = err ?: allocate_consumer_producer_positions();
 	return err;
 }
 
 int pman_prepare_single_ringbuf_before_loading()
 {
+	/* Here we want a unique shared ring buffer for all the CPUs, with the dimension
+	 * chosen by users: `g_state.buffer_bytes_dim`.
+	 */
 	g_state.skel->rodata->ring_buffer_mode = BPF_SINGLE_BUFFER;
-	if(bpf_map__set_max_entries(g_state.skel->maps.single_ringbuffer, g_state.buffer_bytes_dim) < 0)
-	{
-		pman_print_error("Unable to get single ring");
-		return errno;
-	}
-	/* here we have just one buffer */
-	return allocate_consumer_producer_positions(1);;
+	g_state.n_allocated_buffers = 1;
+
+	int err = 0;
+	/* We need to set an inner map inside the array even if we won't use it with this approach */
+	err = ringbuf_array_set_inner_map(MIN_SINGLE_BUFFER_DIM);
+	err = err ?: ringbuf_array_set_max_entries(1);
+	/* Here we set the dimension of the single shared ring buffer */
+	err = err ?: bpf_map__set_max_entries(g_state.skel->maps.single_ringbuffer, g_state.buffer_bytes_dim);
+	/* We need just one consumer and producer position since we have only one ring buffer. */
+	err = err ?: allocate_consumer_producer_positions();
+	return err;
 }
 
 /* After loading */
@@ -144,7 +170,9 @@ int pman_finalize_percpu_ringbuf_after_loading()
 	int index = 0;
 	char error_message[MAX_ERROR_MESSAGE_LEN];
 
-	/* we don't need the single ringbuf map */
+	/* We don't need the single ring buffer map in userspace, by the way
+	 * this map won't be destroyed because is referenced by BPF programs.
+	 */
 	int single_ringbuf_fd = bpf_map__fd(g_state.skel->maps.single_ringbuffer);
 	close(single_ringbuf_fd);
 
@@ -231,6 +259,13 @@ int pman_finalize_paired_ringbuf_after_loading()
 	int ringbuf_map_fd = -1;
 	int index = 0;
 	char error_message[MAX_ERROR_MESSAGE_LEN];
+
+	/* We don't need the single ring buffer map in userspace, by the way
+	 * this map won't be destroyed because is referenced by BPF programs.
+	 */
+	int single_ringbuf_fd = bpf_map__fd(g_state.skel->maps.single_ringbuffer);
+	close(single_ringbuf_fd);
+
 
 	/* We don't need anymore the inner map, close it. */
 	close(g_state.inner_ringbuf_map_fd);
@@ -329,8 +364,13 @@ clean_ring_buffers:
 
 int pman_finalize_single_ringbuf_after_loading()
 {
+	/* We don't need the ring buffer array map in userspace, by the way
+	 * this map won't be destroyed because is referenced by BPF programs.
+	 */
 	int ringubuf_array_fd = bpf_map__fd(g_state.skel->maps.ringbuf_maps);
 	close(ringubuf_array_fd);
+
+
 	g_state.rb_manager = ring_buffer__new(bpf_map__fd(g_state.skel->maps.single_ringbuffer), NULL, NULL, NULL);
 	if(!g_state.rb_manager)
 	{
@@ -413,7 +453,7 @@ done:
 	return sample;
 }
 
-static void ringbuf__consume_first_event_from_multiple_bufs(struct ring_buffer *rb, struct ppm_evt_hdr **event_ptr, int16_t *cpu_id)
+static void ringbuf__consume_first_event_from_multiple_bufs(struct ring_buffer *rb, struct ppm_evt_hdr **event_ptr, int16_t *buffer_id)
 {
 	uint64_t min_ts = 0xffffffffffffffffLL;
 	struct ppm_evt_hdr *tmp_pointer = NULL;
@@ -448,12 +488,12 @@ static void ringbuf__consume_first_event_from_multiple_bufs(struct ring_buffer *
 	}
 
 	*event_ptr = tmp_pointer;
-	*cpu_id = tmp_ring;
+	*buffer_id = tmp_ring;
 	g_state.last_ring_read = tmp_ring;
 	g_state.last_event_size = tmp_cons_increment;
 }
 
-static void ringbuf__consume_first_event_from_single_buf(struct ring_buffer *rb, struct ppm_evt_hdr **event_ptr, int16_t *cpu_id)
+static void ringbuf__consume_first_event_from_single_buf(struct ring_buffer *rb, struct ppm_evt_hdr **event_ptr, int16_t *buffer_id)
 {
 	struct ring *ring = &rb->rings[0];
 	/* We need to check the return in the caller */
@@ -463,14 +503,14 @@ static void ringbuf__consume_first_event_from_single_buf(struct ring_buffer *rb,
 /* Consume */
 
 /* This API must be used if we want to get the first event according to its timestamp */
-void pman_consume_first_from_multiple_buffers(void **event_ptr, int16_t *cpu_id)
+void pman_consume_first_from_multiple_buffers(void **event_ptr, int16_t *buffer_id)
 {
-	ringbuf__consume_first_event_from_multiple_bufs(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, cpu_id);
+	ringbuf__consume_first_event_from_multiple_bufs(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, buffer_id);
 }
 
-void pman_consume_first_from_single_buffer(void **event_ptr, int16_t *cpu_id)
+void pman_consume_first_from_single_buffer(void **event_ptr, int16_t *buffer_id)
 {
-	ringbuf__consume_first_event_from_single_buf(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, cpu_id);
+	ringbuf__consume_first_event_from_single_buf(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, buffer_id);
 }
 
 #ifdef TEST_HELPERS

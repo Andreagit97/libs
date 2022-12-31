@@ -30,8 +30,8 @@ extern "C"
 
 	struct scap_modern_bpf_engine_params
 	{
-		unsigned long buffer_bytes_dim; ///< Dimension of a single per-CPU buffer in bytes. Please note: this buffer will be mapped twice in the process virtual memory, so pay attention to its size.
 		enum modern_bpf_buffer_mode buffer_mode;
+		unsigned long buffer_bytes_dim; ///< Dimension of a ring buffer in bytes. The number of ring buffers allocated changes according to the `buffer_mode`. Please note: this buffer will be mapped twice both kernel and userspace-side, so pay attention to its size.
 	};
 
 #ifdef __cplusplus

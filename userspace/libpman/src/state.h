@@ -30,6 +30,7 @@ struct internal_state
 	struct bpf_probe* skel;		/* bpf skeleton with all programs and maps. */
 	struct ring_buffer* rb_manager; /* ring_buffer manager with all per-CPU ringbufs. */
 	int16_t n_cpus;			/* number of system available CPUs. */
+	uint32_t n_allocated_buffers; /* number of allocated ring buffers */
 	int ringbuf_pos;		/* actual ringbuf we are considering. */
 	unsigned long* cons_pos;	/* every ringbuf has a consumer position. */
 	unsigned long* prod_pos;	/* every ringbuf has a producer position. */

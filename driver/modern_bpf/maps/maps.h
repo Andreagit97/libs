@@ -12,9 +12,6 @@
 #include <driver/ppm_events_public.h>
 #include <driver/driver_config.h>
 
-/* this is a little buffer with 4 KB bytes */
-#define MIN_SINGLE_BUFFER_DIM 4096*4
-
 /*=============================== BPF READ-ONLY GLOBAL VARIABLES ===============================*/
 
 /* The `volatile` qualifier is necessary to make sure Clang doesn't optimize away the read-only

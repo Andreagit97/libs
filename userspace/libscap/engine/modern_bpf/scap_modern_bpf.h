@@ -27,9 +27,10 @@ struct scap;
 
 struct modern_bpf_engine
 {
-	size_t m_num_cpus;
-	unsigned long m_retry_us;
-	char* m_lasterr;
-	enum modern_bpf_buffer_mode m_buffer_mode;
-	interesting_tp_set open_tp_set;
+	uint32_t m_possible_CPUs; /* Number of available CPUs, not online CPUs. */
+	uint32_t m_allocated_buffers; /* Number of allocated ring buffers, according to the `m_buffer_mode` chosen */
+	enum modern_bpf_buffer_mode m_buffer_mode; /* Ring buffer allocation mode */
+	unsigned long m_retry_us; /* Microseconds to wait if all ring buffers are empty */
+	char* m_lasterr; /* Last error caught by the engine */
+	interesting_tp_set open_tp_set; /* Interesting tracepoints */
 };

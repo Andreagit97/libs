@@ -26,7 +26,7 @@ extern "C"
 #endif
 
 	/* `libpman` return values convention:
-	 * In case of success `0` is return otherwise `errno`. If `errno` is not
+	 * In case of success `0` is returned otherwise `errno`. If `errno` is not
 	 * available `-1` is returned.
 	 *
 	 * Please Note:
@@ -58,6 +58,8 @@ extern "C"
 	 * @return number of available CPUs on success, `-1` in case of error.
 	 */
 	int pman_get_cpus_number(void);
+
+	int pman_get_allocated_buffers(void);
 
 	/////////////////////////////
 	// PROBE LIFECYCLE
@@ -229,11 +231,11 @@ extern "C"
 	 *
 	 * @param event_ptr in case of success return a pointer
 	 * to the event, otherwise return NULL.
-	 * @param cpu_id in case of success returns the id of the CPU
+	 * @param buffer_id in case of success returns the id of the CPU
 	 * on which we have found the event, otherwise return `-1`.
 	 */
-	void pman_consume_first_from_multiple_buffers(void** event_ptr, int16_t *cpu_id);
-	void pman_consume_first_from_single_buffer(void** event_ptr, int16_t *cpu_id);
+	void pman_consume_first_from_multiple_buffers(void** event_ptr, int16_t *buffer_id);
+	void pman_consume_first_from_single_buffer(void** event_ptr, int16_t *buffer_id);
 
 	/////////////////////////////
 	// CAPTURE (EXCHANGE VALUES WITH BPF SIDE)
