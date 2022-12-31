@@ -186,7 +186,7 @@ scap_t* open_engine(int argc, char** argv)
 
 	static struct option long_options[] = {
 		{BPF_OPTION, optional_argument, 0, 'b'},
-		{MODERN_BPF_OPTION, no_argument, 0, 'm'},
+		{MODERN_BPF_OPTION, optional_argument, 0, 'm'},
 		{KMOD_OPTION, optional_argument, 0, 'k'},
 		{BUFFER_OPTION, required_argument, 0, 'd'},
 		{SCAP_FILE_OPTION, required_argument, 0, 'f'},
@@ -237,7 +237,7 @@ scap_t* open_engine(int argc, char** argv)
 	int op = 0;
 	int long_index = 0;
 	while((op = getopt_long(argc, argv,
-				"b::mk::d:f:n:t:p:saj::h",
+				"b::m::k::d:f:n:t:p:saj::h",
 				long_options, &long_index)) != -1)
 	{
 		switch(op)
@@ -270,8 +270,21 @@ scap_t* open_engine(int argc, char** argv)
 			abort_if_already_configured(&oargs);
 			oargs.engine_name = MODERN_BPF_ENGINE;
 			modern_bpf_params.buffer_bytes_dim = buffer_bytes_dim;
+			if(optarg == NULL && optind < argc && argv[optind][0] != '-')
+			{
+				/* Not sure this cast is the right way to go */
+				modern_bpf_params.buffer_mode = (enum modern_bpf_buffer_mode)atoi(argv[optind++]);
+			}
+			else if(optarg == NULL)
+			{
+				modern_bpf_params.buffer_mode = MODERN_PER_CPU_BUFFER;
+			}
+			else
+			{
+				modern_bpf_params.buffer_mode = (enum modern_bpf_buffer_mode)atoi(optarg);
+			}
 			oargs.engine_params = &modern_bpf_params;
-			log_info("* Configure modern BPF probe!");
+			log_info("* Configure modern BPF probe! Buffer mode: " << modern_bpf_params.buffer_mode);
 			break;
 
 		case 'k':
