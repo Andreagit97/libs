@@ -17,6 +17,10 @@
  */
 #define AUXILIARY_MAP_SIZE 128 * 1024
 
+#define BPF_PER_CPU_BUFFER 0
+#define	BPF_PAIRED_BUFFER 1
+#define BPF_SINGLE_BUFFER 2
+
 /**
  * @brief General settings shared among all the CPUs.
  *

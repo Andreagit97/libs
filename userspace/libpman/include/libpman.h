@@ -208,7 +208,9 @@ extern "C"
 	 *
 	 * @return `0` on success, `errno` in case of error.
 	 */
-	int pman_prepare_ringbuf_array_before_loading(void);
+	int pman_prepare_percpu_ringbuf_before_loading(void);
+	int pman_prepare_paired_ringbuf_before_loading(void);
+	int pman_prepare_single_ringbuf_before_loading(void);
 
 	/**
 	 * @brief Performs all necessary operations on ringbuf array after the
@@ -217,7 +219,9 @@ extern "C"
 	 *
 	 * @return `0` on success, `errno` in case of error.
 	 */
-	int pman_finalize_ringbuf_array_after_loading(void);
+	int pman_finalize_percpu_ringbuf_after_loading(void);
+	int pman_finalize_paired_ringbuf_after_loading(void);
+	int pman_finalize_single_ringbuf_after_loading(void);
 
 	/**
 	 * @brief Search for the event with the lowest timestamp in
@@ -228,7 +232,8 @@ extern "C"
 	 * @param cpu_id in case of success returns the id of the CPU
 	 * on which we have found the event, otherwise return `-1`.
 	 */
-	void pman_consume_first_from_buffers(void** event_ptr, int16_t *cpu_id);
+	void pman_consume_first_from_multiple_buffers(void** event_ptr, int16_t *cpu_id);
+	void pman_consume_first_from_single_buffer(void** event_ptr, int16_t *cpu_id);
 
 	/////////////////////////////
 	// CAPTURE (EXCHANGE VALUES WITH BPF SIDE)

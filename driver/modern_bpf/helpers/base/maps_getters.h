@@ -74,8 +74,17 @@ static __always_inline struct counter_map *maps__get_counter_map()
 
 static __always_inline struct ringbuf_map *maps__get_ringbuf_map()
 {
-	u32 cpu_id = (u32)bpf_get_smp_processor_id();
-	return (struct ringbuf_map *)bpf_map_lookup_elem(&ringbuf_maps, &cpu_id);
+	/* This is the best way we have to help the verifier prune out unused code. */
+	if(ring_buffer_mode == BPF_PER_CPU_BUFFER || ring_buffer_mode == BPF_PAIRED_BUFFER)
+	{
+		u32 cpu_id = (u32)bpf_get_smp_processor_id();
+		return (struct ringbuf_map *)bpf_map_lookup_elem(&ringbuf_maps, &cpu_id);
+	} 
+	else if(ring_buffer_mode == BPF_SINGLE_BUFFER)
+	{
+		return (struct ringbuf_map *)&single_ringbuffer;
+	}
+	return NULL;
 }
 
 /*=============================== RINGBUF MAPS ===========================*/

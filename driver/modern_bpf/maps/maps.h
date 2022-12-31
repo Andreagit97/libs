@@ -12,6 +12,9 @@
 #include <driver/ppm_events_public.h>
 #include <driver/driver_config.h>
 
+/* this is a little buffer with 4 KB bytes */
+#define MIN_SINGLE_BUFFER_DIM 4096*4
+
 /*=============================== BPF READ-ONLY GLOBAL VARIABLES ===============================*/
 
 /* The `volatile` qualifier is necessary to make sure Clang doesn't optimize away the read-only
@@ -39,6 +42,11 @@ __weak const volatile uint64_t probe_api_ver = PPM_API_CURRENT_VERSION;
  * @brief Actual probe schema version
  */
 __weak const volatile uint64_t probe_schema_var = PPM_SCHEMA_CURRENT_VERSION;
+
+/**
+ * @brief Ring buffer configuration, BPF_PER_CPU_BUFFER is the default choice.
+ */
+__weak const volatile uint8_t ring_buffer_mode = BPF_PER_CPU_BUFFER;
 
 /*=============================== BPF READ-ONLY GLOBAL VARIABLES ===============================*/
 
@@ -146,6 +154,12 @@ struct
 /*=============================== BPF_MAP_TYPE_ARRAY ===============================*/
 
 /*=============================== RINGBUF MAP ===============================*/
+
+struct
+{
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, MIN_SINGLE_BUFFER_DIM);
+} single_ringbuffer __weak SEC(".maps");
 
 /**
  * @brief We will have a ringbuf map for every CPU on the system.

@@ -105,6 +105,61 @@ static int32_t check_minimum_kernel_version(char* last_err)
 	return SCAP_FAILURE;
 }
 
+static int32_t check_buffer_mode(enum modern_bpf_buffer_mode buffer_mode)
+{
+	/* This should be impossible but let's keep it to be supersafe */
+	switch(buffer_mode)
+	{
+	case MODERN_PER_CPU_BUFFER:
+	case MODERN_PAIRED_BUFFER:
+	case MODERN_SINGLE_BUFFER:
+		break;
+	
+	default:
+		return SCAP_FAILURE;
+	}
+	return SCAP_SUCCESS;
+}
+
+/* This is a wrapper that allows us to hide the underlying buffer implementation */
+static int prepare_ringbuf_before_loading(enum modern_bpf_buffer_mode buffer_mode)
+{
+	switch(buffer_mode)
+	{
+	case MODERN_PER_CPU_BUFFER:
+		return pman_prepare_percpu_ringbuf_before_loading();	
+	
+	case MODERN_PAIRED_BUFFER:
+		return pman_prepare_paired_ringbuf_before_loading();	
+
+	case MODERN_SINGLE_BUFFER:
+		return pman_prepare_single_ringbuf_before_loading();	
+
+	default:
+		break;
+	}
+	return SCAP_FAILURE;
+}
+
+static int finalize_ringbuf_after_loading(enum modern_bpf_buffer_mode buffer_mode)
+{
+	switch(buffer_mode)
+	{
+	case MODERN_PER_CPU_BUFFER:
+		return pman_finalize_percpu_ringbuf_after_loading();	
+	
+	case MODERN_PAIRED_BUFFER:
+		return pman_finalize_paired_ringbuf_after_loading();	
+
+	case MODERN_SINGLE_BUFFER:
+		return pman_finalize_single_ringbuf_after_loading();	
+
+	default:
+		break;
+	}
+	return SCAP_FAILURE;
+}
+
 /*=============================== UTILS ===============================*/
 
 /* Right now this is not used */
@@ -130,7 +185,15 @@ static void scap_modern_bpf__free_engine(struct scap_engine_handle engine)
 
 static int32_t scap_modern_bpf__next(struct scap_engine_handle engine, OUT scap_evt** pevent, OUT uint16_t* pcpuid)
 {
-	pman_consume_first_from_buffers((void**)pevent, pcpuid);
+	if(engine.m_handle->m_buffer_mode == MODERN_SINGLE_BUFFER)
+	{
+		pman_consume_first_from_single_buffer((void**)pevent, pcpuid);
+	}
+	else
+	{
+		pman_consume_first_from_multiple_buffers((void**)pevent, pcpuid);
+	}
+
 	if((*pevent) == NULL)
 	{
 		/* The first time we sleep 500 us, if we have consecutive timeouts we can reach also 30 ms. */
@@ -226,6 +289,12 @@ int32_t scap_modern_bpf__init(scap_t* handle, scap_open_args* oargs)
 		return SCAP_FAILURE;
 	}
 
+	if(check_buffer_mode(params->buffer_mode) != SCAP_SUCCESS)
+	{
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "'%d' is not a valid buffer mode!", params->buffer_mode);
+		return SCAP_FAILURE;
+	}
+
 	/* Initialize the libpman internal state */
 	if(pman_init_state(libbpf_verbosity, params->buffer_bytes_dim))
 	{
@@ -239,13 +308,15 @@ int32_t scap_modern_bpf__init(scap_t* handle, scap_open_args* oargs)
 	/* Return the number of system available CPUs, not online CPUs. */
 	engine.m_handle->m_num_cpus = pman_get_cpus_number();
 
+	engine.m_handle->m_buffer_mode = params->buffer_mode;
+
 	/* Load and attach */
 	ret = pman_open_probe();
-	ret = ret ?: pman_prepare_ringbuf_array_before_loading();
+	ret = ret ?: prepare_ringbuf_before_loading(params->buffer_mode);
 	ret = ret ?: pman_prepare_maps_before_loading();
 	ret = ret ?: pman_load_probe();
 	ret = ret ?: pman_finalize_maps_after_loading();
-	ret = ret ?: pman_finalize_ringbuf_array_after_loading();
+	ret = ret ?: finalize_ringbuf_after_loading(params->buffer_mode);
 	ret = ret ?: populate_64bit_interesting_syscalls_table(oargs->ppm_sc_of_interest.ppm_sc);
 	// Do not attach tracepoints at this stage.
 	if(ret != SCAP_SUCCESS)
