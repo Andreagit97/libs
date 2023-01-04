@@ -26,7 +26,7 @@ extern "C"
 #endif
 
 	/* `libpman` return values convention:
-	 * In case of success `0` is return otherwise `errno`. If `errno` is not
+	 * In case of success `0` is returned otherwise `errno`. If `errno` is not
 	 * available `-1` is returned.
 	 *
 	 * Please Note:
@@ -52,12 +52,25 @@ extern "C"
 	int pman_init_state(bool verbosity, unsigned long buf_bytes_dim);
 
 	/**
+	 * @brief Clear the `libpman` global state before it is used.
+	 * This API could be useful if we open the modern bpf engine multiple times.
+	 */
+	void pman_clear_state(void);
+
+	/**
 	 * @brief Return the number of available CPUs on the system, not the
 	 * online CPUs!
 	 *
 	 * @return number of available CPUs on success, `-1` in case of error.
 	 */
 	int pman_get_cpus_number(void);
+
+	/**
+	 * @brief Return the number of allocated ring buffers.
+	 *
+	 * @return number of allocated ring buffers.
+	 */
+	int pman_get_required_buffers(void);
 
 	/////////////////////////////
 	// PROBE LIFECYCLE
@@ -200,24 +213,51 @@ extern "C"
 	/////////////////////////////
 
 	/**
-	 * @brief Performs all necessary operations on ringbuf array before the
-	 * loading phase:
-	 * - Set inner map dimension.
-	 * - Set array max entries.
-	 * - Allocate memory for producers and consumers.
+	 * @brief Prepare our probe to allocate a ring buffer for every CPU,
+	 * using a ring buffer array.
 	 *
 	 * @return `0` on success, `errno` in case of error.
 	 */
-	int pman_prepare_ringbuf_array_before_loading(void);
+	int pman_prepare_percpu_ringbuf_before_loading(void);
 
 	/**
-	 * @brief Performs all necessary operations on ringbuf array after the
-	 * loading phase:
-	 * - Create all the ring_buffer maps inside the array.
+	 * @brief Prepare our probe to allocate a ring buffer for every CPU pair,
+	 * using a ring buffer array.
 	 *
 	 * @return `0` on success, `errno` in case of error.
 	 */
-	int pman_finalize_ringbuf_array_after_loading(void);
+	int pman_prepare_paired_ringbuf_before_loading(void);
+
+	/**
+	 * @brief Prepare our probe to allocate a single ring buffer shared by
+	 * all CPUs.
+	 *
+	 * @return `0` on success, `errno` in case of error.
+	 */
+	int pman_prepare_single_ringbuf_before_loading(void);
+
+	/**
+	 * @brief Create a ring buffer manager and all the ring buffer maps
+	 * for every CPU.
+	 *
+	 * @return `0` on success, `errno` in case of error.
+	 */
+	int pman_finalize_percpu_ringbuf_after_loading(void);
+
+	/**
+	 * @brief Create a ring buffer manager and all the ring buffer maps
+	 * for every CPU pair.
+	 *
+	 * @return `0` on success, `errno` in case of error.
+	 */
+	int pman_finalize_paired_ringbuf_after_loading(void);
+
+	/**
+	 * @brief Create a ring buffer manager.
+	 *
+	 * @return `0` on success, `errno` in case of error.
+	 */
+	int pman_finalize_single_ringbuf_after_loading(void);
 
 	/**
 	 * @brief Search for the event with the lowest timestamp in
@@ -225,10 +265,21 @@ extern "C"
 	 *
 	 * @param event_ptr in case of success return a pointer
 	 * to the event, otherwise return NULL.
-	 * @param cpu_id in case of success returns the id of the CPU
-	 * on which we have found the event, otherwise return `-1`.
+	 * @param buffer_id in case of success returns the id of the ring buffer
+	 * from which we retrieved the event, otherwise return `-1`.
 	 */
-	void pman_consume_first_from_buffers(void** event_ptr, int16_t *cpu_id);
+	void pman_consume_first_from_multiple_buffers(void** event_ptr, int16_t* buffer_id);
+
+	/**
+	 * @brief Get the first event in the single ring buffer,
+	 * All events in the buffer are already ordered according to their timestamps.
+	 *
+	 * @param event_ptr in case of success return a pointer
+	 * to the event, otherwise return NULL.
+	 * @param buffer_id in case of success returns the id of the ring buffer
+	 * from which we retrieved the event, otherwise return `-1`.
+	 */
+	void pman_consume_first_from_single_buffer(void** event_ptr, int16_t* buffer_id);
 
 	/////////////////////////////
 	// CAPTURE (EXCHANGE VALUES WITH BPF SIDE)
@@ -238,7 +289,7 @@ extern "C"
 	 * @brief Enable BPF-capture if we have previously
 	 * disabled it.
 	 */
-	int pman_enable_capture(bool *tp_set);
+	int pman_enable_capture(bool* tp_set);
 
 	/**
 	 * @brief Disable BPF capture for example when we
@@ -413,7 +464,7 @@ extern "C"
 	 * @brief Return `true` if all ring buffers are full. To state
 	 * that a ring buffer is full we check that the free space is less
 	 * than the `threshold`
-	 * 
+	 *
 	 * @param threshold used to check if a buffer is full
 	 * @return `true` if all buffers are full, otherwise `false`
 	 */
@@ -421,7 +472,7 @@ extern "C"
 
 	/**
 	 * @brief Get the producer pos for the required ring
-	 * 
+	 *
 	 * @param ring_num ring for which we want to obtain the producer pos
 	 * @return producer pos as an unsigned long
 	 */

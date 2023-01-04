@@ -17,6 +17,26 @@ limitations under the License.
 
 #define MODERN_BPF_ENGINE "modern_bpf"
 
+/**
+ * - `MODERN_PER_CPU_BUFFER`: we allocate a ring buffer for every possible CPU, so we will have an
+ *   array of ring buffers.
+ * - `MODERN_PAIRED_BUFFER`: we allocate a ring buffer for every possible CPU pair, also in this case
+ *   we will have an array of ring buffers.
+ * - `MODERN_SINGLE_BUFFER`: we allocate a unique ring buffer shared between all the CPUs
+ */
+enum modern_bpf_buffer_mode {
+	MODERN_PER_CPU_BUFFER = 0,
+	MODERN_PAIRED_BUFFER = 1,
+	MODERN_SINGLE_BUFFER = 2,
+};
+
+/* Macro that should be used to translate the mode chosen by the user. */
+#define MODERN_PER_CPU_BUFFER_NAME "per-cpu"
+#define MODERN_PAIRED_BUFFER_NAME "paired"
+#define MODERN_SINGLE_BUFFER_NAME "single"
+
+extern const char* get_modern_bpf_buffer_mode_name(enum modern_bpf_buffer_mode mode);
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -24,7 +44,8 @@ extern "C"
 
 	struct scap_modern_bpf_engine_params
 	{
-		unsigned long buffer_bytes_dim; ///< Dimension of a single per-CPU buffer in bytes. Please note: this buffer will be mapped twice in the process virtual memory, so pay attention to its size.
+		enum modern_bpf_buffer_mode buffer_mode; ///< According to this mode we allocate a different number of ring buffers.
+		unsigned long buffer_bytes_dim; ///< Dimension of a ring buffer in bytes. The number of ring buffers allocated changes according to the `buffer_mode`. Please note: this buffer will be mapped twice both kernel and userspace-side, so pay attention to its size.
 	};
 
 #ifdef __cplusplus

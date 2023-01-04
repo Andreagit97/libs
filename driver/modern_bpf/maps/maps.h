@@ -40,6 +40,12 @@ __weak const volatile uint64_t probe_api_ver = PPM_API_CURRENT_VERSION;
  */
 __weak const volatile uint64_t probe_schema_var = PPM_SCHEMA_CURRENT_VERSION;
 
+/**
+ * @brief Ring buffer configuration: `INTERNAL_PER_CPU_BUFFER` is the default choice.
+ *  `INTERNAL_PER_CPU_BUFFER` means that we allocate a ring buffer for every CPU.
+ */
+__weak const volatile uint8_t ring_buffer_mode = INTERNAL_PER_CPU_BUFFER;
+
 /*=============================== BPF READ-ONLY GLOBAL VARIABLES ===============================*/
 
 /*=============================== BPF GLOBAL VARIABLES ===============================*/
@@ -133,7 +139,7 @@ struct
 
 /**
  * @brief For every CPU on the system we have a counter
- * map where we store the number of events correcty pushed
+ * map where we store the number of events correctly pushed
  * and the number of events dropped.
  */
 struct
@@ -147,10 +153,18 @@ struct
 
 /*=============================== RINGBUF MAP ===============================*/
 
+/* This map will be used only if the `ring_buffer_mode` is `INTERNAL_SINGLE_BUFFER`.
+ * In all other cases we create it with a minimum dimension (2 KB) and we will never use it.
+ * We need to create it even if it is unused, otherwise we cannot load correctly our BPF programs.
+ */
+struct
+{
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, MIN_SINGLE_BUFFER_DIM);
+} single_ringbuffer __weak SEC(".maps");
+
 /**
- * @brief We will have a ringbuf map for every CPU on the system.
- * The dimension of the single ringbuf and the number of
- * ringbuf maps are set in userspace.
+ * @brief We use this map to let the verifier understand the content of our array of maps (`ringbuf_maps`)
  */
 struct ringbuf_map
 {
@@ -158,8 +172,11 @@ struct ringbuf_map
 };
 
 /**
- * @brief This array of maps will contain a ringbuf map for every CPU
- * on the system.
+ * @brief This array of maps will be used if the `ring_buffer_mode` is `INTERNAL_PER_CPU_BUFFER`
+ * or `INTERNAL_PAIRED_BUFFER`. `INTERNAL_PER_CPU_BUFFER` means that every CPU has an associated 
+ * ring_buffer, while `INTERNAL_PAIRED_BUFFER` means that to every CPU pair corresponds a ring buffer.
+ * In the case of `INTERNAL_SINGLE_BUFFER` we don't use this array of maps but we will use the
+ * `single_ringbuffer` approach.
  */
 struct
 {

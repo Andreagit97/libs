@@ -74,8 +74,19 @@ static __always_inline struct counter_map *maps__get_counter_map()
 
 static __always_inline struct ringbuf_map *maps__get_ringbuf_map()
 {
-	u32 cpu_id = (u32)bpf_get_smp_processor_id();
-	return (struct ringbuf_map *)bpf_map_lookup_elem(&ringbuf_maps, &cpu_id);
+	/* `ring_buffer_mode` is a const BPF global variable, we set its value before probe loading
+	 * in this way the verifier will prune unused code, and only the "right" `if` case will be kept.
+	 */
+	if(ring_buffer_mode == INTERNAL_PER_CPU_BUFFER || ring_buffer_mode == INTERNAL_PAIRED_BUFFER)
+	{
+		u32 cpu_id = (u32)bpf_get_smp_processor_id();
+		return (struct ringbuf_map *)bpf_map_lookup_elem(&ringbuf_maps, &cpu_id);
+	} 
+	else if(ring_buffer_mode == INTERNAL_SINGLE_BUFFER)
+	{
+		return (struct ringbuf_map *)&single_ringbuffer;
+	}
+	return NULL;
 }
 
 /*=============================== RINGBUF MAPS ===========================*/

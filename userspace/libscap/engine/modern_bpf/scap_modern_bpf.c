@@ -39,7 +39,7 @@ static void update_single_64bit_syscall_of_interest(int ppm_sc, bool interesting
 {
 	for(int syscall_nr = 0; syscall_nr < SYSCALL_TABLE_SIZE; syscall_nr++)
 	{
-		if (g_syscall_table[syscall_nr].ppm_sc == ppm_sc)
+		if(g_syscall_table[syscall_nr].ppm_sc == ppm_sc)
 		{
 			pman_mark_single_64bit_syscall(syscall_nr, interesting);
 		}
@@ -105,6 +105,44 @@ static int32_t check_minimum_kernel_version(char* last_err)
 	return SCAP_FAILURE;
 }
 
+static int prepare_ringbuf_before_loading(enum modern_bpf_buffer_mode buffer_mode)
+{
+	switch(buffer_mode)
+	{
+	case MODERN_PER_CPU_BUFFER:
+		return pman_prepare_percpu_ringbuf_before_loading();
+
+	case MODERN_PAIRED_BUFFER:
+		return pman_prepare_paired_ringbuf_before_loading();
+
+	case MODERN_SINGLE_BUFFER:
+		return pman_prepare_single_ringbuf_before_loading();
+
+	default:
+		break;
+	}
+	return SCAP_FAILURE;
+}
+
+static int finalize_ringbuf_after_loading(enum modern_bpf_buffer_mode buffer_mode)
+{
+	switch(buffer_mode)
+	{
+	case MODERN_PER_CPU_BUFFER:
+		return pman_finalize_percpu_ringbuf_after_loading();
+
+	case MODERN_PAIRED_BUFFER:
+		return pman_finalize_paired_ringbuf_after_loading();
+
+	case MODERN_SINGLE_BUFFER:
+		return pman_finalize_single_ringbuf_after_loading();
+
+	default:
+		break;
+	}
+	return SCAP_FAILURE;
+}
+
 /*=============================== UTILS ===============================*/
 
 /* Right now this is not used */
@@ -128,9 +166,20 @@ static void scap_modern_bpf__free_engine(struct scap_engine_handle engine)
 	free(engine.m_handle);
 }
 
-static int32_t scap_modern_bpf__next(struct scap_engine_handle engine, OUT scap_evt** pevent, OUT uint16_t* pcpuid)
+/* The third parameter is not the CPU number from which we extract the event but the ring buffer number.
+ * For the old BPF probe and the kernel module the number of CPUs is equal to the number of buffers since we always use a per-CPU approach.
+ */
+static int32_t scap_modern_bpf__next(struct scap_engine_handle engine, OUT scap_evt** pevent, OUT uint16_t* buffer_id)
 {
-	pman_consume_first_from_buffers((void**)pevent, pcpuid);
+	if(engine.m_handle->m_buffer_mode == MODERN_SINGLE_BUFFER)
+	{
+		pman_consume_first_from_single_buffer((void**)pevent, buffer_id);
+	}
+	else
+	{
+		pman_consume_first_from_multiple_buffers((void**)pevent, buffer_id);
+	}
+
 	if((*pevent) == NULL)
 	{
 		/* The first time we sleep 500 us, if we have consecutive timeouts we can reach also 30 ms. */
@@ -210,10 +259,12 @@ int32_t scap_modern_bpf__init(scap_t* handle, scap_open_args* oargs)
 	struct scap_modern_bpf_engine_params* params = oargs->engine_params;
 	bool libbpf_verbosity = false;
 
+	pman_clear_state();
+
 	/* Some checks to test if we can use the modern BPF probe
 	 * - check the ring-buffer dimension in bytes.
 	 * - check the minimum required kernel version.
-	 * 
+	 *
 	 * Please note the presence of BTF is directly checked by `libbpf` see `bpf_object__load_vmlinux_btf` method.
 	 */
 	if(check_buffer_bytes_dim(handle->m_lasterr, params->buffer_bytes_dim) != SCAP_SUCCESS)
@@ -236,22 +287,26 @@ int32_t scap_modern_bpf__init(scap_t* handle, scap_open_args* oargs)
 	/* Set an initial sleep time in case of timeouts. */
 	engine.m_handle->m_retry_us = BUFFER_EMPTY_WAIT_TIME_US_START;
 
-	/* Return the number of system available CPUs, not online CPUs. */
-	engine.m_handle->m_num_cpus = pman_get_cpus_number();
+	/* Return the number of available CPUs, not online CPUs. */
+	engine.m_handle->m_possible_CPUs = pman_get_cpus_number();
+	engine.m_handle->m_buffer_mode = params->buffer_mode;
 
 	/* Load and attach */
 	ret = pman_open_probe();
-	ret = ret ?: pman_prepare_ringbuf_array_before_loading();
+	ret = ret ?: prepare_ringbuf_before_loading(params->buffer_mode);
 	ret = ret ?: pman_prepare_maps_before_loading();
 	ret = ret ?: pman_load_probe();
 	ret = ret ?: pman_finalize_maps_after_loading();
-	ret = ret ?: pman_finalize_ringbuf_array_after_loading();
+	ret = ret ?: finalize_ringbuf_after_loading(params->buffer_mode);
 	ret = ret ?: populate_64bit_interesting_syscalls_table(oargs->ppm_sc_of_interest.ppm_sc);
 	// Do not attach tracepoints at this stage.
 	if(ret != SCAP_SUCCESS)
 	{
 		return ret;
 	}
+
+	/* Get the number of allocated ring buffers according to the `buffer_mode` */
+	engine.m_handle->m_allocated_buffers = pman_get_required_buffers();
 
 	/* Store interesting Tracepoints */
 	memcpy(&engine.m_handle->open_tp_set, &oargs->tp_of_interest, sizeof(interesting_tp_set));
@@ -278,7 +333,7 @@ int32_t scap_modern_bpf__close(struct scap_engine_handle engine)
 
 static uint32_t scap_modern_bpf__get_n_devs(struct scap_engine_handle engine)
 {
-	return engine.m_handle->m_num_cpus;
+	return engine.m_handle->m_allocated_buffers;
 }
 
 int32_t scap_modern_bpf__get_stats(struct scap_engine_handle engine, OUT scap_stats* stats)

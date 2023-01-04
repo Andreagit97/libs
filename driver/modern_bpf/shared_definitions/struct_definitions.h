@@ -17,6 +17,16 @@
  */
 #define AUXILIARY_MAP_SIZE 128 * 1024
 
+/* This is the dimension that the single ring buffer will have if we don't use it. */
+#define MIN_SINGLE_BUFFER_DIM 4096 * 2
+
+/* This is an internal representation of the high-level `modern_bpf_buffer_mode` enum.
+ * We will remove this internal representation when we will drop the `libpman` library.
+ */
+#define INTERNAL_PER_CPU_BUFFER 0
+#define	INTERNAL_PAIRED_BUFFER 1
+#define INTERNAL_SINGLE_BUFFER 2
+
 /**
  * @brief General settings shared among all the CPUs.
  *
