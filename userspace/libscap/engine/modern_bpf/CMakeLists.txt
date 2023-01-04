@@ -24,6 +24,7 @@ add_subdirectory(${LIBSCAP_DIR}/userspace/libpman ${CMAKE_BINARY_DIR}/libpman)
 
 add_library(scap_engine_modern_bpf
 	scap_modern_bpf.c
+  modern_bpf_public.c
 )
 
 add_dependencies(scap_engine_modern_bpf pman)

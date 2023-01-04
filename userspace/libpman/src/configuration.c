@@ -44,9 +44,23 @@ static void setup_libbpf_logging(bool verbosity)
 	}
 }
 
+void pman_clear_state()
+{
+	g_state.skel = NULL;
+	g_state.rb_manager = NULL;
+	g_state.n_cpus = 0;
+	g_state.n_required_buffers = 0;
+	g_state.ringbuf_pos = 0;
+	g_state.cons_pos = NULL;
+	g_state.prod_pos = NULL;
+	g_state.inner_ringbuf_map_fd = 0;
+	g_state.buffer_bytes_dim = 0;
+	g_state.last_ring_read = -1;
+	g_state.last_event_size = 0;
+}
+
 int pman_init_state(bool verbosity, unsigned long buf_bytes_dim)
 {
-
 	/* `LIBBPF_STRICT_ALL` turns on all supported strict features
 	 * of libbpf to simulate libbpf v1.0 behavior.
 	 * `libbpf_set_strict_mode` returns always 0.
@@ -76,4 +90,9 @@ int pman_init_state(bool verbosity, unsigned long buf_bytes_dim)
 int pman_get_cpus_number()
 {
 	return g_state.n_cpus;
+}
+
+int pman_get_required_buffers()
+{
+	return g_state.n_required_buffers;
 }

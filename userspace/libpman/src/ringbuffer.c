@@ -26,13 +26,15 @@ limitations under the License.
 
 #include "ringbuffer_definitions.h"
 
+/* Utility functions object loading */
+
 /* This must be done to please the verifier! At load-time, the verifier must know the
  * size of a map inside the array.
  */
-static int ringbuf_array_set_inner_map()
+static int ringbuf_array_set_inner_map(unsigned long ringbuf_dim)
 {
 	int err = 0;
-	int inner_map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, g_state.buffer_bytes_dim, NULL);
+	int inner_map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, ringbuf_dim, NULL);
 	if(inner_map_fd < 0)
 	{
 		pman_print_error("failed to create the dummy inner map");
@@ -53,9 +55,9 @@ static int ringbuf_array_set_inner_map()
 	return 0;
 }
 
-static int ringbuf_array_set_max_entries()
+static int ringbuf_array_set_max_entries(int16_t max_entries)
 {
-	if(bpf_map__set_max_entries(g_state.skel->maps.ringbuf_maps, g_state.n_cpus))
+	if(bpf_map__set_max_entries(g_state.skel->maps.ringbuf_maps, max_entries))
 	{
 		pman_print_error("unable to set max entries for the ringbuf_array");
 		return errno;
@@ -66,8 +68,8 @@ static int ringbuf_array_set_max_entries()
 static int allocate_consumer_producer_positions()
 {
 	g_state.ringbuf_pos = 0;
-	g_state.cons_pos = (unsigned long *)calloc(g_state.n_cpus, sizeof(unsigned long));
-	g_state.prod_pos = (unsigned long *)calloc(g_state.n_cpus, sizeof(unsigned long));
+	g_state.cons_pos = (unsigned long *)calloc(g_state.n_required_buffers, sizeof(unsigned long));
+	g_state.prod_pos = (unsigned long *)calloc(g_state.n_required_buffers, sizeof(unsigned long));
 	if(g_state.cons_pos == NULL || g_state.prod_pos == NULL)
 	{
 		pman_print_error("failed to alloc memory for cons_pos and prod_pos");
@@ -76,21 +78,90 @@ static int allocate_consumer_producer_positions()
 	return 0;
 }
 
-int pman_prepare_ringbuf_array_before_loading()
+/* Before loading */
+
+int pman_prepare_percpu_ringbuf_before_loading()
 {
-	int err;
-	err = ringbuf_array_set_inner_map();
-	err = err ?: ringbuf_array_set_max_entries();
-	/* Allocate consumer positions and producer positions for the ringbuffer. */
+	/* Here we want a ring buffer for every possible CPU (even if it is not online),
+	 * the size of each buffer is the one chosen by users: `g_state.buffer_bytes_dim`
+	 */
+	g_state.skel->rodata->ring_buffer_mode = INTERNAL_PER_CPU_BUFFER;
+	g_state.n_required_buffers = g_state.n_cpus;
+	int err = 0;
+	err = ringbuf_array_set_inner_map(g_state.buffer_bytes_dim);
+	err = err ?: ringbuf_array_set_max_entries(g_state.n_cpus);
+	/* We need a consumer and a producer for every ring buffer so in this case
+	 * we need `n_cpus` producers/consumers.
+	 */
 	err = err ?: allocate_consumer_producer_positions();
 	return err;
 }
 
-static int create_first_ringbuffer_map()
+int pman_prepare_paired_ringbuf_before_loading()
+{
+	/* Here we want a ring buffer for every CPU pair, the size of each buffer
+	 * is the one chosen by users: `g_state.buffer_bytes_dim`
+	 *
+	 * CPU 0 \
+	 * 		  > RING BUFFER 0
+	 * CPU 1 /
+	 *
+	 * CPU 2 \
+	 * 		  > RING BUFFER 1
+	 * CPU 3 /
+	 *
+	 * As in the `percpu` approach we allocate a ring buffer even if the CPU is not
+	 * available at that moment, in this case, we can easily manage CPU hot plugs.
+	 * This should be a corner case but we can change the behavior in case of issues
+	 */
+	g_state.skel->rodata->ring_buffer_mode = INTERNAL_PAIRED_BUFFER;
+	g_state.n_required_buffers = g_state.n_cpus / 2 + g_state.n_cpus % 2;
+
+	int err = 0;
+	err = ringbuf_array_set_inner_map(g_state.buffer_bytes_dim);
+	/* Please note: here we always need `n_cpus` entries, even if
+	 * we don't have `n_cpus` different buffers, this is because
+	 * 2 consecutive CPUs will point to the same ring buffer.
+	 */
+	err = err ?: ringbuf_array_set_max_entries(g_state.n_cpus);
+	/* We need a consumer and a producer for every ring buffer not for every CPU */
+	err = err ?: allocate_consumer_producer_positions();
+	return err;
+}
+
+int pman_prepare_single_ringbuf_before_loading()
+{
+	/* Here we want a unique shared ring buffer for all the CPUs, with the dimension
+	 * chosen by users: `g_state.buffer_bytes_dim`.
+	 */
+	g_state.skel->rodata->ring_buffer_mode = INTERNAL_SINGLE_BUFFER;
+	g_state.n_required_buffers = 1;
+
+	int err = 0;
+	/* We need to set an inner map inside the array even if we won't use it with this approach */
+	err = ringbuf_array_set_inner_map(MIN_SINGLE_BUFFER_DIM);
+	err = err ?: ringbuf_array_set_max_entries(1);
+	/* Here we set the dimension of the single shared ring buffer */
+	err = err ?: bpf_map__set_max_entries(g_state.skel->maps.single_ringbuffer, g_state.buffer_bytes_dim);
+	/* We need just one consumer and producer position since we have only one ring buffer. */
+	err = err ?: allocate_consumer_producer_positions();
+	return err;
+}
+
+/* After loading */
+
+int pman_finalize_percpu_ringbuf_after_loading()
 {
 	int ringubuf_array_fd = -1;
 	int ringbuf_map_fd = -1;
 	int index = 0;
+	char error_message[MAX_ERROR_MESSAGE_LEN];
+
+	/* We don't need the single ring buffer map in userspace, by the way
+	 * this map won't be destroyed because is referenced by BPF programs.
+	 */
+	int single_ringbuf_fd = bpf_map__fd(g_state.skel->maps.single_ringbuffer);
+	close(single_ringbuf_fd);
 
 	/* We don't need anymore the inner map, close it. */
 	close(g_state.inner_ringbuf_map_fd);
@@ -108,51 +179,27 @@ static int create_first_ringbuffer_map()
 	if(ringbuf_map_fd <= 0)
 	{
 		pman_print_error("failed to create the first ringbuf map");
-		goto clean_create_first_ringbuffer_map;
+		goto clean_percpu_ring_buffers;
 	}
 
 	/* add the first ringbuf map into the array. */
 	if(bpf_map_update_elem(ringubuf_array_fd, &index, &ringbuf_map_fd, BPF_ANY))
 	{
 		pman_print_error("failed to add the first ringbuf map into the array");
-		goto clean_create_first_ringbuffer_map;
+		goto clean_percpu_ring_buffers;
 	}
 
+	/* create the ringbuf manager */
 	g_state.rb_manager = ring_buffer__new(ringbuf_map_fd, NULL, NULL, NULL);
 	if(!g_state.rb_manager)
 	{
 		pman_print_error("failed to instantiate the ringbuf manager. (If you get memory allocation errors try to reduce the buffer dimension)");
-		goto clean_create_first_ringbuffer_map;
+		goto clean_percpu_ring_buffers;
 	}
-	return 0;
-
-clean_create_first_ringbuffer_map:
 	close(ringbuf_map_fd);
-	close(ringubuf_array_fd);
-	return errno;
-}
 
-static int create_remaining_ringbuffer_maps()
-{
-	int ringubuf_array_fd = -1;
-	int ringbuf_map_fd = -1;
-	char error_message[MAX_ERROR_MESSAGE_LEN];
-
-	/* the first ringbuf map is already inserted into the array.
-	 * See `create_first_ringbuffer_map()` function.
-	 */
-	int index = 1;
-
-	/* get the ringbuf_array with a map already in it. */
-	ringubuf_array_fd = bpf_map__fd(g_state.skel->maps.ringbuf_maps);
-	if(ringubuf_array_fd <= 0)
-	{
-		pman_print_error("failed to get a not empty ringubuf_array");
-		return errno;
-	}
-
-	/* for all CPUs add the rinugbuf map into the array and add it also
-	 * into the ringbuf manager. Please note: we have already initialized the
+	/* for all CPUs add the ring buffer map into the array and add it also
+	 * into the ring buffer manager. Please note: we have already initialized the
 	 * the ringbuf_array and the manager with the map for the CPU `0`.
 	 */
 	for(index = 1; index < g_state.n_cpus; index++)
@@ -162,14 +209,129 @@ static int create_remaining_ringbuffer_maps()
 		{
 			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to create the ringbuf map for CPU %d", index);
 			pman_print_error((const char *)error_message);
-			goto clean_create_remaining_ringbuffer_maps;
+			goto clean_percpu_ring_buffers;
 		}
 
 		if(bpf_map_update_elem(ringubuf_array_fd, &index, &ringbuf_map_fd, BPF_ANY))
 		{
 			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to add the ringbuf map for CPU %d into the array", index);
 			pman_print_error((const char *)error_message);
-			goto clean_create_remaining_ringbuffer_maps;
+			goto clean_percpu_ring_buffers;
+		}
+
+		/* add the new ring buffer map into the manager. */
+		if(ring_buffer__add(g_state.rb_manager, ringbuf_map_fd, NULL, NULL))
+		{
+			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to add the ringbuf map for CPU %d into the manager", index);
+			pman_print_error((const char *)error_message);
+			goto clean_percpu_ring_buffers;
+		}
+		close(ringbuf_map_fd);
+	}
+	return 0;
+
+clean_percpu_ring_buffers:
+	close(ringbuf_map_fd);
+	close(ringubuf_array_fd);
+	if(g_state.rb_manager)
+	{
+		ring_buffer__free(g_state.rb_manager);
+	}
+	return errno;
+}
+
+int pman_finalize_paired_ringbuf_after_loading()
+{
+	int ringubuf_array_fd = -1;
+	int ringbuf_map_fd = -1;
+	int index = 0;
+	char error_message[MAX_ERROR_MESSAGE_LEN];
+
+	/* We don't need the single ring buffer map in userspace, by the way
+	 * this map won't be destroyed because is referenced by BPF programs.
+	 */
+	int single_ringbuf_fd = bpf_map__fd(g_state.skel->maps.single_ringbuffer);
+	close(single_ringbuf_fd);
+
+	/* We don't need anymore the inner map, close it. */
+	close(g_state.inner_ringbuf_map_fd);
+
+	/* `ringbuf_array` is a maps array, every map inside it is a `BPF_MAP_TYPE_RINGBUF`. */
+	ringubuf_array_fd = bpf_map__fd(g_state.skel->maps.ringbuf_maps);
+	if(ringubuf_array_fd <= 0)
+	{
+		pman_print_error("failed to get the ringubuf_array");
+		return errno;
+	}
+
+	/* create the first ringbuf map. */
+	ringbuf_map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, g_state.buffer_bytes_dim, NULL);
+	if(ringbuf_map_fd <= 0)
+	{
+		pman_print_error("failed to create the first ringbuf map. (If you get memory allocation errors try to reduce the buffer dimension)");
+		goto clean_paired_ring_buffers;
+	}
+
+	/* add the first ringbuf map into the array. */
+	if(bpf_map_update_elem(ringubuf_array_fd, &index, &ringbuf_map_fd, BPF_ANY))
+	{
+		pman_print_error("failed to map the first ringbuf to CPU 0");
+		goto clean_paired_ring_buffers;
+	}
+
+	/* create the ringbuf manager */
+	g_state.rb_manager = ring_buffer__new(ringbuf_map_fd, NULL, NULL, NULL);
+	if(!g_state.rb_manager)
+	{
+		pman_print_error("failed to instantiate the ringbuf manager");
+		goto clean_paired_ring_buffers;
+	}
+
+	/* This is a corner case but we can simply handle it. */
+	if(g_state.n_cpus == 1)
+	{
+		close(ringbuf_map_fd);
+		return 0;
+	}
+
+	/* If we have a CPU 1 we need to map it to the same ring buffer of CPU 0 */
+	index = 1;
+	if(bpf_map_update_elem(ringubuf_array_fd, &index, &ringbuf_map_fd, BPF_ANY))
+	{
+		pman_print_error("failed to map the first ringbuf to CPU 1");
+		goto clean_paired_ring_buffers;
+	}
+
+	for(index = 2; index < g_state.n_cpus; index++)
+	{
+		/* For odd CPU numbers we already have the ring buffer allocated, we just need to map the CPU to it */
+		if(index % 2 != 0)
+		{
+			if(bpf_map_update_elem(ringubuf_array_fd, &index, &ringbuf_map_fd, BPF_ANY))
+			{
+				snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to map the ringbuf to CPU %d", index);
+				pman_print_error((const char *)error_message);
+				goto clean_paired_ring_buffers;
+			}
+			continue;
+		}
+
+		/* Close the handle to the previous ring buffer */
+		close(ringbuf_map_fd);
+
+		ringbuf_map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, g_state.buffer_bytes_dim, NULL);
+		if(ringbuf_map_fd <= 0)
+		{
+			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to create the ringbuf map for CPU %d", index);
+			pman_print_error((const char *)error_message);
+			goto clean_paired_ring_buffers;
+		}
+
+		if(bpf_map_update_elem(ringubuf_array_fd, &index, &ringbuf_map_fd, BPF_ANY))
+		{
+			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to map the ringbuf to CPU %d", index);
+			pman_print_error((const char *)error_message);
+			goto clean_paired_ring_buffers;
 		}
 
 		/* add the new ringbuf map into the manager. */
@@ -177,29 +339,36 @@ static int create_remaining_ringbuffer_maps()
 		{
 			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to add the ringbuf map for CPU %d into the manager", index);
 			pman_print_error((const char *)error_message);
-			goto clean_create_remaining_ringbuffer_maps;
+			goto clean_paired_ring_buffers;
 		}
 	}
 	return 0;
 
-clean_create_remaining_ringbuffer_maps:
+clean_paired_ring_buffers:
 	close(ringbuf_map_fd);
 	close(ringubuf_array_fd);
+	if(g_state.rb_manager)
+	{
+		ring_buffer__free(g_state.rb_manager);
+	}
 	return errno;
 }
 
-/* Create all the ringbuffer maps inside the ringbuffer_array and assign
- * them to the manager. Note, the first ringbuffer map is separated from
- * the others because we first need to create the ringbuffer manager with
- * just one map `ring_buffer__new`. After having instanciating the manager
- * we can add to it all the other maps with `ring_buffer__add`.
- */
-int pman_finalize_ringbuf_array_after_loading()
+int pman_finalize_single_ringbuf_after_loading()
 {
-	int err;
-	err = create_first_ringbuffer_map();
-	err = err ?: create_remaining_ringbuffer_maps();
-	return err;
+	/* We don't need the ring buffer array map in userspace, by the way
+	 * this map won't be destroyed because is referenced by BPF programs.
+	 */
+	int ringubuf_array_fd = bpf_map__fd(g_state.skel->maps.ringbuf_maps);
+	close(ringubuf_array_fd);
+
+	g_state.rb_manager = ring_buffer__new(bpf_map__fd(g_state.skel->maps.single_ringbuffer), NULL, NULL, NULL);
+	if(!g_state.rb_manager)
+	{
+		pman_print_error("failed to instantiate the ringbuf manager. (If you get memory allocation errors try to reduce the buffer dimension)");
+		return errno;
+	}
+	return 0;
 }
 
 static inline void *ringbuf__get_first_ring_event(struct ring *r, int pos)
@@ -209,7 +378,7 @@ static inline void *ringbuf__get_first_ring_event(struct ring *r, int pos)
 	void *sample = NULL;
 
 	/* If the consumer reaches the producer update the producer position to
-	 * get the newly collected events. 
+	 * get the newly collected events.
 	 */
 	if(g_state.cons_pos[pos] >= g_state.prod_pos[pos])
 	{
@@ -238,7 +407,7 @@ static inline void *ringbuf__get_first_ring_event(struct ring *r, int pos)
 	return sample;
 }
 
-static void ringbuf__consume_first_event(struct ring_buffer *rb, struct ppm_evt_hdr **event_ptr, int16_t *cpu_id)
+static void ringbuf__consume_first_event_from_multiple_bufs(struct ring_buffer *rb, struct ppm_evt_hdr **event_ptr, int16_t *buffer_id)
 {
 	uint64_t min_ts = 0xffffffffffffffffLL;
 	struct ppm_evt_hdr *tmp_pointer = NULL;
@@ -273,15 +442,60 @@ static void ringbuf__consume_first_event(struct ring_buffer *rb, struct ppm_evt_
 	}
 
 	*event_ptr = tmp_pointer;
-	*cpu_id = tmp_ring;
+	*buffer_id = tmp_ring;
 	g_state.last_ring_read = tmp_ring;
 	g_state.last_event_size = tmp_cons_increment;
 }
 
-/* This API must be used if we want to get the first event according to its timestamp */
-void pman_consume_first_from_buffers(void **event_ptr, int16_t *cpu_id)
+/* Consume */
+
+void pman_consume_first_from_multiple_buffers(void **event_ptr, int16_t *buffer_id)
 {
-	ringbuf__consume_first_event(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, cpu_id);
+	ringbuf__consume_first_event_from_multiple_bufs(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, buffer_id);
+}
+
+void pman_consume_first_from_single_buffer(void **event_ptr, int16_t *buffer_id)
+{
+	struct ring *r = &g_state.rb_manager->rings[0];
+	/* We set it to `-1` so we can return immediately in case of failure */
+	*buffer_id = -1;
+	/* We set it to NULL so we can return immediately in case of failure */
+	*event_ptr = NULL;
+
+	int *len_ptr = NULL;
+	int len = 0;
+
+	smp_store_release(r->consumer_pos, g_state.cons_pos[0]);
+
+	if(g_state.cons_pos[0] >= g_state.prod_pos[0])
+	{
+		g_state.prod_pos[0] = smp_load_acquire(r->producer_pos);
+		if(g_state.cons_pos[0] >= g_state.prod_pos[0])
+		{
+			return;
+		}
+	}
+
+	len_ptr = r->data + (g_state.cons_pos[0] & r->mask);
+	len = smp_load_acquire(len_ptr);
+
+	/* Check in the header if the bit is active, sample not committed yet, we need to retry the next time */
+	if(len & BPF_RINGBUF_BUSY_BIT)
+	{
+		return;
+	}
+
+	/* This will be the new consumer position in the next round,
+	 * we don't store the new position until we have processed the current event in scap.
+	 */
+	g_state.cons_pos[0] += roundup_len(len);
+
+	/* The sample is not discarded kernel-side, we can return it, otherwise, we return NULL */
+	if((len & BPF_RINGBUF_DISCARD_BIT) == 0)
+	{
+		*event_ptr = (void *)len_ptr + BPF_RINGBUF_HDR_SZ;
+		*buffer_id = 0;
+	}
 }
 
 #ifdef TEST_HELPERS

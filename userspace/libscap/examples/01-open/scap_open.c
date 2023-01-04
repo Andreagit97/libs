@@ -39,6 +39,7 @@ limitations under the License.
 #define EVENT_TYPE_OPTION "--evt_type"
 #define BUFFER_OPTION "--buffer_dim"
 #define SIMPLE_SET_OPTION "--simple_set"
+#define BUFFER_MODE_OPTION "--buffer_mode"
 
 /* PRINT */
 #define VALIDATION_OPTION "--validate_syscalls"
@@ -709,6 +710,7 @@ void print_help()
 	printf("'%s <num_events>': number of events to catch before terminating. (default: UINT64_MAX)\n", NUM_EVENTS_OPTION);
 	printf("'%s <event_type>': every event of this type will be printed to console. (default: -1, no print)\n", EVENT_TYPE_OPTION);
 	printf("'%s <dim>': dimension in bytes of a single per CPU buffer.\n", BUFFER_OPTION);
+	printf("'%s <buffer_mode>': modern BPF probe offers 3 possible ring-buffer strategies: %s, %s, %s\n", BUFFER_MODE_OPTION, MODERN_PER_CPU_BUFFER_NAME, MODERN_PAIRED_BUFFER_NAME, MODERN_SINGLE_BUFFER_NAME);
 	printf("\n------> VALIDATION OPTIONS\n");
 	printf("'%s': validation checks.\n", VALIDATION_OPTION);
 	printf("\n------> PRINT OPTIONS\n");
@@ -731,7 +733,8 @@ void print_scap_source()
 	}
 	else if(strcmp(oargs.engine_name, MODERN_BPF_ENGINE) == 0)
 	{
-		printf("* Modern BPF probe.\n");
+		struct scap_modern_bpf_engine_params* params = oargs.engine_params;
+		printf("* Modern BPF probe, buffer mode: %s\n", get_modern_bpf_buffer_mode_name(params->buffer_mode));
 	}
 	else if(strcmp(oargs.engine_name, SAVEFILE_ENGINE) == 0)
 	{
@@ -887,6 +890,33 @@ void parse_CLI_options(int argc, char** argv)
 		if(!strcmp(argv[i], SIMPLE_SET_OPTION))
 		{
 			enable_simple_set();
+		}
+		/* This should be used only with the modern probe */
+		if(!strcmp(argv[i], BUFFER_MODE_OPTION))
+		{
+			if(!(i + 1 < argc))
+			{
+				printf("\nYou need to specify also the buffer mode: single, paired, per-cpu. Bye!\n");
+				exit(EXIT_FAILURE);
+			}
+			const char* option_name = argv[++i];
+			if(!strcmp(option_name, MODERN_PER_CPU_BUFFER_NAME))
+			{
+				modern_bpf_params.buffer_mode = MODERN_PER_CPU_BUFFER;
+			}
+			else if(!strcmp(option_name, MODERN_PAIRED_BUFFER_NAME))
+			{
+				modern_bpf_params.buffer_mode = MODERN_PAIRED_BUFFER;
+			}
+			else if(!strcmp(option_name, MODERN_SINGLE_BUFFER_NAME))
+			{
+				modern_bpf_params.buffer_mode = MODERN_SINGLE_BUFFER;
+			}
+			else
+			{
+				printf("\nUnknown buffer mode. Bye!\n");
+				exit(EXIT_FAILURE);
+			}
 		}
 
 		/*=============================== CONFIGURATIONS ===========================*/

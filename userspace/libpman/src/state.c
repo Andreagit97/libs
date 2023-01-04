@@ -22,7 +22,7 @@ limitations under the License.
 #include <unistd.h>
 #include "state.h"
 
-struct internal_state g_state;
+struct internal_state g_state = {};
 
 void pman_print_error(const char* error_message)
 {
