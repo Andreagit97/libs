@@ -367,6 +367,15 @@ extern "C"
 	 */
 	void pman_clean_all_64bit_interesting_syscalls(void);
 
+	/**
+	 * @brief Given the event type, returns the name of the BPF
+	 * program associated with that event.
+	 *
+	 * @param event_type event type
+	 * @return name of the BPF program associated with the event type
+	 */
+	const char* pman_get_event_prog_name(int event_type);
+
 	/////////////////////////////
 	// TEST HELPERS
 	/////////////////////////////
@@ -399,15 +408,6 @@ extern "C"
 	 * @return number of params associated with the event type
 	 */
 	uint8_t pman_get_event_params(int event_type);
-
-	/**
-	 * @brief Given the event type, returns the name of the BPF
-	 * program associated with that event.
-	 *
-	 * @param event_type event type
-	 * @return name of the BPF program associated with the event type
-	 */
-	const char* pman_get_event_prog_name(int event_type);
 
 	/**
 	 * @brief Return `true` if all ring buffers are full. To state

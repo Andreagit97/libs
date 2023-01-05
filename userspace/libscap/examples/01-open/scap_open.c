@@ -22,6 +22,7 @@ limitations under the License.
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include "strlcpy.h"
+#include <libpman.h>
 
 #define SYSCALL_NAME_MAX_LEN 40
 #define UNKNOWN_ENGINE "unknown"
@@ -993,6 +994,25 @@ int main(int argc, char** argv)
 	}
 
 	g_syscall_info_table = scap_get_syscall_info_table();
+
+	printf("\n--------------------------------------------\n");
+	char str[SYSCALL_TABLE_SIZE][SYSCALL_NAME_MAX_LEN];
+	int interesting_syscall = 0;
+	for(int i = 0; i < SYSCALL_TABLE_SIZE; i++)
+	{
+		if(g_syscall_table[i].enter_event_type != PPME_GENERIC_E)
+		{
+			if(pman_get_event_prog_name(g_syscall_table[i].enter_event_type) != NULL)
+			{
+				continue;
+			}
+			strlcpy(str[interesting_syscall++], g_syscall_info_table[g_syscall_table[i].ppm_sc].name, SYSCALL_NAME_MAX_LEN);
+		}
+	}
+	print_sorted_syscalls(str, interesting_syscall);
+
+	printf("\n--------------------------------------------\n");
+	return 0;
 
 	parse_CLI_options(argc, argv);
 
