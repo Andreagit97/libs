@@ -225,7 +225,7 @@ public:
 	virtual void open_savefile(const std::string &filename, int fd = 0);
 	virtual void open_plugin(const std::string &plugin_name, const std::string &plugin_open_params);
 	virtual void open_gvisor(const std::string &config_path, const std::string &root_path);
-	virtual void open_modern_bpf(unsigned long driver_buffer_bytes_dim = DEFAULT_DRIVER_BUFFER_BYTES_DIM, const std::unordered_set<uint32_t> &ppm_sc_of_interest = {}, const std::unordered_set<uint32_t> &tp_of_interest = {});
+	virtual void open_modern_bpf(unsigned long driver_buffer_bytes_dim = DEFAULT_DRIVER_BUFFER_BYTES_DIM, uint16_t cpus_for_each_buffer = DEFAULT_BUFFER_FOR_EACH_CPU_PAIR, const std::unordered_set<uint32_t> &ppm_sc_of_interest = {}, const std::unordered_set<uint32_t> &tp_of_interest = {});
 	virtual void open_test_input(scap_test_input_data *data);
 
 	scap_open_args factory_open_args(const char* engine_name, scap_mode_t scap_mode);
