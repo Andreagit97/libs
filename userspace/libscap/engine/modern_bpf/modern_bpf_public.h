@@ -16,6 +16,11 @@ limitations under the License.
 #include <stdint.h>
 
 #define MODERN_BPF_ENGINE "modern_bpf"
+/* This will allow us to preserve the same memory footprint of the other 2 drivers (bpf, kmod) even if
+ * they use a buffer for every CPU. This is because the `BPF_RINGBUF` is mapped twice both kernel and userspace-side,
+ * so if we require a buffer of 8 MB the kernel will allocate 16 MB of memory under the hood.
+ */
+#define DEFAULT_BUFFER_FOR_EACH_CPU_PAIR 2
 
 #ifdef __cplusplus
 extern "C"
@@ -24,7 +29,8 @@ extern "C"
 
 	struct scap_modern_bpf_engine_params
 	{
-		unsigned long buffer_bytes_dim; ///< Dimension of a single per-CPU buffer in bytes. Please note: this buffer will be mapped twice in the process virtual memory, so pay attention to its size.
+		uint16_t cpus_for_each_buffer;	///< We will allocate a ring buffer every `cpus_for_each_buffer` CPUs. `0` is a special value and means a single ring buffer shared between all the CPUs.
+		unsigned long buffer_bytes_dim; ///< Dimension of a ring buffer in bytes. The number of ring buffers allocated changes according to the `cpus_for_each_buffer` param. Please note: this buffer will be mapped twice both kernel and userspace-side, so pay attention to its size.
 	};
 
 #ifdef __cplusplus
