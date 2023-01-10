@@ -21,6 +21,8 @@ limitations under the License.
 #include "events_prog_names.h"
 #include <scap.h>
 
+#include <linux/net.h>
+
 extern const struct ppm_event_info g_event_info[PPM_EVENT_MAX];
 extern const struct syscall_evt_pair g_syscall_table[SYSCALL_TABLE_SIZE];
 
@@ -208,6 +210,86 @@ clean_fill_syscalls_tail_table:
 	return errno;
 }
 
+int pman_fill_socketcall_tail_tables()
+{
+	/* We use the evt_pair just to have enter and exit events in one shot */
+	const struct syscall_evt_pair socketcall_prog_names[SYS_SENDMMSG+1] = {
+		[SYS_SOCKET] = {0, PPME_SOCKET_SOCKET_E, PPME_SOCKET_SOCKET_X, 0},
+		[SYS_BIND] = {0, PPME_SOCKET_BIND_E, PPME_SOCKET_BIND_X, 0},
+		[SYS_CONNECT] = {0, PPME_SOCKET_CONNECT_E, PPME_SOCKET_CONNECT_X, 0},
+		[SYS_LISTEN] = {0, PPME_SOCKET_LISTEN_E, PPME_SOCKET_LISTEN_X, 0},
+		[SYS_ACCEPT] = {0, PPME_SOCKET_ACCEPT_5_E, PPME_SOCKET_ACCEPT_5_X, 0},
+		[SYS_GETSOCKNAME] = {0, PPME_SOCKET_GETSOCKNAME_E, PPME_SOCKET_SETSOCKOPT_X, 0},
+		[SYS_GETPEERNAME]= {0, PPME_SOCKET_GETPEERNAME_E, PPME_SOCKET_GETPEERNAME_X, 0},
+		[SYS_SOCKETPAIR] = {0, PPME_SOCKET_SOCKETPAIR_E, PPME_SOCKET_SOCKETPAIR_X, 0},
+		[SYS_SEND] = {0, PPME_SOCKET_SEND_E, PPME_SOCKET_SEND_X, 0},
+		[SYS_RECV]  = {0, PPME_SOCKET_RECV_E, PPME_SOCKET_RECV_X, 0},
+		[SYS_SENDTO] = {0, PPME_SOCKET_SENDTO_E, PPME_SOCKET_SENDTO_X, 0},
+		[SYS_RECVFROM] = {0, PPME_SOCKET_RECVFROM_E, PPME_SOCKET_RECVFROM_X, 0},
+		[SYS_SHUTDOWN]  = {0, PPME_SOCKET_SHUTDOWN_E, PPME_SOCKET_SHUTDOWN_X, 0},
+		[SYS_SETSOCKOPT] = {0, PPME_SOCKET_SETSOCKOPT_E, PPME_SOCKET_SETSOCKOPT_X, 0},
+		[SYS_GETSOCKOPT] = {0, PPME_SOCKET_GETSOCKOPT_E, PPME_SOCKET_GETSOCKOPT_X, 0},
+		[SYS_SENDMSG] = {0, PPME_SOCKET_SENDMSG_E, PPME_SOCKET_SENDMSG_X, 0},
+		[SYS_RECVMSG] = {0, PPME_SOCKET_RECVMSG_E, PPME_SOCKET_RECVMSG_X, 0},
+		[SYS_ACCEPT4] = {0, PPME_SOCKET_ACCEPT4_5_E, PPME_SOCKET_ACCEPT4_5_X, 0},
+		[SYS_RECVMMSG] = {0, PPME_SOCKET_RECVMMSG_E, PPME_SOCKET_RECVMMSG_X, 0},
+		[SYS_SENDMMSG] = {0, PPME_SOCKET_SENDMMSG_E, PPME_SOCKET_SENDMMSG_X, 0},
+	};
+
+	int	enter_event_type = 0;
+	int	exit_event_type = 0;
+	const char* enter_prog_name = NULL;
+	const char* exit_prog_name = NULL;
+	int socketcall_enter_table_fd = 0;
+	int socketcall_exit_table_fd = 0;
+
+	socketcall_enter_table_fd = bpf_map__fd(g_state.skel->maps.socketcall_enter_table);
+	if(socketcall_enter_table_fd <= 0)
+	{
+		pman_print_error("unable to get the socketcall_enter_table");
+		return errno;
+	}
+
+	socketcall_exit_table_fd = bpf_map__fd(g_state.skel->maps.socketcall_exit_table);
+	if(socketcall_exit_table_fd <= 0)
+	{
+		pman_print_error("unable to get the syscall exit tail table");
+		return errno;
+	}
+
+	for(int socketcall_id = 0; socketcall_id < SYS_SENDMMSG+1; socketcall_id++)
+	{
+		enter_prog_name = event_prog_names[socketcall_prog_names[socketcall_id].enter_event_type];
+		exit_prog_name = event_prog_names[socketcall_prog_names[socketcall_id].exit_event_type];
+		
+		/* we need this workaround to manage still not implemented syscalls */
+		if(!enter_prog_name)
+		{
+			enter_prog_name = event_prog_names[PPME_GENERIC_E];
+		}
+
+		if(!exit_prog_name)
+		{
+			exit_prog_name = event_prog_names[PPME_GENERIC_X];
+		}
+
+		if(add_bpf_program_to_tail_table(socketcall_enter_table_fd, enter_prog_name, socketcall_id))
+		{
+			goto clean_fill_socketcall_tail_table;
+		}
+
+		if(add_bpf_program_to_tail_table(socketcall_exit_table_fd, exit_prog_name, socketcall_id))
+		{
+			goto clean_fill_socketcall_tail_table;
+		}
+	}
+
+clean_fill_socketcall_tail_table:
+	close(socketcall_enter_table_fd);
+	close(socketcall_exit_table_fd);
+	return errno;	
+}
+
 int pman_fill_extra_event_prog_tail_table()
 {
 	int extra_event_prog_tail_table_fd = 0;
@@ -292,6 +374,7 @@ int pman_finalize_maps_after_loading()
 
 	/* We have to fill all ours tail tables. */
 	err = pman_fill_syscalls_tail_table();
+	err = pman_fill_socketcall_tail_tables();
 	err = err ?: pman_fill_extra_event_prog_tail_table();
 	return err;
 }

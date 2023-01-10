@@ -33,6 +33,13 @@ int BPF_PROG(sys_exit,
 		return 0;
 	}
 
+	if(syscall_id == __NR_socketcall)
+	{
+		int socketcall_id = (int)extract__syscall_argument(regs, 0);
+		bpf_tail_call(ctx, &socketcall_exit_table, socketcall_id);
+		return 0;
+	}
+
 	bpf_tail_call(ctx, &syscall_exit_tail_table, syscall_id);
 
 	return 0;

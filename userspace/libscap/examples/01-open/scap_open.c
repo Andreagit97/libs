@@ -144,6 +144,8 @@ static int simple_set[] = {
 	PPM_SC_UNSHARE,
 	PPM_SC_USERFAULTFD,
 	PPM_SC_VFORK,
+	/* Otherwise `socketcall` is truncated by the simple consumer */
+	PPM_SC_SOCKETCALL,
 	-1
 };
 
