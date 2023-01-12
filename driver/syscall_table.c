@@ -43,6 +43,13 @@ or GPL2.txt for full copies of the license.
 #endif /* __mips__ */
 #endif /* __KERNEL__ */
 
+#ifdef __x86_64__
+#include "./syscall_compact_x86_64.h"
+#elif __aarch64__
+#include "./syscall_compact_aarch64.h"
+#elif __s390x__
+#include "./syscall_compact_s390x.h"
+#endif /* __x86_64__ */
 
 #include "ppm_events_public.h"
 #ifdef __KERNEL__
