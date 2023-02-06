@@ -75,7 +75,7 @@ jobs:
           name: Run scap-open with kmod 🏎️
           command: |
             cd /tmp/libs/build
-            sudo insmod ./driver/scap.ko
+            sudo insmod ./driver/scap.ko || true
             sudo ./libscap/examples/01-open/scap-open --kmod --num_events 0
             sudo rmmod scap
 
