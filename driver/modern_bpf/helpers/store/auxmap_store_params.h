@@ -346,6 +346,7 @@ static __always_inline u16 auxmap__store_charbuf_param(struct auxiliary_map *aux
 	{
 		charbuf_len = push__charbuf(auxmap->data, &auxmap->payload_pos, charbuf_pointer, len_to_read, mem);
 	}
+	bpf_printk("charbuf_len: %d", charbuf_len);
 	/* If we are not able to push anything with `push__charbuf`
 	 * `charbuf_len` will be equal to `0` so we will send an
 	 * empty param to userspace.

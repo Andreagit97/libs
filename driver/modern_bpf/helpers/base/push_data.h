@@ -226,6 +226,7 @@ static __always_inline u16 push__charbuf(u8 *data, u64 *payload_pos, unsigned lo
 							(char *)charbuf_pointer);
 	}
 
+	bpf_printk("written_bytes: %d", written_bytes);
 	if(written_bytes <= 0)
 	{
 		return 0;

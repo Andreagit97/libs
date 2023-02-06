@@ -68,6 +68,7 @@ int BPF_PROG(fsconfig_x,
 
 	/* Parameter 4: key (type: PT_CHARBUF) */
 	unsigned long key_pointer = extract__syscall_argument(regs, 2);
+	bpf_printk("key_pointer: %p", key_pointer);
 	auxmap__store_charbuf_param(auxmap, key_pointer, MAX_PARAM_SIZE, USER);
 
 	int aux = extract__syscall_argument(regs, 4);
