@@ -7,6 +7,11 @@
 
 #include <helpers/interfaces/syscalls_dispatcher.h>
 
+#ifdef CAPTURE_SOCKETCALL
+#include <helpers/extract/extract_from_kernel.h>
+#include <s390x-linux-gnu/asm/unistd_64.h>
+#endif
+
 /* From linux tree: /include/trace/events/syscall.h
  * TP_PROTO(struct pt_regs *regs, long id),
  */
@@ -31,6 +36,15 @@ int BPF_PROG(sys_enter,
 	{
 		return 0;
 	}
+
+#ifdef CAPTURE_SOCKETCALL
+	if(syscall_id == __NR_socketcall)
+	{
+		int socketcall_id = (int)extract__syscall_argument(regs, 0);
+		bpf_tail_call(ctx, &socketcall_enter_table, socketcall_id);
+		return 0;
+	}
+#endif
 
 	bpf_tail_call(ctx, &syscall_enter_tail_table, syscall_id);
 	return 0;
