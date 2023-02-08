@@ -553,8 +553,6 @@ public:
 	 */
 	void assert_ptrace_data(int param_num);
 
-	void set_event_type(enum ppm_event_type type);
-
 private:
 	enum ppm_event_type m_event_type;	  /* type of the event we want to assert in this test. */
 	std::vector<struct param> m_event_params; /* all the params of the event (len+value). */

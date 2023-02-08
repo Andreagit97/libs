@@ -1,16 +1,13 @@
 #include "../../event_class/event_class.h"
 
-#ifdef __NR_socketcall
+#if defined(__NR_socketcall) && defined(__NR_socket) && defined(__NR_bind) && defined(__NR_connect)
 
 #include <sys/socket.h>
 #include <linux/net.h>
 
 TEST(SyscallExit, socketcall_socketX)
 {
-	/* RIGHT NOW we enable all the syscalls, we create a dedicated helper IMHO */
-	auto evt_test = get_syscall_event_test();
-
-	evt_test->set_event_type(PPME_SOCKET_SOCKET_X);
+	auto evt_test = get_syscall_event_test(__NR_socket, EXIT_EVENT);
 
 	evt_test->enable_capture();
 
@@ -28,7 +25,7 @@ TEST(SyscallExit, socketcall_socketX)
 
 	evt_test->disable_capture();
 
-	evt_test->assert_event_presence(CURRENT_PID, PPME_SOCKET_SOCKET_X);
+	evt_test->assert_event_presence();
 
 	if(HasFatalFailure())
 	{
@@ -51,10 +48,7 @@ TEST(SyscallExit, socketcall_socketX)
 
 TEST(SyscallExit, socketcall_bindX)
 {
-	/* RIGHT NOW we enable all the syscalls, we create a dedicated helper IMHO */
-	auto evt_test = get_syscall_event_test();
-
-	evt_test->set_event_type(PPME_SOCKET_BIND_X);
+	auto evt_test = get_syscall_event_test(__NR_bind, EXIT_EVENT);
 
 	evt_test->enable_capture();
 
@@ -81,7 +75,7 @@ TEST(SyscallExit, socketcall_bindX)
 
 	evt_test->disable_capture();
 
-	evt_test->assert_event_presence(CURRENT_PID, PPME_SOCKET_BIND_X);
+	evt_test->assert_event_presence();
 
 	if(HasFatalFailure())
 	{
@@ -107,9 +101,7 @@ TEST(SyscallExit, socketcall_bindX)
 
 TEST(SyscallExit, socketcall_connectX)
 {
-	auto evt_test = get_syscall_event_test();
-
-	evt_test->set_event_type(PPME_SOCKET_CONNECT_X);
+	auto evt_test = get_syscall_event_test(__NR_connect, EXIT_EVENT);
 
 	evt_test->enable_capture();
 
@@ -143,7 +135,7 @@ TEST(SyscallExit, socketcall_connectX)
 
 	evt_test->disable_capture();
 
-	evt_test->assert_event_presence(CURRENT_PID, PPME_SOCKET_CONNECT_X);
+	evt_test->assert_event_presence();
 
 	if(HasFatalFailure())
 	{

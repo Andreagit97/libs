@@ -7,11 +7,6 @@
 
 #include <helpers/interfaces/syscalls_dispatcher.h>
 
-#ifdef CAPTURE_SOCKETCALL
-#include <helpers/extract/extract_from_kernel.h>
-#include <s390x-linux-gnu/asm/unistd_64.h>
-#endif
-
 /* From linux tree: /include/trace/events/syscall.h
  * TP_PROTO(struct pt_regs *regs, long ret),
  */
@@ -20,7 +15,15 @@ int BPF_PROG(sys_exit,
 	     struct pt_regs *regs,
 	     long ret)
 {
-	u32 syscall_id = syscalls_dispatcher__get_syscall_id(regs);
+	u32 syscall_id = extract__syscall_id(regs);
+
+#ifdef CAPTURE_SOCKETCALL
+	/* we convert it here in this way the syscall will be treated exactly as the original one */
+	if(syscall_id == __NR_socketcall)
+	{
+		syscall_id = conver_network_syscalls(regs);
+	}
+#endif
 
 	/* The `syscall-id` can refer to both 64-bit and 32-bit architectures.
 	 * Right now we filter only 64-bit syscalls, all the 32-bit syscalls
@@ -37,15 +40,6 @@ int BPF_PROG(sys_exit,
 	{
 		return 0;
 	}
-
-#ifdef CAPTURE_SOCKETCALL
-	if(syscall_id == __NR_socketcall)
-	{
-		int socketcall_id = (int)extract__syscall_argument(regs, 0);
-		bpf_tail_call(ctx, &socketcall_exit_table, socketcall_id);
-		return 0;
-	}
-#endif
 
 	bpf_tail_call(ctx, &syscall_exit_tail_table, syscall_id);
 

@@ -10,7 +10,10 @@
 #include <helpers/base/maps_getters.h>
 #include <helpers/base/read_from_task.h>
 #include <driver/ppm_flag_helpers.h>
-#include <helpers/extract/extract_from_syscall.h>
+
+#ifdef CAPTURE_SOCKETCALL
+#include <s390x-linux-gnu/asm/unistd_64.h>
+#endif
 
 /* Used to convert from page number to KB. */
 #define DO_PAGE_SHIFT(x) (x) << (IOC_PAGE_SHIFT - 10)
@@ -26,6 +29,98 @@ enum capability_type
 /* All the functions that are called in bpf to extract parameters
  * start with the `extract` prefix.
  */
+
+///////////////////////////
+// EXTRACT FROM SYSCALLS
+///////////////////////////
+
+/**
+ * @brief Extract the syscall id starting from the registers
+ *
+ * @param regs pointer to the struct where we find the arguments
+ * @return syscall id
+ */
+static __always_inline u32 extract__syscall_id(struct pt_regs *regs)
+{
+#if defined(__TARGET_ARCH_x86)
+	return (u32)regs->orig_ax;
+#elif defined(__TARGET_ARCH_arm64)
+	return (u32)regs->syscallno;
+#elif defined(__TARGET_ARCH_s390)
+	return (u32)regs->int_code & 0xffff;
+#else
+	return 0;
+#endif
+}
+
+/**
+ * @brief Extract a specific syscall argument
+ *
+ * @param regs pointer to the strcut where we find the arguments
+ * @param idx index of the argument to extract
+ * @return generic unsigned long value that can be a pointer to the arg
+ * or directly the value, it depends on the type of arg.
+ */
+static __always_inline unsigned long extract__syscall_argument(struct pt_regs *regs, int idx)
+{
+	unsigned long arg;
+	switch(idx)
+	{
+	case 0:
+		arg = PT_REGS_PARM1_CORE_SYSCALL(regs);
+		break;
+	case 1:
+		arg = PT_REGS_PARM2_CORE_SYSCALL(regs);
+		break;
+	case 2:
+		arg = PT_REGS_PARM3_CORE_SYSCALL(regs);
+		break;
+	case 3:
+		arg = PT_REGS_PARM4_CORE_SYSCALL(regs);
+		break;
+	case 4:
+		arg = PT_REGS_PARM5_CORE_SYSCALL(regs);
+		break;
+	case 5:
+		/* Not defined in libbpf, look at `definitions_helpers.h` */
+		arg = PT_REGS_PARM6_CORE_SYSCALL(regs);
+		break;
+	default:
+		arg = 0;
+	}
+
+	return arg;
+}
+
+/**
+ * @brief Extract one ore more arguments related to a network / socket system call.
+ *
+ * This function takes into consideration whether the network system call has been
+ * called directly (e.g. accept4) or through the socketcall system call multiplexer.
+ * For the socketcall multiplexer, arguments are extracted from the second argument
+ * of the socketcall system call.  See socketcall(2) for more information.
+ *
+ * @param argv Pointer to store up to @num arguments of size `unsigned long`
+ * @param num Number of arguments to extract
+ * @param regs Pointer to the struct pt_regs to access arguments and system call ID
+ */
+static __always_inline void extract__network_args(void *argv, int num, struct pt_regs *regs)
+{
+#ifdef CAPTURE_SOCKETCALL
+	int id = extract__syscall_id(regs);
+	if(id == __NR_socketcall)
+	{
+		unsigned long args_pointer = extract__syscall_argument(regs, 1);
+		bpf_probe_read_user(argv, num * sizeof(unsigned long), (void*)args_pointer);
+		return;
+	}
+#endif
+	for (int i = 0; i < num; i++)
+	{
+		unsigned long *dst = (unsigned long *)argv;
+		dst[i] = extract__syscall_argument(regs, i);
+	}
+}
 
 ///////////////////////////
 // ENCODE DEVICE NUMBER
