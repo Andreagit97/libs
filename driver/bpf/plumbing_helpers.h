@@ -274,8 +274,8 @@ static __always_inline unsigned long bpf_syscall_get_argument(struct filler_data
 #ifdef CAPTURE_SOCKETCALL
 	if(syscall_id == __NR_socketcall)
 	{
-		unsigned long pointer = final_arg;
-		int ret = bpf_probe_read_user(&final_arg, sizeof(unsigned long), (void*)pointer + (final_idx*sizeof(unsigned long)));
+		void* pointer = final_arg;
+		int ret = bpf_probe_read_user(&final_arg, sizeof(unsigned long), (void*)&pointer[final_idx]);
 		const char step0[] = "[0 step] param: %lu, ret: %d, index: %d";
 		bpf_trace_printk(step0, sizeof(step0), final_arg, ret, final_idx);
 	}
