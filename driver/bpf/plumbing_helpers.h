@@ -13,6 +13,10 @@ or GPL2.txt for full copies of the license.
 #include <linux/version.h>
 #include <linux/fdtable.h>
 
+#ifdef CAPTURE_SOCKETCALL
+#include <linux/net.h>
+#endif
+
 #include "types.h"
 #include "builtins.h"
 
@@ -248,11 +252,36 @@ static __always_inline unsigned long bpf_syscall_get_argument_from_ctx(void *ctx
 static __always_inline unsigned long bpf_syscall_get_argument(struct filler_data *data,
 							      int idx)
 {
+	unsigned long final_arg = 0;
+
+#ifdef CAPTURE_SOCKETCALL
+	int final_idx = idx;
+	int syscall_id = bpf_syscall_get_nr(data->ctx);
+	/* we want to access always the original argument with index `0` */
+	if(syscall_id == __NR_socketcall)
+	{
+		/* We want to extract the pointer to the real arguments */
+		idx = 1;
+	}
+#endif	
+
 #ifdef BPF_SUPPORTS_RAW_TRACEPOINTS
-	return bpf_syscall_get_argument_from_ctx(data->ctx, idx);
+	final_arg = bpf_syscall_get_argument_from_ctx(data->ctx, idx);
 #else
-	return bpf_syscall_get_argument_from_args(data->args, idx);
+	final_arg = bpf_syscall_get_argument_from_args(data->args, idx);
 #endif
+
+#ifdef CAPTURE_SOCKETCALL
+	if(syscall_id == __NR_socketcall)
+	{
+		unsigned long pointer = final_arg;
+		int ret = bpf_probe_read_user(&final_arg, sizeof(unsigned long), (void*)pointer + (final_idx*sizeof(unsigned long)));
+		const char step0[] = "[0 step] param: %lu, ret: %d, index: %d";
+		bpf_trace_printk(step0, sizeof(step0), final_arg, ret, final_idx);
+	}
+#endif	
+
+	return final_arg;
 }
 
 static __always_inline char *get_frame_scratch_area(unsigned int cpu)
@@ -557,6 +586,39 @@ static __always_inline void reset_tail_ctx(struct scap_bpf_per_cpu_state *state,
 	state->tail_ctx.prev_res = 0;
 }
 
+#ifdef CAPTURE_SOCKETCALL
+static __always_inline void correct_event(void *ctx, enum ppm_event_type* old_type)
+{
+	int socketcall_id = bpf_syscall_get_argument_from_ctx(ctx, 0);
+
+	/* If it was an exit event we start from one otherwise from 0 */
+	if(*old_type % 2 !=0)
+	{
+		*old_type = 1;
+	}
+	else
+	{
+		*old_type = 0;
+	}
+
+	switch (socketcall_id) {
+	case SYS_SOCKET:
+		*old_type += PPME_SOCKET_SOCKET_E;
+		return;
+	case SYS_BIND:
+		*old_type += PPME_SOCKET_BIND_E;
+		return;
+	case SYS_CONNECT:
+		*old_type += PPME_SOCKET_CONNECT_E;
+		return;
+	default:
+		*old_type += PPME_GENERIC_E;
+		return;
+	}
+
+}
+#endif
+
 static __always_inline void call_filler(void *ctx,
 					void *stack_ctx,
 					enum ppm_event_type evt_type,
@@ -568,6 +630,14 @@ static __always_inline void call_filler(void *ctx,
 	unsigned long long pid;
 	unsigned long long ts;
 	unsigned int cpu;
+
+#ifdef CAPTURE_SOCKETCALL
+	if(bpf_syscall_get_nr(ctx) == __NR_socketcall)
+	{
+		drop_flags = UF_NEVER_DROP;
+		correct_event(ctx, &evt_type);
+	}
+#endif
 
 	cpu = bpf_get_smp_processor_id();
 
