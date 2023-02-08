@@ -111,16 +111,6 @@ int f_sys_generic(struct event_filler_arguments *args)
 	long table_index = args->syscall_id - SYSCALL_TABLE_ID0;
 	const struct syscall_evt_pair *cur_g_syscall_table = args->cur_g_syscall_table;
 
-#ifdef _HAS_SOCKETCALL
-	if (unlikely(args->syscall_id == args->socketcall_syscall)) {
-		/*
-		 * All the socket calls should be implemented
-		 */
-		ASSERT(false);
-		return PPM_FAILURE_BUG;
-	}
-#endif
-
 	/*
 	 * name
 	 */

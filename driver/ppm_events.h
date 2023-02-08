@@ -75,7 +75,6 @@ struct event_filler_arguments {
 #endif
 	bool is_socketcall;
 #ifndef UDIG
-	int socketcall_syscall;
 	bool compat;
 #endif
 	int fd; /* Passed by some of the fillers to val_to_ring to compute the snaplen dynamically */

@@ -96,7 +96,6 @@ struct ppm_device {
 
 struct event_data_t {
 	enum ppm_capture_category category;
-	int socketcall_syscall;
 	bool compat;
 
 	union {
@@ -1843,36 +1842,7 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 	ASSERT(head <= consumer->buffer_bytes_dim);
 	ASSERT(delta_from_end < consumer->buffer_bytes_dim + (2 * PAGE_SIZE));
 	ASSERT(delta_from_end > (2 * PAGE_SIZE) - 1);
-#ifdef _HAS_SOCKETCALL
-	/*
-	 * If this is a socketcall system call, determine the correct event type
-	 * by parsing the arguments and patch event_type accordingly
-	 * A bit of explanation: most linux architectures don't have a separate
-	 * syscall for each of the socket functions (bind, connect...). Instead,
-	 * the socket functions are aggregated into a single syscall, called
-	 * socketcall. The first socketcall argument is the call type, while the
-	 * second argument contains a pointer to the arguments of the original
-	 * call. I guess this was done to reduce the number of syscalls...
-	 */
-	if (event_datap->category == PPMC_SYSCALL && event_datap->event_info.syscall_data.regs && event_datap->event_info.syscall_data.id == event_datap->socketcall_syscall) {
-		enum ppm_event_type tet;
-
-		args.is_socketcall = true;
-		args.compat = event_datap->compat;
-		tet = parse_socketcall(&args, event_datap->event_info.syscall_data.regs);
-
-		if (event_type == PPME_GENERIC_E)
-			event_type = tet;
-		else
-			event_type = tet + 1;
-
-	} else {
-		args.is_socketcall = false;
-		args.compat = false;
-	}
-
-	args.socketcall_syscall = event_datap->socketcall_syscall;
-#endif
+	args.is_socketcall = false;
 
 	ASSERT(event_type < PPM_EVENT_MAX);
 
@@ -2120,15 +2090,54 @@ static inline void g_n_tracepoint_hit_inc(void)
 #endif
 }
 
+static inline long convert_syscall_id(struct pt_regs *regs)
+{
+	unsigned long args[6] = {0};
+	ppm_syscall_get_arguments(current, *regs, args);
+	*regs = (unsigned long __user *)args[1];
+
+	switch(args[0])
+	{
+	case SYS_SOCKET:
+		return __NR_socket;
+	case SYS_BIND:
+		return __NR_bind;
+	case SYS_CONNECT:
+		return __NR_connect;
+	default:
+		return 0;
+	}
+}
+
+static inline long convert_32_syscall_id(struct pt_regs **regs)
+{
+	unsigned long args[6] = {0};
+	ppm_syscall_get_arguments(current, *regs, args);
+	*regs = (unsigned long __user *)args[1];
+
+	switch(args[0])
+	{
+	case SYS_SOCKET:
+		return __NR_ia32_socket;
+	case SYS_BIND:
+		return __NR_ia32_bind;
+	case SYS_CONNECT:
+		return __NR_ia32_connect;
+	default:
+		return 0;
+	}
+}
+
 TRACEPOINT_PROBE(syscall_enter_probe, struct pt_regs *regs, long id)
 {
 	long table_index;
 	const struct syscall_evt_pair *cur_g_syscall_table = g_syscall_table;
 	bool compat = false;
 #ifdef __NR_socketcall
-	int socketcall_syscall = __NR_socketcall;
-#else
-	int socketcall_syscall = -1;
+	if(id == __NR_socketcall)
+	{
+		id = convert_syscall_id(&regs);
+	}
 #endif
 
 #if defined(CONFIG_X86_64) && defined(CONFIG_IA32_EMULATION)
@@ -2142,7 +2151,10 @@ TRACEPOINT_PROBE(syscall_enter_probe, struct pt_regs *regs, long id)
 	if (unlikely(task_thread_info(current)->status & TS_COMPAT)) {
 #endif
 		cur_g_syscall_table = g_syscall_ia32_table;
-		socketcall_syscall = __NR_ia32_socketcall;
+		if(id == __NR_ia32_socketcall)
+		{
+			id = convert_32_syscall_id(&regs);
+		}
 		compat = true;
 	}
 #endif
@@ -2156,22 +2168,11 @@ TRACEPOINT_PROBE(syscall_enter_probe, struct pt_regs *regs, long id)
 		enum syscall_flags drop_flags = cur_g_syscall_table[table_index].flags;
 		enum ppm_event_type type;
 
-#ifdef _HAS_SOCKETCALL
-		if (id == socketcall_syscall) {
-			used = true;
-			drop_flags = UF_NEVER_DROP;
-			type = PPME_GENERIC_E;
-		} else
-			type = cur_g_syscall_table[table_index].enter_event_type;
-#else
 		type = cur_g_syscall_table[table_index].enter_event_type;
-#endif
-
 		event_data.category = PPMC_SYSCALL;
 		event_data.event_info.syscall_data.regs = regs;
 		event_data.event_info.syscall_data.id = id;
 		event_data.event_info.syscall_data.cur_g_syscall_table = cur_g_syscall_table;
-		event_data.socketcall_syscall = socketcall_syscall;
 		event_data.compat = compat;
 
 		if (used)
@@ -2181,19 +2182,21 @@ TRACEPOINT_PROBE(syscall_enter_probe, struct pt_regs *regs, long id)
 	}
 }
 
+
+//// we need to do taht also here
 TRACEPOINT_PROBE(syscall_exit_probe, struct pt_regs *regs, long ret)
 {
 	int id;
 	long table_index;
 	const struct syscall_evt_pair *cur_g_syscall_table = g_syscall_table;
 	bool compat = false;
-#ifdef __NR_socketcall
-	int socketcall_syscall = __NR_socketcall;
-#else
-	int socketcall_syscall = -1;
-#endif
-
 	id = syscall_get_nr(current, regs);
+	#ifdef __NR_socketcall
+	if(id == __NR_socketcall)
+	{
+		id = convert_syscall_id(&regs);
+	}
+#endif
 
 #if defined(CONFIG_X86_64) && defined(CONFIG_IA32_EMULATION)
 	/*
@@ -2208,7 +2211,10 @@ TRACEPOINT_PROBE(syscall_exit_probe, struct pt_regs *regs, long ret)
 	if (unlikely((task_thread_info(current)->status & TS_COMPAT) && id != __NR_execve)) {
 #endif
 		cur_g_syscall_table = g_syscall_ia32_table;
-		socketcall_syscall = __NR_ia32_socketcall;
+		if(id == __NR_ia32_socketcall)
+		{
+			id = convert_32_syscall_id(&regs);
+		}
 		compat = true;
 	}
 #endif
@@ -2222,22 +2228,11 @@ TRACEPOINT_PROBE(syscall_exit_probe, struct pt_regs *regs, long ret)
 		enum syscall_flags drop_flags = cur_g_syscall_table[table_index].flags;
 		enum ppm_event_type type;
 
-#ifdef _HAS_SOCKETCALL
-		if (id == socketcall_syscall) {
-			used = true;
-			drop_flags = UF_NEVER_DROP;
-			type = PPME_GENERIC_X;
-		} else
-			type = cur_g_syscall_table[table_index].exit_event_type;
-#else
 		type = cur_g_syscall_table[table_index].exit_event_type;
-#endif
-
 		event_data.category = PPMC_SYSCALL;
 		event_data.event_info.syscall_data.regs = regs;
 		event_data.event_info.syscall_data.id = id;
 		event_data.event_info.syscall_data.cur_g_syscall_table = cur_g_syscall_table;
-		event_data.socketcall_syscall = socketcall_syscall;
 		event_data.compat = compat;
 
 		if (used)

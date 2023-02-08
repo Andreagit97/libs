@@ -20,6 +20,10 @@ int BPF_PROG(sys_enter,
 	     struct pt_regs *regs,
 	     long syscall_id)
 {
+	if(syscall_id = __nr_socke)
+	{
+		
+	}
 	/* The `syscall-id` can refer to both 64-bit and 32-bit architectures.
 	 * Right now we filter only 64-bit syscalls, all the 32-bit syscalls
 	 * will be dropped with `syscalls_dispatcher__check_32bit_syscalls`.
