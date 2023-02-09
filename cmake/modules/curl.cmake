@@ -74,6 +74,7 @@ else()
 			--without-nghttp2
 			--without-libssh2
 			--disable-threaded-resolver
+			--with-ca-path=/etc/ssl/certs/
 			--without-brotli
 			--without-zstd
 			BUILD_COMMAND ${CMD_MAKE}
