@@ -19,7 +19,6 @@ limitations under the License.
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <ppm_tp.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -98,13 +97,6 @@ extern "C"
 	/////////////////////////////
 	// ATTACH PROGRAMS
 	/////////////////////////////
-
-	/**
-	 * @brief Attach all available BPF programs
-	 *
-	 * @return `0` on success, `errno` in case of error.
-	 */
-	int pman_attach_all_programs(void);
 
 	/**
 	 * @brief Detach all available BPF programs
@@ -294,7 +286,7 @@ extern "C"
 	 * @brief Enable BPF-capture if we have previously
 	 * disabled it.
 	 */
-	int pman_enable_capture(bool *ppm_sc_set, bool *ppm_tp_set);
+	int pman_enable_capture(bool *ppm_sc_set);
 
 	/**
 	 * @brief Disable BPF capture for example when we

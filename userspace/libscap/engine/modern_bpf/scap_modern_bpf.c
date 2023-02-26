@@ -146,9 +146,6 @@ static int32_t scap_modern_bpf_handle_ppm_sc_mask(struct scap_engine_handle engi
 	struct modern_bpf_engine* handle = engine.m_handle;
 	int32_t ret = SCAP_SUCCESS;
 
-	// Load initial tp_set
-	bool curr_tp_set[TP_VAL_MAX];
-	tp_set_from_sc_set(handle->curr_sc_set.ppm_sc, curr_tp_set);
 	switch(op)
 	{
 	case SCAP_PPM_SC_MASK_SET:
@@ -172,23 +169,17 @@ static int32_t scap_modern_bpf_handle_ppm_sc_mask(struct scap_engine_handle engi
 		return SCAP_FAILURE;
 	}
 
+	/* We could add some logic to attach/detach SYS_ENTER/SYS_EXIT */
 
+	/* If we have a syscall we mark it as interesting/uninteresting */
 	if(ppm_sc < PPM_SC_SYSCALL_END)
 	{
 		pman_mark_single_ppm_sc(ppm_sc, op == SCAP_PPM_SC_MASK_SET);
+		return SCAP_SUCCESS;
 	}
 
-	// Load final tp_set
-	bool final_tp_set[TP_VAL_MAX];
-	tp_set_from_sc_set(handle->curr_sc_set.ppm_sc, final_tp_set);
-	for (int tp = 0; tp < TP_VAL_MAX && ret == SCAP_SUCCESS; tp++)
-	{
-		if (curr_tp_set[tp] != final_tp_set[tp])
-		{
-			ret = pman_update_single_program(tp, final_tp_set[tp]);
-		}
-	}
-	return ret;
+	/* If we have a tracepoint we attach/detach it */
+	return pman_update_single_program(ppm_sc, op == SCAP_PPM_SC_MASK_SET);
 }
 
 static int32_t scap_modern_bpf__configure(struct scap_engine_handle engine, enum scap_setting setting, unsigned long arg1, unsigned long arg2)
@@ -236,11 +227,7 @@ static int32_t scap_modern_bpf__configure(struct scap_engine_handle engine, enum
 int32_t scap_modern_bpf__start_capture(struct scap_engine_handle engine)
 {
 	struct modern_bpf_engine* handle = engine.m_handle;
-
-	bool tp_set[TP_VAL_MAX];
-	tp_set_from_sc_set(engine.m_handle->curr_sc_set.ppm_sc, tp_set);
-
-	return pman_enable_capture(handle->curr_sc_set.ppm_sc, tp_set);
+	return pman_enable_capture(handle->curr_sc_set.ppm_sc);
 }
 
 int32_t scap_modern_bpf__stop_capture(struct scap_engine_handle engine)

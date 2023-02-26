@@ -19,48 +19,55 @@ limitations under the License.
 #include <scap.h>
 #include <libpman.h>
 
-int pman_enable_capture(bool *ppm_sc_set, bool *ppm_tp_set)
+int pman_enable_capture(bool *sc_set)
 {
-	if (!ppm_tp_set)
-	{
-		pman_attach_all_programs();
-	}
-	else
-	{
-		int ret = 0;
-		/* Enable requested tracepoints */
-		for (int i = 0; i < TP_VAL_MAX && ret == 0; i++)
-		{
-			if(ppm_tp_set[i])
-			{
-				ret = pman_update_single_program(i, true);
-			}
-		}
-		if (ret != 0)
-		{
-			return ret;
-		}
-	}
+	/* We still need to understand the empty set case, should be handled by sinsp (?) */
 
-	if (!ppm_sc_set)
+	/* If we are interested in at least one syscall we need to enable sys_enter and sys_exit tracepoints. */
+	bool attach_sys_tracepoints = false;
+	int ret = 0;
+	for(int syscall = 0; syscall < PPM_SC_SYSCALL_END; syscall++)
 	{
-		for (int i = 0; i < PPM_SC_SYSCALL_END; i++)
+		if(sc_set[syscall])
 		{
-			pman_mark_single_ppm_sc(i, true);
-		}
-
-	}
-	else
-	{
-		for (int i = 0; i < PPM_SC_SYSCALL_END; i++)
-		{
-			if (ppm_sc_set[i])
+			pman_mark_single_ppm_sc(syscall, true);
+			if(!attach_sys_tracepoints)
 			{
-				pman_mark_single_ppm_sc(i, true);
+				ret = pman_attach_syscall_enter_dispatcher();
+				ret = ret ?: pman_attach_syscall_exit_dispatcher();
+				attach_sys_tracepoints = true;
 			}
 		}
 	}
-	return 0;
+
+	/* If we have one of these syscalls we need to enable the dedicated logic */
+#ifdef CAPTURE_SCHED_PROC_FORK
+	if(sc_set[PPM_SC_CLONE] ||
+	   sc_set[PPM_SC_CLONE3] ||
+	   sc_set[PPM_SC_FORK] ||
+	   sc_set[PPM_SC_VFORK])
+	{
+		ret = ret ?: pman_attach_sched_proc_fork();
+	}
+#endif
+
+#ifdef CAPTURE_SCHED_PROC_EXEC
+	if(sc_set[PPM_SC_EXECVE] ||
+	   sc_set[PPM_SC_EXECVEAT])
+	{
+		ret = ret ?: pman_attach_sched_proc_exec();
+	}
+#endif
+
+	/* Now we enable the required tracepoints */
+	for(int tp = PPM_SC_TP_START; tp < PPM_SC_MAX; tp++)
+	{
+		if(sc_set[tp])
+		{
+			ret = ret ?: pman_update_single_program(tp, true);
+		}
+	}
+	return ret;
 }
 
 int pman_disable_capture()
@@ -68,9 +75,9 @@ int pman_disable_capture()
 	/* If we fail at initialization time the BPF skeleton is not initialized */
 	if(g_state.skel)
 	{
-		for (int i = 0; i < PPM_SC_SYSCALL_END; i++)
+		for(int syscall = 0; syscall < PPM_SC_SYSCALL_END; syscall++)
 		{
-			pman_mark_single_ppm_sc(i, false);
+			pman_mark_single_ppm_sc(syscall, false);
 		}
 		return pman_detach_all_programs();
 	}
@@ -102,7 +109,7 @@ int pman_get_scap_stats(void *scap_stats_struct)
 	 * - stats->n_preemptions
 	 */
 
-	/* We always take statistics from all the CPUs, even if some of them are not online. 
+	/* We always take statistics from all the CPUs, even if some of them are not online.
 	 * If the CPU is not online the counter map will be empty.
 	 */
 	for(int index = 0; index < g_state.n_possible_cpus; index++)
@@ -137,7 +144,7 @@ int pman_get_n_tracepoint_hit(long *n_events_per_cpu)
 		return errno;
 	}
 
-	/* We always take statistics from all the CPUs, even if some of them are not online. 
+	/* We always take statistics from all the CPUs, even if some of them are not online.
 	 * If the CPU is not online the counter map will be empty.
 	 */
 	for(int index = 0; index < g_state.n_possible_cpus; index++)
