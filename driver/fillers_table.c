@@ -246,8 +246,6 @@ const struct ppm_event_entry g_ppm_events[PPM_EVENT_MAX] = {
 	[PPME_SYSCALL_PPOLL_X] = {FILLER_REF(sys_poll_x)}, /* exit same for poll() and ppoll() */
 	[PPME_SYSCALL_MOUNT_E] = {FILLER_REF(sys_mount_e)},
 	[PPME_SYSCALL_MOUNT_X] = {FILLER_REF(sys_autofill), 4, APT_REG, {{AF_ID_RETVAL}, {0}, {1}, {2} } },
-	[PPME_SYSCALL_UMOUNT_E] = {FILLER_REF(sys_autofill), 1, APT_REG, {{1} } },
-	[PPME_SYSCALL_UMOUNT_X] = {FILLER_REF(sys_autofill), 2, APT_REG, {{AF_ID_RETVAL}, {0} } },
 	[PPME_SYSCALL_SEMGET_E] = {FILLER_REF(sys_semget_e)},
 	[PPME_SYSCALL_SEMGET_X] = {FILLER_REF(sys_single_x)},
 	[PPME_SYSCALL_ACCESS_E] = {FILLER_REF(sys_access_e)},
@@ -342,4 +340,6 @@ const struct ppm_event_entry g_ppm_events[PPM_EVENT_MAX] = {
 	[PPME_SYSCALL_FCHOWNAT_X] = {FILLER_REF(sys_fchownat_x)},
 	[PPME_SYSCALL_UMOUNT_1_E] = {FILLER_REF(sys_empty)},
 	[PPME_SYSCALL_UMOUNT_1_X] = {FILLER_REF(sys_umount_x)},
+	[PPME_SYSCALL_UMOUNT2_E] = {FILLER_REF(sys_umount2_e)},
+	[PPME_SYSCALL_UMOUNT2_X] = {FILLER_REF(sys_umount2_x)},
 };
