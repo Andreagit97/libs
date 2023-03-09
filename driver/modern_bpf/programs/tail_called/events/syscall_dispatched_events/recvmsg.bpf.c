@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 The Falco Authors.
+ * Copyright (C) 2023 The Falco Authors.
  *
  * This file is dual licensed under either the MIT or GPL 2. See MIT.txt
  * or GPL2.txt for full copies of the license.
@@ -62,46 +62,47 @@ int BPF_PROG(recvmsg_x,
 	/* Parameter 1: res (type: PT_ERRNO) */
 	auxmap__store_s64_param(auxmap, ret);
 
-	/* Please note: when the peer has performed an orderly shutdown the return value is 0
-	 * and we cannot catch the right length of the data received from the return value.
-	 * Right now in this case we send an empty parameter to userspace.
+	/* Collect parameters at the beginning to manage socketcalls */
+	unsigned long args[2];
+	extract__network_args(args, 2, regs);
+
+	/* Parameter 2: size (type: PT_UINT32) */
+	/* if the syscall doesn't fail we send the return value as `size`
+	 * otherwise we use the size provided by the user. When the peer
+	 * has performed an orderly shutdown the return value is 0) in
+	 * this case we send the user size.
 	 */
+	unsigned long bytes_to_read = maps__get_snaplen();
 	if(ret > 0)
 	{
-
 		/* Parameter 2: size (type: PT_UINT32) */
 		auxmap__store_u32_param(auxmap, (u32)ret);
 
-		/* We read the minimum between `snaplen` and what we really
-		 * have in the buffer.
-		 */
-		unsigned long bytes_to_read = maps__get_snaplen();
-
-		if(bytes_to_read > ret)
+		if(ret < bytes_to_read)
 		{
 			bytes_to_read = ret;
 		}
-
-		/* Collect parameters at the beginning to manage socketcalls */
-		unsigned long args[2];
-		extract__network_args(args, 2, regs);
-
-		/* Parameter 3: data (type: PT_BYTEBUF) */
+	}
+	else
+	{
+		/* Parameter 2: size (type: PT_UINT32) */
 		unsigned long msghdr_pointer = args[1];
-		auxmap__store_iovec_data_param(auxmap, msghdr_pointer, bytes_to_read);
+		auxmap__store_iovec_size_param(auxmap, msghdr_pointer);
+	}
 
+	/* Parameter 3: data (type: PT_BYTEBUF) */
+	unsigned long msghdr_pointer = args[1];
+	auxmap__store_iovec_data_param(auxmap, msghdr_pointer, bytes_to_read);
+
+	/* Please note: when the peer has performed an orderly shutdown the return value is 0 */
+	if(ret >= 0)
+	{
 		/* Parameter 4: tuple (type: PT_SOCKTUPLE) */
 		u32 socket_fd = (u32)args[0];
 		auxmap__store_socktuple_param(auxmap, socket_fd, INBOUND);
 	}
 	else
 	{
-		/* Parameter 2: size (type: PT_UINT32) */
-		auxmap__store_u32_param(auxmap, 0);
-
-		/* Parameter 3: data (type: PT_BYTEBUF) */
-		auxmap__store_empty_param(auxmap);
-
 		/* Parameter 4: tuple (type: PT_SOCKTUPLE) */
 		auxmap__store_empty_param(auxmap);
 	}

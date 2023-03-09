@@ -211,6 +211,62 @@ TEST(SyscallExit, recvmsgX_fail)
 	/*=============================== TRIGGER SYSCALL ===========================*/
 
 	int32_t mock_fd = -1;
+	struct msghdr recv_msg = {0};
+	struct iovec iov = {0};
+	memset(&recv_msg, 0, sizeof(recv_msg));
+	memset(&iov, 0, sizeof(iov));
+	char data_1[MAX_RECV_BUF_SIZE] = "some-data";
+	iov.iov_base = data_1;
+	iov.iov_len = MAX_RECV_BUF_SIZE;
+	recv_msg.msg_iov = &iov;
+	/* here we pass a wrong `iovlen` to check the behavior */
+	recv_msg.msg_iovlen = 2;
+	uint32_t recvmsg_flags = 0;
+
+	assert_syscall_state(SYSCALL_FAILURE, "recvmsg", syscall(__NR_recvmsg, mock_fd, &recv_msg, recvmsg_flags));
+	int64_t errno_value = -errno;
+
+	/*=============================== TRIGGER SYSCALL ===========================*/
+
+	evt_test->disable_capture();
+
+	evt_test->assert_event_presence();
+
+	if(HasFatalFailure())
+	{
+		return;
+	}
+
+	evt_test->parse_event();
+
+	evt_test->assert_header();
+
+	/*=============================== ASSERT PARAMETERS  ===========================*/
+
+	/* Parameter 1: res (type: PT_ERRNO) */
+	evt_test->assert_numeric_param(1, (int64_t)errno_value);
+
+	/* Parameter 2: size (type: PT_UINT32) */
+	evt_test->assert_numeric_param(2, (uint32_t)MAX_RECV_BUF_SIZE);
+
+	/* Parameter 3: data (type: PT_BYTEBUF) */
+	evt_test->assert_bytebuf_param(3, data_1, DEFAULT_SNAPLEN);
+
+	/* Parameter 4: tuple (type: PT_SOCKTUPLE) */
+	evt_test->assert_empty_param(4);
+
+	/*=============================== ASSERT PARAMETERS  ===========================*/
+}
+
+TEST(SyscallExit, recvmsgX_empty)
+{
+	auto evt_test = get_syscall_event_test(__NR_recvmsg, EXIT_EVENT);
+
+	evt_test->enable_capture();
+
+	/*=============================== TRIGGER SYSCALL ===========================*/
+
+	int32_t mock_fd = -1;
 	struct msghdr *msg = NULL;
 	int flags = 0;
 	assert_syscall_state(SYSCALL_FAILURE, "recvmsg", syscall(__NR_recvmsg, mock_fd, msg, flags));

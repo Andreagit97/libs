@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 The Falco Authors.
+ * Copyright (C) 2023 The Falco Authors.
  *
  * This file is dual licensed under either the MIT or GPL 2. See MIT.txt
  * or GPL2.txt for full copies of the license.
@@ -66,39 +66,30 @@ int BPF_PROG(recvfrom_x,
 	/* Parameter 1: res (type: PT_ERRNO) */
 	auxmap__store_s64_param(auxmap, ret);
 
-	/* Please note: when the peer has performed an orderly shutdown the return value is 0
-	 * and we cannot catch the right length of the data received from the return value.
-	 * Right now in this case we send an empty parameter to userspace.
-	 */
-	if(ret > 0)
+	/* Collect parameters at the beginning to manage socketcalls */
+	unsigned long args[3];
+	extract__network_args(args, 3, regs);
+
+	unsigned long bytes_to_read = ret > 0 ? ret : args[2];
+	unsigned long snaplen = maps__get_snaplen();
+	if(bytes_to_read > snaplen)
 	{
-		/* We read the minimum between `snaplen` and what we really
-		 * have in the buffer.
-		 */
-		unsigned long bytes_to_read = maps__get_snaplen();
+		bytes_to_read = snaplen;
+	}
 
-		if(bytes_to_read > ret)
-		{
-			bytes_to_read = ret;
-		}
+	/* Parameter 2: data (type: PT_BYTEBUF) */
+	unsigned long received_data_pointer = args[1];
+	auxmap__store_bytebuf_param(auxmap, received_data_pointer, bytes_to_read, USER);
 
-		/* Collect parameters at the beginning to manage socketcalls */
-		unsigned long args[2];
-		extract__network_args(args, 2, regs);
-
-		/* Parameter 2: data (type: PT_BYTEBUF) */
-		unsigned long received_data_pointer = args[1];
-		auxmap__store_bytebuf_param(auxmap, received_data_pointer, bytes_to_read, USER);
-
+	/* Please note: when the peer has performed an orderly shutdown the return value is 0. */
+	if(ret >= 0)
+	{
 		/* Parameter 3: tuple (type: PT_SOCKTUPLE) */
 		u32 socket_fd = (u32)args[0];
 		auxmap__store_socktuple_param(auxmap, socket_fd, INBOUND);
 	}
 	else
 	{
-		/* Parameter 2: data (type: PT_BYTEBUF) */
-		auxmap__store_empty_param(auxmap);
-
 		/* Parameter 3: tuple (type: PT_SOCKTUPLE) */
 		auxmap__store_empty_param(auxmap);
 	}
