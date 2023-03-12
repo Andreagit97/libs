@@ -256,6 +256,11 @@ set<ppm_tp_code> all_tp_set();
 std::unordered_set<std::string> tp_set_to_names(const set<ppm_tp_code>& tp_set);
 
 /*!
+  
+*/
+set<ppm_tp_code> event_names_to_tp_set(const std::unordered_set<std::string>& event_names);
+
+/*!
 	\brief Provides the minimum set of tracepoints required by `libsinsp` state collection.
 */
 set<ppm_tp_code> sinsp_state_tp_set();

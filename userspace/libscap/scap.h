@@ -743,6 +743,10 @@ ppm_sc_code scap_ppm_sc_from_name(const char *name);
 ppm_sc_code scap_native_id_to_ppm_sc(int native_id);
 
 /*!
+*/
+int scap_get_tp_from_events(IN const uint8_t events_array[PPM_EVENT_MAX], OUT uint8_t tp_array[TP_VAL_MAX]);
+
+/*!
   \brief Returns the set of minimum tracepoints required by `libsinsp` state.
 */
 int scap_get_modifies_state_tracepoints(OUT uint8_t tp_array[TP_VAL_MAX]);

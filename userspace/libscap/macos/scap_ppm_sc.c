@@ -45,3 +45,8 @@ ppm_sc_code scap_native_id_to_ppm_sc(int native_id)
 {
 	return PPM_SC_UNKNOWN;
 }
+
+int scap_get_tp_from_events(IN const uint8_t events_array[PPM_EVENT_MAX], OUT uint8_t tp_array[TP_VAL_MAX])
+{
+	return SCAP_FAILURE;
+}

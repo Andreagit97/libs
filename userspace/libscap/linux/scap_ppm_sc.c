@@ -184,8 +184,8 @@ static const int *g_events_to_src[] = {
 	[PPME_DROP_X] = NULL,
 	[PPME_SYSCALL_FCNTL_E] = (int[]){PPM_SC_FCNTL, PPM_SC_FCNTL64, -1},
 	[PPME_SYSCALL_FCNTL_X] = (int[]){PPM_SC_FCNTL, PPM_SC_FCNTL64, -1},
-	[PPME_SCHEDSWITCH_6_E] = (int[]){PPM_SC_UNKNOWN, -1}, // TODO PPM_SC_SCHED_SWITCH
-	[PPME_SCHEDSWITCH_6_X] = (int[]){SCHED_SWITCH, -1},
+	[PPME_SCHEDSWITCH_6_E] = (int[]){SCHED_SWITCH, -1},
+	[PPME_SCHEDSWITCH_6_X] = NULL,
 	[PPME_SYSCALL_EXECVE_13_E] = (int[]){PPM_SC_EXECVE, -1},
 	[PPME_SYSCALL_EXECVE_13_X] = (int[]){PPM_SC_EXECVE, -1},
 	[PPME_SYSCALL_CLONE_16_E] = (int[]){PPM_SC_CLONE, -1},
@@ -560,4 +560,78 @@ ppm_sc_code scap_native_id_to_ppm_sc(int native_id)
 		return PPM_SC_UNKNOWN;
 	}
 	return g_syscall_table[native_id].ppm_sc;
+}
+
+/// TODO: PROC_EXIT usually is not passed as an event but we always want to enable it, what to do (?)
+int scap_get_tp_from_events(IN const uint8_t events_array[PPM_EVENT_MAX], OUT uint8_t tp_array[TP_VAL_MAX])
+{
+	if (events_array == NULL || tp_array == NULL)
+	{
+		return SCAP_FAILURE;
+	}
+
+	/* Clear the array before using it.
+	 * This is not necessary but just to be future-proof.
+	 */
+	memset(tp_array, 0, sizeof(*tp_array) * TP_VAL_MAX);
+
+	/* Particular tracepoints that depend on syscalls */
+	bool sys_enter_exit = false;
+	bool sched_proc_exec = false;
+	bool sched_proc_fork = false;
+
+	for (int ev = 0; ev < PPM_EVENT_MAX; ev++)
+	{
+		if(!events_array[ev])
+		{
+			continue;
+		}
+
+		if((scap_get_event_info_table()[ev].category & EC_SYSCALL) && !sys_enter_exit)
+		{
+			sys_enter_exit = true;
+			tp_array[SYS_ENTER] = 1;
+			tp_array[SYS_EXIT] = 1;			
+			///TODO: THE BPF TRACEPOINT FOR KERNEL VERSIONS < 4.14
+		}
+
+		if((scap_get_event_info_table()[ev].category & EC_SYSCALL) && (!sched_proc_exec || !sched_proc_fork))
+		{
+			/* In this way we can avoid managing event types for various versions of `EXECVE`/`CLONE` */
+			const ppm_sc_code *sc_codes = (ppm_sc_code*)g_events_to_src[ev];
+			while(sc_codes && *sc_codes != -1)
+			{
+				switch(*sc_codes)
+				{
+				case PPM_SC_FORK:
+				case PPM_SC_VFORK:
+				case PPM_SC_CLONE:
+				case PPM_SC_CLONE3:
+					sched_proc_fork = true;
+					tp_array[SCHED_PROC_FORK] = 1;
+					break;
+
+				case PPM_SC_EXECVE:
+				case PPM_SC_EXECVEAT:
+					sched_proc_exec = true;
+					tp_array[SCHED_PROC_EXEC] = 1;
+
+				default:
+					break;
+				}
+				sc_codes++;
+			}
+		}
+
+		if((scap_get_event_info_table()[ev].category & EC_TRACEPOINT))
+		{
+			const ppm_tp_code *tp_codes = (ppm_tp_code*)g_events_to_src[ev];
+			while(tp_codes && *tp_codes != -1)
+			{
+				tp_array[*tp_codes] = 1;
+				tp_codes++;
+			}
+		}
+	}
+	return SCAP_SUCCESS;
 }
