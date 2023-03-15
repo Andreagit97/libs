@@ -27,6 +27,7 @@ set(PMAN_LINK_LIBRARIES
     "${LIBELF_LIB}"
     "${ZLIB_LIB}"
     scap_event_schema
+    scap_platform
 )
 
 if(USE_BUNDLED_MODERN_BPF)

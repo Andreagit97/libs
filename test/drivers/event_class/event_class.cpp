@@ -119,7 +119,6 @@ event_test::event_test(ppm_sc_code sc_code):
 		m_event_type = PPME_SCHEDSWITCH_6_E;
 		break;
 
-#ifdef CAPTURE_PAGE_FAULTS
 	case PPM_SC_PAGE_FAULT_USER:
 		m_event_type = PPME_PAGE_FAULT_E;
 		break;
@@ -127,7 +126,6 @@ event_test::event_test(ppm_sc_code sc_code):
 	case PPM_SC_PAGE_FAULT_KERNEL:
 		m_event_type = PPME_PAGE_FAULT_E;
 		break;
-#endif
 
 	case PPM_SC_SIGNAL_DELIVER:
 		m_event_type = PPME_SIGNALDELIVER_E;
@@ -162,9 +160,7 @@ event_test::event_test(int syscall_id, int event_direction):
 	}
 
 	m_current_param = 0;
-
-	/* Set the current as the only interesting syscall. */
-	scap_set_ppm_sc(s_scap_handle, g_syscall_table[syscall_id].ppm_sc, true);
+	m_sc_set[g_syscall_table[syscall_id].ppm_sc] = 1;
 }
 
 /* This constructor must be used with syscalls events when you
@@ -178,7 +174,7 @@ event_test::event_test():
 	/* Enable all the syscalls and tracepoints */
 	for(int ppm_sc = 0; ppm_sc < PPM_SC_MAX; ppm_sc++)
 	{
-		scap_set_ppm_sc(s_scap_handle, (ppm_sc_code)ppm_sc, true);
+		m_sc_set[ppm_sc] = 1;
 	}
 }
 
