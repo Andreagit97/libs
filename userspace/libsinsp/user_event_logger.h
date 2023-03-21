@@ -30,13 +30,13 @@ namespace user_event_logger
  */
 enum severity
 {
-	SEV_EVT_FATAL,
-	SEV_EVT_CRITICAL,
-	SEV_EVT_ERROR,
-	SEV_EVT_WARNING,
-	SEV_EVT_NOTICE,
-	SEV_EVT_INFORMATION,
-	SEV_EVT_DEBUG,
+    SEV_EVT_FATAL,
+    SEV_EVT_CRITICAL,
+    SEV_EVT_ERROR,
+    SEV_EVT_WARNING,
+    SEV_EVT_NOTICE,
+    SEV_EVT_INFORMATION,
+    SEV_EVT_DEBUG,
 };
 
 /**
@@ -45,21 +45,22 @@ enum severity
  */
 class callback
 {
-public:
-	using ptr_t = std::shared_ptr<callback>;
+    public:
+    using ptr_t = std::shared_ptr<callback>;
 
-	virtual ~callback() = default;
+    virtual ~callback() = default;
 
-	/**
-	 * Write the given log str with the given severity.
-	 */
-	virtual void log(const sinsp_user_event& evt, user_event_logger::severity sev) = 0;
+    /**
+     * Write the given log str with the given severity.
+     */
+    virtual void log(const sinsp_user_event& evt,
+		     user_event_logger::severity sev) = 0;
 
-	/**
-	 * We use the "Null Object Pattern" with this interface; this will
-	 * return true for do-nothing implementations, false otherwise.
-	 */
-	virtual bool is_null() const { return false; }
+    /**
+     * We use the "Null Object Pattern" with this interface; this will
+     * return true for do-nothing implementations, false otherwise.
+     */
+    virtual bool is_null() const { return false; }
 };
 
 /**
@@ -84,4 +85,3 @@ void register_callback(user_event_logger::callback::ptr_t callback);
 const callback& get_callback();
 
 } // end namespace user_event_logger
-

@@ -20,15 +20,17 @@ limitations under the License.
 
 	\section Introduction
 
-	libsinsp is a system inspection library written in C++ and implementing high level
-	functionality like:
+	libsinsp is a system inspection library written in C++ and implementing
+   high level functionality like:
 	- live capture control (start/stop/pause...)
 	- event capture from file or the live OS
-	- OS state reconstruction. By parsing /proc and inspecting the live event stream,
-	libsinsp is capable of mirroring the OS process state and putting context around
-	key OS primitives like process IDs and file descriptors. That way, these primitives
-	can be treated like programs, files, connections and users.
-	- parsing of OS events and conversion of events into human-readable strings
+	- OS state reconstruction. By parsing /proc and inspecting the live
+   event stream, libsinsp is capable of mirroring the OS process state and
+   putting context around key OS primitives like process IDs and file
+   descriptors. That way, these primitives can be treated like programs, files,
+   connections and users.
+	- parsing of OS events and conversion of events into human-readable
+   strings
 	- event filtering
 
 	This manual includes the following sections:
@@ -45,7 +47,7 @@ limitations under the License.
 #include "container_engine/wmi_handle_source.h"
 
 #ifdef _WIN32
-#pragma warning(disable: 4251 4200 4221 4190)
+#pragma warning(disable : 4251 4200 4221 4190)
 #else
 #include "tbb/concurrent_queue.h"
 #endif
@@ -78,7 +80,8 @@ using namespace std;
 #include "utils.h"
 
 #ifndef VISIBILITY_PRIVATE
-// Some code defines VISIBILITY_PRIVATE to nothing to get private access to sinsp
+// Some code defines VISIBILITY_PRIVATE to nothing to get private access to
+// sinsp
 #define VISIBILITY_PRIVATE private:
 #define VISIBILITY_PROTECTED protected:
 #else
@@ -118,38 +121,41 @@ class sinsp_plugin_manager;
 #if defined(HAS_CAPTURE) && !defined(_WIN32)
 class sinsp_ssl;
 class sinsp_bearer_token;
-template <class T> class socket_data_handler;
-template <class T> class socket_collector;
+template<class T> class socket_data_handler;
+template<class T> class socket_collector;
 class k8s_handler;
 class k8s_api_handler;
 #endif // HAS_CAPTURE
 
-std::vector<std::string> sinsp_split(const std::string &s, char delim);
+std::vector<std::string> sinsp_split(const std::string& s, char delim);
 
 /*!
   \brief Information about a group of filter/formatting fields.
 */
 class filter_check_info
 {
-public:
-	enum flags
-	{
-		FL_NONE =   0,
-		FL_WORKS_ON_THREAD_TABLE = (1 << 0),	///< This filter check class supports filtering incomplete events that contain only valid thread info and FD info.
-		FL_HIDDEN = (1 << 1),	///< This filter check class won't be shown by fields/filter listings.
-	};
+    public:
+    enum flags
+    {
+	FL_NONE = 0,
+	FL_WORKS_ON_THREAD_TABLE =
+		(1 << 0), ///< This filter check class supports filtering
+			  ///< incomplete events that contain only valid thread
+			  ///< info and FD info.
+	FL_HIDDEN = (1 << 1), ///< This filter check class won't be shown by
+			      ///< fields/filter listings.
+    };
 
-	filter_check_info()
-	{
-		m_flags = 0;
-	}
+    filter_check_info() { m_flags = 0; }
 
-	string m_name; ///< Field class name.
-	string m_shortdesc; ///< short (< 10 words) description of this filtercheck. Can be blank.
-	string m_desc; ///< Field class description.
-	int32_t m_nfields; ///< Number of fields in this field group.
-	const filtercheck_field_info* m_fields; ///< Array containing m_nfields field descriptions.
-	uint32_t m_flags;
+    string m_name;	///< Field class name.
+    string m_shortdesc; ///< short (< 10 words) description of this filtercheck.
+			///< Can be blank.
+    string m_desc;	///< Field class description.
+    int32_t m_nfields;	///< Number of fields in this field group.
+    const filtercheck_field_info*
+	    m_fields; ///< Array containing m_nfields field descriptions.
+    uint32_t m_flags;
 };
 
 /*!
@@ -158,14 +164,15 @@ public:
 */
 class metadata_download_params
 {
-public:
-	uint32_t m_data_max_b = K8S_DATA_MAX_B;
-	uint32_t m_data_chunk_wait_us = K8S_DATA_CHUNK_WAIT_US;
-	uint32_t m_data_watch_freq_sec = METADATA_DATA_WATCH_FREQ_SEC;
+    public:
+    uint32_t m_data_max_b = K8S_DATA_MAX_B;
+    uint32_t m_data_chunk_wait_us = K8S_DATA_CHUNK_WAIT_US;
+    uint32_t m_data_watch_freq_sec = METADATA_DATA_WATCH_FREQ_SEC;
 };
 
 /*!
-  \brief The user agent string to use for any libsinsp connection, can be changed at compile time
+  \brief The user agent string to use for any libsinsp connection, can be
+  changed at compile time
 */
 
 #if !defined(LIBSINSP_USER_AGENT)
@@ -175,7 +182,9 @@ public:
 /*!
   \brief The default way an event is converted to string by the library
 */
-#define DEFAULT_OUTPUT_STR "*%evt.num %evt.time %evt.cpu %proc.name (%thread.tid) %evt.dir %evt.type %evt.args"
+#define DEFAULT_OUTPUT_STR                                                     \
+    "*%evt.num %evt.time %evt.cpu %proc.name (%thread.tid) %evt.dir "          \
+    "%evt.type %evt.args"
 
 //
 // Internal stuff for meta event management
@@ -183,13 +192,13 @@ public:
 typedef void (*meta_event_callback)(sinsp*, void* data);
 class sinsp_proc_metainfo
 {
-public:
-	sinsp_evt m_pievt;
-	scap_evt* m_piscapevt;
-	uint64_t* m_piscapevt_vals;
-	uint64_t m_n_procinfo_evts;
-	int64_t m_cur_procinfo_evt;
-	ppm_proclist_info* m_pli;
+    public:
+    sinsp_evt m_pievt;
+    scap_evt* m_piscapevt;
+    uint64_t* m_piscapevt_vals;
+    uint64_t m_n_procinfo_evts;
+    int64_t m_cur_procinfo_evt;
+    ppm_proclist_info* m_pli;
 };
 
 /** @defgroup inspector Main library
@@ -206,1126 +215,1099 @@ public:
 */
 class SINSP_PUBLIC sinsp : public capture_stats_source, public wmi_handle_source
 {
-public:
-	typedef std::shared_ptr<sinsp> ptr;
-	typedef std::set<std::string> k8s_ext_list_t;
-	typedef std::shared_ptr<k8s_ext_list_t> k8s_ext_list_ptr_t;
+    public:
+    typedef std::shared_ptr<sinsp> ptr;
+    typedef std::set<std::string> k8s_ext_list_t;
+    typedef std::shared_ptr<k8s_ext_list_t> k8s_ext_list_ptr_t;
 
-	sinsp(bool static_container = false,
-		  const std::string &static_id = "",
-		  const std::string &static_name = "",
-		  const std::string &static_image = "");
+    sinsp(bool static_container = false, const std::string& static_id = "",
+	  const std::string& static_name = "",
+	  const std::string& static_image = "");
 
-	~sinsp() override;
+    ~sinsp() override;
 
-	/*!
-	  \brief Start a live event capture.
+    /*!
+      \brief Start a live event capture.
 
-	  \param timeout_ms the optional read timeout, i.e. the time after which a
-	  call to \ref next() returns even if no events are available.
+      \param timeout_ms the optional read timeout, i.e. the time after which a
+      call to \ref next() returns even if no events are available.
 
-	  @throws a sinsp_exception containing the error string is thrown in case
-	   of failure.
-	*/
-	virtual void open(uint32_t timeout_ms = SCAP_TIMEOUT_MS);
+      @throws a sinsp_exception containing the error string is thrown in case
+       of failure.
+    */
+    virtual void open(uint32_t timeout_ms = SCAP_TIMEOUT_MS);
 
-	/*!
-	  \brief Start an event capture from a trace file.
+    /*!
+      \brief Start an event capture from a trace file.
 
-	  \param filename the trace file name.
+      \param filename the trace file name.
 
-	  @throws a sinsp_exception containing the error string is thrown in case
-	   of failure.
-	*/
-	void open(const std::string &filename);
+      @throws a sinsp_exception containing the error string is thrown in case
+       of failure.
+    */
+    void open(const std::string& filename);
 
-	/*!
-	  \brief Start an event capture from a file descriptor.
+    /*!
+      \brief Start an event capture from a file descriptor.
 
-	  \param fd the file descriptor
+      \param fd the file descriptor
 
-	  @throws a sinsp_exception containing the error string is thrown in case
-	   of failure.
-	*/
-	void fdopen(int fd);
+      @throws a sinsp_exception containing the error string is thrown in case
+       of failure.
+    */
+    void fdopen(int fd);
 
-	void open_udig(uint32_t timeout_ms = SCAP_TIMEOUT_MS);
-	void open_gvisor(std::string config_path, std::string root_path, uint32_t timeout_ms = SCAP_TIMEOUT_MS);
+    void open_udig(uint32_t timeout_ms = SCAP_TIMEOUT_MS);
+    void open_gvisor(std::string config_path, std::string root_path,
+		     uint32_t timeout_ms = SCAP_TIMEOUT_MS);
 
-	std::string generate_gvisor_config(std::string socket_path);
+    std::string generate_gvisor_config(std::string socket_path);
 
-	void open_nodriver();
+    void open_nodriver();
 
-	/*!
-	  \brief Ends a capture and release all resources.
-	*/
-	void close();
+    /*!
+      \brief Ends a capture and release all resources.
+    */
+    void close();
 
-	/*!
-	  \brief Get the next event from the open capture source
+    /*!
+      \brief Get the next event from the open capture source
 
-	  \param evt a \ref sinsp_evt pointer that will be initialized to point to
-	  the next available event.
+      \param evt a \ref sinsp_evt pointer that will be initialized to point to
+      the next available event.
 
-	  \return SCAP_SUCCESS if the call is successful and pevent and pcpuid contain
-	   valid data. SCAP_TIMEOUT in case the read timeout expired and no event is
-	   available. SCAP_EOF when the end of an offline capture is reached.
-	   On Failure, SCAP_FAILURE is returned and getlasterr() can be used to
-	   obtain the cause of the error.
+      \return SCAP_SUCCESS if the call is successful and pevent and pcpuid
+      contain valid data. SCAP_TIMEOUT in case the read timeout expired and no
+      event is available. SCAP_EOF when the end of an offline capture is
+      reached. On Failure, SCAP_FAILURE is returned and getlasterr() can be used
+      to obtain the cause of the error.
 
-	  \note: the returned event can be considered valid only until the next
-	   call to \ref)
-	*/
-	virtual int32_t next(OUT sinsp_evt **evt);
+      \note: the returned event can be considered valid only until the next
+       call to \ref)
+    */
+    virtual int32_t next(OUT sinsp_evt** evt);
 
-	/*!
-	  \brief Get the maximum number of bytes currently in use by any CPU buffer
+    /*!
+      \brief Get the maximum number of bytes currently in use by any CPU buffer
+ */
+    uint64_t max_buf_used();
+
+    /*!
+      \brief Get the number of events that have been captured and processed
+       since the call to \ref open()
+
+      \return the number of captured events.
+    */
+    uint64_t get_num_events();
+
+    /*!
+      \brief Set the capture snaplen, i.e. the maximum size an event
+      parameter can reach before the driver starts truncating it.
+
+      \param snaplen the snaplen for this capture instance, in bytes.
+
+      \note This function can only be called for live captures.
+      \note By default, the driver captures the first 80 bytes of the
+      buffers coming from events like read, write, send, recv, etc.
+      If you're not interested in payloads, smaller values will save
+      capture buffer space and make capture files smaller.
+      Conversely, big values should be used with care because they can
+      easily generate huge capture files.
+
+      @throws a sinsp_exception containing the error string is thrown in case
+       of failure.
+    */
+    void set_snaplen(uint32_t snaplen);
+
+    /*!
+      \brief Determine if this inspector is going to load user tables on
+      startup.
+
+      \param import_users if true, no user tables will be created for
+      this capture. This also means that no user or group info will be
+      written to the trace file by the -w flag. The user/group tables are
+      necessary to use filter fields like user.name or group.name. However,
+      creating them can increase the startup time. Moreover, they contain
+      information that could be privacy sensitive.
+
+      \note default behavior is import_users=true.
+
+      @throws a sinsp_exception containing the error string is thrown in case
+       of failure.
+    */
+    void set_import_users(bool import_users);
+
+    /*!
+      \brief temporarily pauses event capture.
+
+      \note This function can only be called for live captures.
+    */
+    void stop_capture();
+
+    /*!
+      \brief Restarts an event capture that had been paused with
+       \ref stop_capture().
+
+      \note This function can only be called for live captures.
+    */
+    void start_capture();
+
+    /*!
+      \brief Compiles and installs the given capture filter.
+
+      \param filter the filter string. Refer to the filtering language
+       section for information about the filtering
+       syntax.
+
+      @throws a sinsp_exception containing the error string is thrown in case
+       the filter is invalid.
+    */
+    void set_filter(const string& filter);
+
+    /*!
+      \brief Installs the given capture runtime filter object.
+
+      \param filter the runtime filter object
+    */
+    void set_filter(sinsp_filter* filter);
+
+    /*!
+      \brief Return the filter set for this capture.
+
+      \return the filter previously set with \ref set_filter(), or an empty
+       string if no filter has been set yet.
+    */
+    const string get_filter();
+
+    bool run_filters_on_evt(sinsp_evt* evt);
+
+    /*!
+      \brief This method can be used to specify a function to collect the
+      library log messages.
+
+      \param cb the target function that will receive the log messages.
+    */
+    void set_log_callback(sinsp_logger_callback cb);
+
+    /*!
+      \brief Instruct sinsp to write its log messages to the given file.
+    */
+    void set_log_file(string filename);
+
+    /*!
+      \brief Instruct sinsp to write its log messages to stderr.
+    */
+    void set_log_stderr();
+
+    /*!
+      \brief Specify the minimum severity of the messages that go into the logs
+       emitted by the library.
+    */
+    void set_min_log_severity(sinsp_logger::severity sev);
+
+    /*!
+     * \brief set whether the library will automatically purge the threadtable
+     *        at specific times. If not, client is responsible for thread
+     * lifetime management. If invoked, then the purge interval and thread
+     * timeout change defaults, but have no observable effect.
      */
-	uint64_t max_buf_used();
+    void disable_automatic_threadtable_purging();
 
-	/*!
-	  \brief Get the number of events that have been captured and processed
-	   since the call to \ref open()
+    /*!
+     * \brief sets the interval at which the thread purge code runs. This does
+     *        not run every event as it's mildly expensive if there are lots of
+     * threads
+     */
+    void set_thread_purge_interval_s(uint32_t val);
 
-	  \return the number of captured events.
-	*/
-	uint64_t get_num_events();
+    /*!
+     * \brief sets the amount of time after which a thread which has seen no
+     * events can be purged. As the purging happens only every
+     * m_thread_purge_interval_s, the max time a thread may linger is actually
+     * m_thread_purge_interval + m_thread_timeout_s
+     */
+    void set_thread_timeout_s(uint32_t val);
 
-	/*!
-	  \brief Set the capture snaplen, i.e. the maximum size an event
-	  parameter can reach before the driver starts truncating it.
+    /*!
+      \brief Start writing the captured events to file.
 
-	  \param snaplen the snaplen for this capture instance, in bytes.
+      \param dump_filename the destination trace file.
 
-	  \note This function can only be called for live captures.
-	  \note By default, the driver captures the first 80 bytes of the
-	  buffers coming from events like read, write, send, recv, etc.
-	  If you're not interested in payloads, smaller values will save
-	  capture buffer space and make capture files smaller.
-	  Conversely, big values should be used with care because they can
-	  easily generate huge capture files.
+      \param compress true to save the trace file in a compressed format.
 
-	  @throws a sinsp_exception containing the error string is thrown in case
-	   of failure.
-	*/
-	void set_snaplen(uint32_t snaplen);
+      \note only the events that pass the capture filter set with \ref
+      set_filter() will be saved to disk. \note this simplified dump interface
+      allows only one dump per capture. For more flexibility, refer to the \ref
+      sinsp_dumper class, that can also be combined with \ref sinsp_filter to
+      filter what will go into the file.
 
-	/*!
-	  \brief Determine if this inspector is going to load user tables on
-	  startup.
+      @throws a sinsp_exception containing the error string is thrown in case
+       of failure.
+    */
+    void autodump_start(const string& dump_filename, bool compress);
 
-	  \param import_users if true, no user tables will be created for
-	  this capture. This also means that no user or group info will be
-	  written to the trace file by the -w flag. The user/group tables are
-	  necessary to use filter fields like user.name or group.name. However,
-	  creating them can increase the startup time. Moreover, they contain
-	  information that could be privacy sensitive.
+    /*!
+      \brief Cycles the file pointer to a new capture file
+    */
+    void autodump_next_file();
 
-	  \note default behavior is import_users=true.
+    /*!
+      \brief Stops an event dump that was started with \ref autodump_start().
 
-	  @throws a sinsp_exception containing the error string is thrown in case
-	   of failure.
-	*/
-	void set_import_users(bool import_users);
+      @throws a sinsp_exception containing the error string is thrown in case
+       of failure.
+    */
+    void autodump_stop();
 
-	/*!
-	  \brief temporarily pauses event capture.
+    /*!
+      \brief Populate the given vector with the full list of filter check fields
+       that this version of the library supports.
+    */
+    static void
+    get_filtercheck_fields_info(std::vector<const filter_check_info*>& list);
 
-	  \note This function can only be called for live captures.
-	*/
-	void stop_capture();
+    /*!
+      \brief Returns a new instance of a filtercheck supporting fields for
+      a generic event source (e.g. evt.num, evt.time, evt.pluginname...)
+    */
+    static sinsp_filter_check* new_generic_filtercheck();
 
-	/*!
-	  \brief Restarts an event capture that had been paused with
-	   \ref stop_capture().
+    bool has_metrics();
 
-	  \note This function can only be called for live captures.
-	*/
-	void start_capture();
+    /*!
+      \brief Return information about the machine generating the events.
 
-	/*!
-	  \brief Compiles and installs the given capture filter.
+      \note this call works with file captures as well, because the machine
+       info is stored in the trace files. In that case, the returned
+       machine info is the one of the machine where the capture happened.
+    */
+    const scap_machine_info* get_machine_info();
 
-	  \param filter the filter string. Refer to the filtering language
-	   section for information about the filtering
-	   syntax.
+    /*!
+      \brief Look up a thread given its tid and return its information,
+       and optionally go dig into proc if the thread is not in the thread table.
 
-	  @throws a sinsp_exception containing the error string is thrown in case
-	   the filter is invalid.
-	*/
-	void set_filter(const string& filter);
+      \param tid the ID of the thread. In case of multi-thread processes,
+       this corresponds to the PID.
+      \param query_os_if_not_found if true, the library will search for this
+       thread's information in proc, use the result to create a new thread
+       entry, and return the new entry.
 
-	/*!
-	  \brief Installs the given capture runtime filter object.
+      \return the \ref sinsp_threadinfo object containing full thread
+      information and state.
 
-	  \param filter the runtime filter object
-	*/
-	void set_filter(sinsp_filter* filter);
+      \note if you are interested in a process' information, just give this
+      function with the PID of the process.
 
-	/*!
-	  \brief Return the filter set for this capture.
+      @throws a sinsp_exception containing the error string is thrown in case
+       of failure.
+    */
+    threadinfo_map_t::ptr_t get_thread_ref(int64_t tid,
+					   bool query_os_if_not_found = false,
+					   bool lookup_only = true,
+					   bool main_thread = false);
 
-	  \return the filter previously set with \ref set_filter(), or an empty
-	   string if no filter has been set yet.
-	*/
-	const string get_filter();
+    /*!
+      \brief Fill the given structure with statistics about the currently
+       open capture.
 
-	bool run_filters_on_evt(sinsp_evt *evt);
-
-	/*!
-	  \brief This method can be used to specify a function to collect the library
-	   log messages.
-
-	  \param cb the target function that will receive the log messages.
-	*/
-	void set_log_callback(sinsp_logger_callback cb);
-
-	/*!
-	  \brief Instruct sinsp to write its log messages to the given file.
-	*/
-	void set_log_file(string filename);
-
-	/*!
-	  \brief Instruct sinsp to write its log messages to stderr.
-	*/
-	void set_log_stderr();
-
-	/*!
-	  \brief Specify the minimum severity of the messages that go into the logs
-	   emitted by the library.
-	*/
-	void set_min_log_severity(sinsp_logger::severity sev);
-
-	/*!
-	 * \brief set whether the library will automatically purge the threadtable
-	 *        at specific times. If not, client is responsible for thread lifetime
-	 *        management. If invoked, then the purge interval and thread timeout change
-	 *        defaults, but have no observable effect.
-	 */
-	void disable_automatic_threadtable_purging();
-
-	/*!
-	 * \brief sets the interval at which the thread purge code runs. This does
-	 *        not run every event as it's mildly expensive if there are lots of threads
-	 */
-	void set_thread_purge_interval_s(uint32_t val);
-
-	/*!
-	 * \brief sets the amount of time after which a thread which has seen no events
-	 *        can be purged. As the purging happens only every m_thread_purge_interval_s,
-	 *        the max time a thread may linger is actually m_thread_purge_interval +
-	 *        m_thread_timeout_s
-	 */
-	void set_thread_timeout_s(uint32_t val);
-
-
-	/*!
-	  \brief Start writing the captured events to file.
-
-	  \param dump_filename the destination trace file.
-
-	  \param compress true to save the trace file in a compressed format.
-
-	  \note only the events that pass the capture filter set with \ref set_filter()
-	   will be saved to disk.
-	  \note this simplified dump interface allows only one dump per capture.
-	   For more flexibility, refer to the \ref sinsp_dumper class, that can
-	   also be combined with \ref sinsp_filter to filter what will go into
-	   the file.
-
-	  @throws a sinsp_exception containing the error string is thrown in case
-	   of failure.
-	*/
-	void autodump_start(const string& dump_filename, bool compress);
-
- 	/*!
-	  \brief Cycles the file pointer to a new capture file
-	*/
-	void autodump_next_file();
-
-	/*!
-	  \brief Stops an event dump that was started with \ref autodump_start().
-
-	  @throws a sinsp_exception containing the error string is thrown in case
-	   of failure.
-	*/
-	void autodump_stop();
-
-	/*!
-	  \brief Populate the given vector with the full list of filter check fields
-	   that this version of the library supports.
-	*/
-	static void get_filtercheck_fields_info(std::vector<const filter_check_info*>& list);
-
-	/*!
-	  \brief Returns a new instance of a filtercheck supporting fields for
-	  a generic event source (e.g. evt.num, evt.time, evt.pluginname...)
-	*/
-	static sinsp_filter_check* new_generic_filtercheck();
-
-	bool has_metrics();
-
-	/*!
-	  \brief Return information about the machine generating the events.
-
-	  \note this call works with file captures as well, because the machine
-	   info is stored in the trace files. In that case, the returned
-	   machine info is the one of the machine where the capture happened.
-	*/
-	const scap_machine_info* get_machine_info();
-
-	/*!
-	  \brief Look up a thread given its tid and return its information,
-	   and optionally go dig into proc if the thread is not in the thread table.
-
-	  \param tid the ID of the thread. In case of multi-thread processes,
-	   this corresponds to the PID.
-	  \param query_os_if_not_found if true, the library will search for this
-	   thread's information in proc, use the result to create a new thread
-	   entry, and return the new entry.
-
-	  \return the \ref sinsp_threadinfo object containing full thread information
-	   and state.
-
-	  \note if you are interested in a process' information, just give this
-	  function with the PID of the process.
-
-	  @throws a sinsp_exception containing the error string is thrown in case
-	   of failure.
-	*/
-	threadinfo_map_t::ptr_t get_thread_ref(int64_t tid, bool query_os_if_not_found = false, bool lookup_only = true, bool main_thread = false);
-
-	/*!
-	  \brief Fill the given structure with statistics about the currently
-	   open capture.
-
-	  \note this call won't work on file captures.
-	*/
-	void get_capture_stats(scap_stats* stats) const override;
+      \note this call won't work on file captures.
+    */
+    void get_capture_stats(scap_stats* stats) const override;
 
 #ifdef GATHER_INTERNAL_STATS
-	sinsp_stats get_stats();
+    sinsp_stats get_stats();
 #endif
 
-	libsinsp::event_processor* m_external_event_processor;
+    libsinsp::event_processor* m_external_event_processor;
 
-	sinsp_threadinfo* build_threadinfo()
+    sinsp_threadinfo* build_threadinfo()
     {
-        return m_external_event_processor ? m_external_event_processor->build_threadinfo(this)
-                                          : new sinsp_threadinfo(this);
+	return m_external_event_processor
+		       ? m_external_event_processor->build_threadinfo(this)
+		       : new sinsp_threadinfo(this);
     }
 
-	/*!
-	  \brief registers external event processor.
-	  After this, callbacks on libsinsp::event_processor will happen at
-	  the appropriate times. This registration must happen before calling open.
-	*/
-	void register_external_event_processor(libsinsp::event_processor& processor)
+    /*!
+      \brief registers external event processor.
+      After this, callbacks on libsinsp::event_processor will happen at
+      the appropriate times. This registration must happen before calling open.
+    */
+    void register_external_event_processor(libsinsp::event_processor& processor)
+    {
+	m_external_event_processor = &processor;
+    }
+
+    libsinsp::event_processor* get_external_event_processor() const
+    {
+	return m_external_event_processor;
+    }
+
+    /*!
+      \brief Return the event and system call information tables.
+
+      This function exports the tables containing the information about the
+      events supported by the capture infrastructure and the available system
+      calls.
+    */
+    sinsp_evttables* get_event_info_tables();
+
+    /*!
+      \brief get last library error.
+    */
+    string getlasterr() { return m_lasterr; }
+
+    /*!
+      \brief Get the list of machine network interfaces.
+
+      \return Pointer to the interface list manager.
+    */
+    sinsp_network_interfaces* get_ifaddr_list();
+
+    /*!
+      \brief Set the format used to render event data
+       buffer arguments.
+    */
+    void set_buffer_format(sinsp_evt::param_fmt format);
+
+    /*!
+      \brief Get the format used to render event data
+       buffer arguments.
+    */
+    sinsp_evt::param_fmt get_buffer_format();
+
+    /*!
+      \brief Set event flags for which matching events should be dropped
+      pre-filtering
+    */
+    void set_drop_event_flags(ppm_event_flags flags);
+
+    /*!
+      \brief Returns true if the current capture is offline
+    */
+    inline bool is_capture() { return m_mode == SCAP_MODE_CAPTURE; }
+
+    /*!
+      \brief Returns true if the current capture is live
+    */
+    inline bool is_live() { return m_mode == SCAP_MODE_LIVE; }
+
+    /*!
+      \brief Returns true if the kernel module is not loaded
+    */
+    inline bool is_nodriver() { return m_mode == SCAP_MODE_NODRIVER; }
+
+    /*!
+      \brief Returns true if the current capture has a plugin producing events
+    */
+    inline bool is_plugin() { return m_mode == SCAP_MODE_PLUGIN; }
+
+    /*!
+      \brief Returns true if the inspector is configured to collect events from
+      gVisor
+    */
+    inline bool is_gvisor() { return m_gvisor; }
+
+    /*!
+      \brief Returns the framework plugin api version as a string with static
+      storage
+    */
+    inline const char* get_plugin_api_version() const
+    {
+	return PLUGIN_API_VERSION_STR;
+    }
+
+    /*!
+      \brief Returns the API version supported by the driver
+    */
+    inline uint64_t get_driver_api_version() const
+    {
+	return scap_get_driver_api_version(m_h);
+    }
+
+    /*!
+      \brief Returns the minimum API version required by the userspace library
+    */
+    inline uint64_t get_scap_api_version() const
+    {
+	return SCAP_MINIMUM_DRIVER_API_VERSION;
+    }
+
+    /*!
+      \brief Returns the schema version supported by the driver
+    */
+    inline uint64_t get_driver_schema_version() const
+    {
+	return scap_get_driver_schema_version(m_h);
+    }
+
+    /*!
+      \brief Returns the minimum schema version required by the userspace
+      library
+    */
+    inline uint64_t get_scap_schema_version() const
+    {
+	return SCAP_MINIMUM_DRIVER_SCHEMA_VERSION;
+    }
+
+    /*!
+      \brief Returns true if truncated environments should be loaded from /proc
+    */
+    inline bool large_envs_enabled()
+    {
+	return is_live() && m_large_envs_enabled;
+    }
+
+    /*!
+      \brief Enable/disable large environment support
+
+      \param enable when it is true and the current capture is live
+      environments larger than SCAP_MAX_ENV_SIZE will be loaded
+      from /proc/<pid>/environ (if possible)
+    */
+    void set_large_envs(bool enable);
+
+    /*!
+      \brief Set the debugging mode of the inspector.
+
+      \param enable_debug when it is true and the current capture is live
+      the inspector filters out events about itself.
+    */
+    void set_debug_mode(bool enable_debug);
+
+    /*!
+      \brief Set the fatfile mode when writing events to file.
+
+      \note fatfile mode involves saving "hidden" events in the trace file
+       that make it possible to preserve full state even when filters that
+       would drop state packets are used during the capture.
+    */
+    void set_fatfile_dump_mode(bool enable_fatfile);
+
+    /*!
+      \brief Set internal events mode.
+
+      \note By default, internal events, such as events that note
+	    when new containers or orchestration entities have
+	    been created, are not returned in sinsp::next(). (They
+	    are always written to capture files, to ensure that
+	    the full state can be reconstructed when capture files
+	    are read). Enabling internal events mode will result
+	    in these events being returned.
+    */
+    void set_internal_events_mode(bool enable_internal_events);
+
+    /*!
+      \brief Set whether to resolve hostnames and port protocols or not.
+
+      \note It can use the system library functions getservbyport and so to
+       resolve protocol names and domain names.
+
+      \param enable If set to false it will enable this function and use plain
+       numerical values.
+    */
+    void set_hostname_and_port_resolution_mode(bool enable);
+
+    /*!
+      \brief Set the runtime flag for resolving the timespan in a human
+       readable mode.
+
+      \param flag Can be 'h', 'a', 'r', 'd', 'D' as documented in the manual.
+    */
+    inline void set_time_output_mode(char flag) { m_output_time_flag = flag; }
+
+    /*!
+      \brief Sets the max length of event argument strings.
+
+      \param len Max length after which an event argument string is truncated.
+       0 means no limit. Use this to reduce verbosity when printing event info
+       on screen.
+    */
+    void set_max_evt_output_len(uint32_t len);
+
+    /*!
+      \brief Returns true if the debug mode is enabled.
+    */
+    inline bool is_debug_enabled() { return m_isdebug_enabled; }
+
+    /*!
+      \brief Set a flag indicating if the command line requested to show
+      container information.
+
+      \param set true if the command line argument is set to show container
+      information
+    */
+    void set_print_container_data(bool print_container_data);
+
+    /*!
+      \brief Returns true if the command line argument is set to show container
+      information.
+    */
+    inline bool is_print_container_data() { return m_print_container_data; }
+
+    /*!
+      \brief Lets a filter plugin request a protocol decoder.
+
+      \param the name of the required decoder
+    */
+    sinsp_protodecoder* require_protodecoder(std::string decoder_name);
+
+    /*!
+      \brief Lets a filter plugin request a protocol decoder.
+
+      \param the name of the required decoder
+    */
+    void protodecoder_register_reset(sinsp_protodecoder* dec);
+
+    /*!
+      \brief If this is an offline capture, return the name of the file that is
+       being read, otherwise return an empty string.
+    */
+    std::string get_input_filename() { return m_input_filename; }
+
+    /*!
+      \brief If this is an online capture, set event_id.
+      \param event type to set
+      \return SCAP_SUCCESS if the call is successful
+       On Failure, SCAP_FAILURE is returned and getlasterr() can be used to
+       obtain the cause of the error.
+
+      \note For a list of event types, refer to \ref etypes.
+    */
+    void set_eventmask(uint32_t event_types);
+
+    /*!
+      \brief If this is an online capture, unset event_id.
+      \param event type to unset
+      \return SCAP_SUCCESS if the call is successful
+       On Failure, SCAP_FAILURE is returned and getlasterr() can be used to
+       obtain the cause of the error.
+
+      \note For a list of event types, refer to \ref etypes.
+    */
+    void unset_eventmask(uint32_t event_id);
+
+    /*!
+      \brief When reading events from a trace file or a plugin, this function
+       returns the read progress as a number between 0 and 100.
+    */
+    double get_read_progress();
+
+    /*!
+      \brief When reading events from a trace file or a plugin, this function
+       returns the read progress as a number and as a string, giving the plugins
+       flexibility on the format.
+    */
+    double get_read_progress_with_str(OUT string* progress_str);
+
+    /*!
+      \brief Make the amount of data gathered for a syscall to be
+      determined by the number of parameters.
+    */
+    virtual int /*SCAP_X*/ dynamic_snaplen(bool enable)
+    {
+	if(enable)
 	{
-		m_external_event_processor = &processor;
+	    return scap_enable_dynamic_snaplen(m_h);
 	}
-
-	libsinsp::event_processor* get_external_event_processor() const
+	else
 	{
-		return m_external_event_processor;
+	    return scap_disable_dynamic_snaplen(m_h);
 	}
+    }
 
-	/*!
-	  \brief Return the event and system call information tables.
-
-	  This function exports the tables containing the information about the
-	  events supported by the capture infrastructure and the available system calls.
-	*/
-	sinsp_evttables* get_event_info_tables();
-
-	/*!
-	  \brief get last library error.
-	*/
-	string getlasterr()
-	{
-		return m_lasterr;
-	}
-
-	/*!
-	  \brief Get the list of machine network interfaces.
-
-	  \return Pointer to the interface list manager.
-	*/
-	sinsp_network_interfaces* get_ifaddr_list();
-
-	/*!
-	  \brief Set the format used to render event data
-	   buffer arguments.
-	*/
-	void set_buffer_format(sinsp_evt::param_fmt format);
-
-	/*!
-	  \brief Get the format used to render event data
-	   buffer arguments.
-	*/
-	sinsp_evt::param_fmt get_buffer_format();
-
-	/*!
-	  \brief Set event flags for which matching events should be dropped pre-filtering
-	*/
-	void set_drop_event_flags(ppm_event_flags flags);
-
-	/*!
-	  \brief Returns true if the current capture is offline
-	*/
-	inline bool is_capture()
-	{
-		return m_mode == SCAP_MODE_CAPTURE;
-	}
-
-	/*!
-	  \brief Returns true if the current capture is live
-	*/
-	inline bool is_live()
-	{
-		return m_mode == SCAP_MODE_LIVE;
-	}
-
-	/*!
-	  \brief Returns true if the kernel module is not loaded
-	*/
-	inline bool is_nodriver()
-	{
-		return m_mode == SCAP_MODE_NODRIVER;
-	}
-
-	/*!
-	  \brief Returns true if the current capture has a plugin producing events
-	*/
-	inline bool is_plugin()
-	{
-		return m_mode == SCAP_MODE_PLUGIN;
-	}
-
-	/*!
-	  \brief Returns true if the inspector is configured to collect events from gVisor
-	*/
-	inline bool is_gvisor()
-	{
-		return m_gvisor;
-	}
-
-	/*!
-	  \brief Returns the framework plugin api version as a string with static storage
-	*/
-	inline const char *get_plugin_api_version() const
-	{
-		return PLUGIN_API_VERSION_STR;
-	}
-
-	/*!
-	  \brief Returns the API version supported by the driver
-	*/
-	inline uint64_t get_driver_api_version() const
-	{
-		return scap_get_driver_api_version(m_h);
-	}
-
-	/*!
-	  \brief Returns the minimum API version required by the userspace library
-	*/
-	inline uint64_t get_scap_api_version() const
-	{
-		return SCAP_MINIMUM_DRIVER_API_VERSION;
-	}
-
-	/*!
-	  \brief Returns the schema version supported by the driver
-	*/
-	inline uint64_t get_driver_schema_version() const
-	{
-		return scap_get_driver_schema_version(m_h);
-	}
-
-	/*!
-	  \brief Returns the minimum schema version required by the userspace library
-	*/
-	inline uint64_t get_scap_schema_version() const
-	{
-		return SCAP_MINIMUM_DRIVER_SCHEMA_VERSION;
-	}
-
-	/*!
-	  \brief Returns true if truncated environments should be loaded from /proc
-	*/
-	inline bool large_envs_enabled()
-	{
-		return is_live() && m_large_envs_enabled;
-	}
-
-	/*!
-	  \brief Enable/disable large environment support
-
-	  \param enable when it is true and the current capture is live
-	  environments larger than SCAP_MAX_ENV_SIZE will be loaded
-	  from /proc/<pid>/environ (if possible)
-	*/
-	void set_large_envs(bool enable);
-
-	/*!
-	  \brief Set the debugging mode of the inspector.
-
-	  \param enable_debug when it is true and the current capture is live
-	  the inspector filters out events about itself.
-	*/
-	void set_debug_mode(bool enable_debug);
-
-	/*!
-	  \brief Set the fatfile mode when writing events to file.
-
-	  \note fatfile mode involves saving "hidden" events in the trace file
-	   that make it possible to preserve full state even when filters that
-	   would drop state packets are used during the capture.
-	*/
-	void set_fatfile_dump_mode(bool enable_fatfile);
-
-	/*!
-	  \brief Set internal events mode.
-
-	  \note By default, internal events, such as events that note
-                when new containers or orchestration entities have
-                been created, are not returned in sinsp::next(). (They
-                are always written to capture files, to ensure that
-                the full state can be reconstructed when capture files
-                are read). Enabling internal events mode will result
-                in these events being returned.
-	*/
-	void set_internal_events_mode(bool enable_internal_events);
-
-	/*!
-	  \brief Set whether to resolve hostnames and port protocols or not.
-
-	  \note It can use the system library functions getservbyport and so to
-	   resolve protocol names and domain names.
-
-	  \param enable If set to false it will enable this function and use plain
-	   numerical values.
-	*/
-	void set_hostname_and_port_resolution_mode(bool enable);
-
-	/*!
-	  \brief Set the runtime flag for resolving the timespan in a human
-	   readable mode.
-
-	  \param flag Can be 'h', 'a', 'r', 'd', 'D' as documented in the manual.
-	*/
-	inline void set_time_output_mode(char flag)
-	{
-		m_output_time_flag = flag;
-	}
-
-	/*!
-	  \brief Sets the max length of event argument strings.
-
-	  \param len Max length after which an event argument string is truncated.
-	   0 means no limit. Use this to reduce verbosity when printing event info
-	   on screen.
-	*/
-	void set_max_evt_output_len(uint32_t len);
-
-	/*!
-	  \brief Returns true if the debug mode is enabled.
-	*/
-	inline bool is_debug_enabled()
-	{
-		return m_isdebug_enabled;
-	}
-
-	/*!
-	  \brief Set a flag indicating if the command line requested to show container information.
-
-	  \param set true if the command line argument is set to show container information
-	*/
-	void set_print_container_data(bool print_container_data);
-
-
-	/*!
-	  \brief Returns true if the command line argument is set to show container information.
-	*/
-	inline bool is_print_container_data()
-	{
-		return m_print_container_data;
-	}
-
-	/*!
-	  \brief Lets a filter plugin request a protocol decoder.
-
-	  \param the name of the required decoder
-	*/
-	sinsp_protodecoder* require_protodecoder(std::string decoder_name);
-
-	/*!
-	  \brief Lets a filter plugin request a protocol decoder.
-
-	  \param the name of the required decoder
-	*/
-	void protodecoder_register_reset(sinsp_protodecoder* dec);
-
-	/*!
-	  \brief If this is an offline capture, return the name of the file that is
-	   being read, otherwise return an empty string.
-	*/
-	std::string get_input_filename()
-	{
-		return m_input_filename;
-	}
-
-	/*!
-	  \brief If this is an online capture, set event_id.
-	  \param event type to set
-	  \return SCAP_SUCCESS if the call is successful
-	   On Failure, SCAP_FAILURE is returned and getlasterr() can be used to
-	   obtain the cause of the error.
-
-	  \note For a list of event types, refer to \ref etypes.
-	*/
-	void set_eventmask(uint32_t event_types);
-
-	/*!
-	  \brief If this is an online capture, unset event_id.
-	  \param event type to unset
-	  \return SCAP_SUCCESS if the call is successful
-	   On Failure, SCAP_FAILURE is returned and getlasterr() can be used to
-	   obtain the cause of the error.
-
-	  \note For a list of event types, refer to \ref etypes.
-	*/
-	void unset_eventmask(uint32_t event_id);
-
-	/*!
-	  \brief When reading events from a trace file or a plugin, this function
-	   returns the read progress as a number between 0 and 100.
-	*/
-	double get_read_progress();
-
-	/*!
-	  \brief When reading events from a trace file or a plugin, this function
-	   returns the read progress as a number and as a string, giving the plugins
-	   flexibility on the format.
-	*/
-	double get_read_progress_with_str(OUT string* progress_str);
-
-	/*!
-	  \brief Make the amount of data gathered for a syscall to be
-	  determined by the number of parameters.
-	*/
-	virtual int /*SCAP_X*/ dynamic_snaplen(bool enable)
-	{
-		if(enable)
-		{
-			return scap_enable_dynamic_snaplen(m_h);
-		}
-		else
-		{
-			return scap_disable_dynamic_snaplen(m_h);
-		}
-	}
-
-	/*!
-	  \brief Set the parameters that control metadata fetching from orchestrators
-	  like Kuberneted and mesos.
-	*/
-	void set_metadata_download_params(uint32_t data_max_b,
-		uint32_t data_chunk_wait_us,
-		uint32_t data_watch_freq_sec);
-
+    /*!
+      \brief Set the parameters that control metadata fetching from
+      orchestrators like Kuberneted and mesos.
+    */
+    void set_metadata_download_params(uint32_t data_max_b,
+				      uint32_t data_chunk_wait_us,
+				      uint32_t data_watch_freq_sec);
 
 #if !defined(CYGWING_AGENT) && !defined(MINIMAL_BUILD)
-	void init_k8s_ssl(const std::string *ssl_cert);
+    void init_k8s_ssl(const std::string* ssl_cert);
 
-	/*!
-	  \brief Initialize the Kubernetes client.
-	  \param api_server Kubernetes API server URI
-	  \param ssl_cert use the provided file name to authenticate with the Kubernetes API server
-	  \param node_name the node name is used as a filter when requesting metadata of pods 
-	  to the API server; if empty, no filter is set
-	*/
-	void init_k8s_client(std::string* api_server, std::string* ssl_cert, std::string *node_name, bool verbose = false);
-	void make_k8s_client();
-	k8s* get_k8s_client() const { return m_k8s_client; }
-	void validate_k8s_node_name();
+    /*!
+      \brief Initialize the Kubernetes client.
+      \param api_server Kubernetes API server URI
+      \param ssl_cert use the provided file name to authenticate with the
+      Kubernetes API server \param node_name the node name is used as a filter
+      when requesting metadata of pods to the API server; if empty, no filter is
+      set
+    */
+    void init_k8s_client(std::string* api_server, std::string* ssl_cert,
+			 std::string* node_name, bool verbose = false);
+    void make_k8s_client();
+    k8s* get_k8s_client() const { return m_k8s_client; }
+    void validate_k8s_node_name();
 
-	void init_mesos_client(std::string* api_server, bool verbose = false);
-	mesos* get_mesos_client() const { return m_mesos_client; }
+    void init_mesos_client(std::string* api_server, bool verbose = false);
+    mesos* get_mesos_client() const { return m_mesos_client; }
 #endif // !defined(CYGWING_AGENT) && !defined(MINIMAL_BUILD)
 
-	//
-	// Misc internal stuff
-	//
-	void stop_dropping_mode();
-	void start_dropping_mode(uint32_t sampling_ratio);
-	void on_new_entry_from_proc(void* context, scap_t* handle, int64_t tid, scap_threadinfo* tinfo,
-		scap_fdinfo* fdinfo);
-	void set_get_procs_cpu_from_driver(bool get_procs_cpu_from_driver)
-	{
-		m_get_procs_cpu_from_driver = get_procs_cpu_from_driver;
-	}
+    //
+    // Misc internal stuff
+    //
+    void stop_dropping_mode();
+    void start_dropping_mode(uint32_t sampling_ratio);
+    void on_new_entry_from_proc(void* context, scap_t* handle, int64_t tid,
+				scap_threadinfo* tinfo, scap_fdinfo* fdinfo);
+    void set_get_procs_cpu_from_driver(bool get_procs_cpu_from_driver)
+    {
+	m_get_procs_cpu_from_driver = get_procs_cpu_from_driver;
+    }
 
-	//
-	// Used by filters to enable app event state tracking, which is disabled
-	// by default for performance reasons
-	//
-	void request_tracer_state_tracking()
-	{
-		m_track_tracers_state = true;
-	}
+    //
+    // Used by filters to enable app event state tracking, which is disabled
+    // by default for performance reasons
+    //
+    void request_tracer_state_tracking() { m_track_tracers_state = true; }
 
-	//
-	// Allocates private state in the thread info class.
-	// Returns the ID to use when retrieving the memory area.
-	// Will fail if called after the capture starts.
-	//
-	uint32_t reserve_thread_memory(uint32_t size);
+    //
+    // Allocates private state in the thread info class.
+    // Returns the ID to use when retrieving the memory area.
+    // Will fail if called after the capture starts.
+    //
+    uint32_t reserve_thread_memory(uint32_t size);
 
-	sinsp_parser* get_parser();
+    sinsp_parser* get_parser();
 
-	/*!
-	  \brief Enables simple_consumer mode on sinsp, at driver level.
-	  This will avoid tracing syscalls flagged with EF_DROP_SIMPLE_CONS.
-	  Must be called before sinsp opening.
-	*/
-	void set_simple_consumer();
+    /*!
+      \brief Enables simple_consumer mode on sinsp, at driver level.
+      This will avoid tracing syscalls flagged with EF_DROP_SIMPLE_CONS.
+      Must be called before sinsp opening.
+    */
+    void set_simple_consumer();
 
-	bool setup_cycle_writer(std::string base_file_name, int rollover_mb, int duration_seconds, int file_limit, unsigned long event_limit, bool compress);
-	void import_ipv4_interface(const sinsp_ipv4_ifinfo& ifinfo);
-	void add_meta_event(sinsp_evt *metaevt);
-	void add_meta_event_callback(meta_event_callback cback, void* data);
-	void remove_meta_event_callback();
-	void filter_proc_table_when_saving(bool filter);
-	void enable_tracers_capture();
-	void enable_page_faults();
-	uint64_t get_bytes_read()
-	{
-		return scap_ftell(m_h);
-	}
-	void refresh_ifaddr_list();
-	void refresh_proc_list() {
-		scap_refresh_proc_table(m_h);
-	}
+    bool setup_cycle_writer(std::string base_file_name, int rollover_mb,
+			    int duration_seconds, int file_limit,
+			    unsigned long event_limit, bool compress);
+    void import_ipv4_interface(const sinsp_ipv4_ifinfo& ifinfo);
+    void add_meta_event(sinsp_evt* metaevt);
+    void add_meta_event_callback(meta_event_callback cback, void* data);
+    void remove_meta_event_callback();
+    void filter_proc_table_when_saving(bool filter);
+    void enable_tracers_capture();
+    void enable_page_faults();
+    uint64_t get_bytes_read() { return scap_ftell(m_h); }
+    void refresh_ifaddr_list();
+    void refresh_proc_list() { scap_refresh_proc_table(m_h); }
 
-	void set_simpledriver_mode();
-	std::vector<long> get_n_tracepoint_hit();
-	void set_bpf_probe(const std::string& bpf_probe);
+    void set_simpledriver_mode();
+    std::vector<long> get_n_tracepoint_hit();
+    void set_bpf_probe(const std::string& bpf_probe);
 
-	bool is_bpf_enabled();
+    bool is_bpf_enabled();
 
-	static unsigned num_possible_cpus();
+    static unsigned num_possible_cpus();
 
 #if defined(HAS_CAPTURE) && !defined(_WIN32)
-	static std::shared_ptr<std::string> lookup_cgroup_dir(const std::string& subsys);
+    static std::shared_ptr<std::string>
+    lookup_cgroup_dir(const std::string& subsys);
 #endif
 #if defined(CYGWING_AGENT)
-	wh_t* get_wmi_handle() override
-	{
-		return scap_get_wmi_handle(m_h);
-	}
+    wh_t* get_wmi_handle() override { return scap_get_wmi_handle(m_h); }
 #endif
 
-	static inline bool simple_consumer_consider_evtnum(uint16_t etype)
-	{
-		enum ppm_event_flags flags = g_infotables.m_event_info[etype].flags;
+    static inline bool simple_consumer_consider_evtnum(uint16_t etype)
+    {
+	enum ppm_event_flags flags = g_infotables.m_event_info[etype].flags;
 
-		return ! (flags & sinsp::simple_consumer_skip_flags());
-	}
+	return !(flags & sinsp::simple_consumer_skip_flags());
+    }
 
-	static inline bool simple_consumer_consider_syscallid(uint16_t scid)
-	{
-		enum ppm_event_flags flags = g_infotables.m_syscall_info_table[scid].flags;
+    static inline bool simple_consumer_consider_syscallid(uint16_t scid)
+    {
+	enum ppm_event_flags flags =
+		g_infotables.m_syscall_info_table[scid].flags;
 
-		return ! (flags & sinsp::simple_consumer_skip_flags());
-	}
+	return !(flags & sinsp::simple_consumer_skip_flags());
+    }
 
-	// Add comm to the list of comms for which the inspector
-	// should not return events.
-	bool suppress_events_comm(const std::string &comm);
+    // Add comm to the list of comms for which the inspector
+    // should not return events.
+    bool suppress_events_comm(const std::string& comm);
 
-	bool check_suppressed(int64_t tid);
+    bool check_suppressed(int64_t tid);
 
-	void set_docker_socket_path(std::string socket_path);
-	void set_query_docker_image_info(bool query_image_info);
+    void set_docker_socket_path(std::string socket_path);
+    void set_query_docker_image_info(bool query_image_info);
 
-	void set_cri_extra_queries(bool extra_queries);
+    void set_cri_extra_queries(bool extra_queries);
 
-	void set_fullcapture_port_range(uint16_t range_start, uint16_t range_end);
+    void set_fullcapture_port_range(uint16_t range_start, uint16_t range_end);
 
-	void set_statsd_port(uint16_t port);
+    void set_statsd_port(uint16_t port);
 
-	/*!
-	  \brief Reset list of crio socket paths currently stored, and set path as the only path.
-	*/
-	void set_cri_socket_path(const std::string& path);
-	/*!
-	  \brief Pushed a new path to the list of crio socket paths
-	*/
-	void add_cri_socket_path(const std::string &path);
-	void set_cri_timeout(int64_t timeout_ms);
-	void set_cri_async(bool async);
-	void set_cri_delay(uint64_t delay_ms);
-	void set_container_labels_max_len(uint32_t max_label_len);
+    /*!
+      \brief Reset list of crio socket paths currently stored, and set path as
+      the only path.
+    */
+    void set_cri_socket_path(const std::string& path);
+    /*!
+      \brief Pushed a new path to the list of crio socket paths
+    */
+    void add_cri_socket_path(const std::string& path);
+    void set_cri_timeout(int64_t timeout_ms);
+    void set_cri_async(bool async);
+    void set_cri_delay(uint64_t delay_ms);
+    void set_container_labels_max_len(uint32_t max_label_len);
 
-	// Create and register a plugin from a shared library pointed
-	// to by filepath, and add it to the inspector.
-	// The created sinsp_plugin is returned.
-	std::shared_ptr<sinsp_plugin> register_plugin(const std::string& filepath);
-	const sinsp_plugin_manager* get_plugin_manager();
-	void set_input_plugin(const string& name, const string& params);
+    // Create and register a plugin from a shared library pointed
+    // to by filepath, and add it to the inspector.
+    // The created sinsp_plugin is returned.
+    std::shared_ptr<sinsp_plugin> register_plugin(const std::string& filepath);
+    const sinsp_plugin_manager* get_plugin_manager();
+    void set_input_plugin(const string& name, const string& params);
 
-	uint64_t get_lastevent_ts() const { return m_lastevent_ts; }
+    uint64_t get_lastevent_ts() const { return m_lastevent_ts; }
 
-VISIBILITY_PROTECTED
-	bool add_thread(const sinsp_threadinfo *ptinfo);
-	void set_mode(scap_mode_t value)
-	{
-		m_mode = value;
-	}
+    VISIBILITY_PROTECTED
+    bool add_thread(const sinsp_threadinfo* ptinfo);
+    void set_mode(scap_mode_t value) { m_mode = value; }
 
-VISIBILITY_PRIVATE
+    VISIBILITY_PRIVATE
 
-        static inline ppm_event_flags simple_consumer_skip_flags()
-        {
-		return (ppm_event_flags) (EF_SKIPPARSERESET | EF_UNUSED | EF_DROP_SIMPLE_CONS | EF_OLD_VERSION);
-        }
+    static inline ppm_event_flags simple_consumer_skip_flags()
+    {
+	return (ppm_event_flags)(EF_SKIPPARSERESET | EF_UNUSED |
+				 EF_DROP_SIMPLE_CONS | EF_OLD_VERSION);
+    }
 // Doxygen doesn't understand VISIBILITY_PRIVATE
 #ifdef _DOXYGEN
-private:
+    private:
 #endif
 
-	void open_int();
-	void open_live_common(uint32_t timeout_ms, scap_mode_t mode);
-	void init();
-	void deinit_state();
-	void consume_initialstate_events();
-	bool is_initialstate_event(scap_evt* pevent);
-	void import_thread_table();
-	void import_ifaddr_list();
-	void import_user_list();
-	void add_protodecoders();
-	void fill_syscalls_of_interest(scap_open_args *oargs);
-	void remove_thread(int64_t tid, bool force);
+    void open_int();
+    void open_live_common(uint32_t timeout_ms, scap_mode_t mode);
+    void init();
+    void deinit_state();
+    void consume_initialstate_events();
+    bool is_initialstate_event(scap_evt* pevent);
+    void import_thread_table();
+    void import_ifaddr_list();
+    void import_user_list();
+    void add_protodecoders();
+    void fill_syscalls_of_interest(scap_open_args* oargs);
+    void remove_thread(int64_t tid, bool force);
 
-	//
-	// Note: lookup_only should be used when the query for the thread is made
-	//       not as a consequence of an event for that thread arriving, but
-	//       just for lookup reason. In that case, m_lastaccess_ts is not updated
-	//       and m_last_tinfo is not set.
-	//
-	inline threadinfo_map_t::ptr_t find_thread(int64_t tid, bool lookup_only)
-	{
-		return m_thread_manager->find_thread(tid, lookup_only);
-	}
+    //
+    // Note: lookup_only should be used when the query for the thread is made
+    //       not as a consequence of an event for that thread arriving, but
+    //       just for lookup reason. In that case, m_lastaccess_ts is not
+    //       updated and m_last_tinfo is not set.
+    //
+    inline threadinfo_map_t::ptr_t find_thread(int64_t tid, bool lookup_only)
+    {
+	return m_thread_manager->find_thread(tid, lookup_only);
+    }
 
-	// this is here for testing purposes only
-	sinsp_threadinfo* find_thread_test(int64_t tid, bool lookup_only);
-	bool remove_inactive_threads();
+    // this is here for testing purposes only
+    sinsp_threadinfo* find_thread_test(int64_t tid, bool lookup_only);
+    bool remove_inactive_threads();
 
 #if !defined(CYGWING_AGENT) && !defined(MINIMAL_BUILD)
-	void k8s_discover_ext();
-	void collect_k8s();
-	void update_k8s_state();
-	void update_mesos_state();
-	bool get_mesos_data();
+    void k8s_discover_ext();
+    void collect_k8s();
+    void update_k8s_state();
+    void update_mesos_state();
+    bool get_mesos_data();
 #endif // !defined(CYGWING_AGENT) && !defined(MINIMAL_BUILD)
 
-	static int64_t get_file_size(const std::string& fname, char *error);
-	static std::string get_error_desc(const std::string& msg = "");
+    static int64_t get_file_size(const std::string& fname, char* error);
+    static std::string get_error_desc(const std::string& msg = "");
 
-	void restart_capture();
+    void restart_capture();
 
-	void fseek(uint64_t filepos)
-	{
-		scap_fseek(m_h, filepos);
-	}
+    void fseek(uint64_t filepos) { scap_fseek(m_h, filepos); }
 
-	void add_suppressed_comms(scap_open_args &oargs);
+    void add_suppressed_comms(scap_open_args& oargs);
 
-	bool increased_snaplen_port_range_set() const
-	{
-		return m_increased_snaplen_port_range.range_start > 0 &&
-		       m_increased_snaplen_port_range.range_end > 0;
-	}
+    bool increased_snaplen_port_range_set() const
+    {
+	return m_increased_snaplen_port_range.range_start > 0 &&
+	       m_increased_snaplen_port_range.range_end > 0;
+    }
 
-	double get_read_progress_file();
-	void get_read_progress_plugin(OUT double* nres, string* sres);
+    double get_read_progress_file();
+    void get_read_progress_plugin(OUT double* nres, string* sres);
 
-	void get_procs_cpu_from_driver(uint64_t ts);
+    void get_procs_cpu_from_driver(uint64_t ts);
 
-	scap_t* m_h;
-	uint64_t m_nevts;
-	int64_t m_filesize;
+    scap_t* m_h;
+    uint64_t m_nevts;
+    int64_t m_filesize;
 
-	bool m_simpleconsumer;
+    bool m_simpleconsumer;
 
-	scap_mode_t m_mode = SCAP_MODE_NONE;
+    scap_mode_t m_mode = SCAP_MODE_NONE;
 
-	// If non-zero, reading from this fd and m_input_filename contains "fd
-	// <m_input_fd>". Otherwise, reading from m_input_filename.
-	int m_input_fd;
-	std::string m_input_filename;
-	bool m_bpf;
-	bool m_udig;
-	bool m_gvisor;
-	std::string m_gvisor_root_path = "";
-	std::string m_gvisor_config_path = "";
-	bool m_is_windows;
-	std::string m_bpf_probe;
-	bool m_isdebug_enabled;
-	bool m_isfatfile_enabled;
-	bool m_isinternal_events_enabled;
-	bool m_hostname_and_port_resolution_enabled;
-	char m_output_time_flag;
-	uint32_t m_max_evt_output_len;
-	bool m_compress;
-	sinsp_evt m_evt;
-	std::string m_lasterr;
-	int64_t m_tid_to_remove;
-	int64_t m_tid_of_fd_to_remove;
-	std::vector<int64_t>* m_fds_to_remove;
-	uint64_t m_lastevent_ts;
-	// the parsing engine
-	sinsp_parser* m_parser;
-	// the statistics analysis engine
-	scap_dumper_t* m_dumper;
-	bool m_is_dumping;
-	bool m_filter_proc_table_when_saving;
-	const scap_machine_info* m_machine_info;
-	uint32_t m_num_cpus;
-	sinsp_thread_privatestate_manager m_thread_privatestate_manager;
-	bool m_is_tracers_capture_enabled;
-	bool m_flush_memory_dump;
-	bool m_large_envs_enabled;
+    // If non-zero, reading from this fd and m_input_filename contains "fd
+    // <m_input_fd>". Otherwise, reading from m_input_filename.
+    int m_input_fd;
+    std::string m_input_filename;
+    bool m_bpf;
+    bool m_udig;
+    bool m_gvisor;
+    std::string m_gvisor_root_path = "";
+    std::string m_gvisor_config_path = "";
+    bool m_is_windows;
+    std::string m_bpf_probe;
+    bool m_isdebug_enabled;
+    bool m_isfatfile_enabled;
+    bool m_isinternal_events_enabled;
+    bool m_hostname_and_port_resolution_enabled;
+    char m_output_time_flag;
+    uint32_t m_max_evt_output_len;
+    bool m_compress;
+    sinsp_evt m_evt;
+    std::string m_lasterr;
+    int64_t m_tid_to_remove;
+    int64_t m_tid_of_fd_to_remove;
+    std::vector<int64_t>* m_fds_to_remove;
+    uint64_t m_lastevent_ts;
+    // the parsing engine
+    sinsp_parser* m_parser;
+    // the statistics analysis engine
+    scap_dumper_t* m_dumper;
+    bool m_is_dumping;
+    bool m_filter_proc_table_when_saving;
+    const scap_machine_info* m_machine_info;
+    uint32_t m_num_cpus;
+    sinsp_thread_privatestate_manager m_thread_privatestate_manager;
+    bool m_is_tracers_capture_enabled;
+    bool m_flush_memory_dump;
+    bool m_large_envs_enabled;
 
-	sinsp_network_interfaces* m_network_interfaces;
+    sinsp_network_interfaces* m_network_interfaces;
 
-public:
-	sinsp_thread_manager* m_thread_manager;
+    public:
+    sinsp_thread_manager* m_thread_manager;
 
-	sinsp_container_manager m_container_manager;
+    sinsp_container_manager m_container_manager;
 
-	sinsp_usergroup_manager m_usergroup_manager;
+    sinsp_usergroup_manager m_usergroup_manager;
 
-	metadata_download_params m_metadata_download_params;
+    metadata_download_params m_metadata_download_params;
 
-	//
-	// Kubernetes
-	//
+    //
+    // Kubernetes
+    //
 #if !defined(CYGWING_AGENT) && !defined(MINIMAL_BUILD)
-	std::string* m_k8s_api_server;
-	std::string* m_k8s_api_cert;
-	std::string* m_k8s_node_name;
-	bool m_k8s_node_name_validated = false;
+    std::string* m_k8s_api_server;
+    std::string* m_k8s_api_cert;
+    std::string* m_k8s_node_name;
+    bool m_k8s_node_name_validated = false;
 #ifdef HAS_CAPTURE
-	std::shared_ptr<sinsp_ssl> m_k8s_ssl;
-	std::shared_ptr<sinsp_bearer_token> m_k8s_bt;
-	unique_ptr<k8s_api_handler> m_k8s_api_handler;
-	shared_ptr<socket_collector<socket_data_handler<k8s_handler>>> m_k8s_collector;
-	bool m_k8s_api_detected = false;
-	unique_ptr<k8s_api_handler> m_k8s_ext_handler;
-	k8s_ext_list_ptr_t m_ext_list_ptr;
-	bool m_k8s_ext_detect_done = false;
+    std::shared_ptr<sinsp_ssl> m_k8s_ssl;
+    std::shared_ptr<sinsp_bearer_token> m_k8s_bt;
+    unique_ptr<k8s_api_handler> m_k8s_api_handler;
+    shared_ptr<socket_collector<socket_data_handler<k8s_handler>>>
+	    m_k8s_collector;
+    bool m_k8s_api_detected = false;
+    unique_ptr<k8s_api_handler> m_k8s_ext_handler;
+    k8s_ext_list_ptr_t m_ext_list_ptr;
+    bool m_k8s_ext_detect_done = false;
 #endif // HAS_CAPTURE
-	k8s* m_k8s_client;
-	uint64_t m_k8s_last_watch_time_ns;
+    k8s* m_k8s_client;
+    uint64_t m_k8s_last_watch_time_ns;
 #endif // !defined(CYGWING_AGENT) && !defined(MINIMAL_BUILD)
 
-	//
-	// Mesos/Marathon
-	//
-	std::string m_mesos_api_server;
-	std::vector<std::string> m_marathon_api_server;
-	mesos* m_mesos_client;
-	uint64_t m_mesos_last_watch_time_ns;
+    //
+    // Mesos/Marathon
+    //
+    std::string m_mesos_api_server;
+    std::vector<std::string> m_marathon_api_server;
+    mesos* m_mesos_client;
+    uint64_t m_mesos_last_watch_time_ns;
 
-	//
-	// True when ran with -v.
-	// Used by mesos and k8s objects.
-	//
-	bool m_verbose_json = false;
+    //
+    // True when ran with -v.
+    // Used by mesos and k8s objects.
+    //
+    bool m_verbose_json = false;
 
-	//
-	// True if the command line argument is set to show container information
-	// The default is false set within the constructor
-	//
-	bool m_print_container_data;
+    //
+    // True if the command line argument is set to show container information
+    // The default is false set within the constructor
+    //
+    bool m_print_container_data;
 
-	uint64_t m_firstevent_ts;
-	sinsp_filter* m_filter;
-	std::string m_filterstring;
-	unordered_set<uint32_t> m_ppm_sc_of_interest;
+    uint64_t m_firstevent_ts;
+    sinsp_filter* m_filter;
+    std::string m_filterstring;
+    unordered_set<uint32_t> m_ppm_sc_of_interest;
 
-	//
-	// Internal stats
-	//
+    //
+    // Internal stats
+    //
 #ifdef GATHER_INTERNAL_STATS
-	sinsp_stats m_stats;
+    sinsp_stats m_stats;
 #endif
 #ifdef HAS_ANALYZER
-	std::vector<uint64_t> m_tid_collisions;
+    std::vector<uint64_t> m_tid_collisions;
 #endif
 
-	//
-	// Saved snaplen
-	//
-	uint32_t m_snaplen;
+    //
+    // Saved snaplen
+    //
+    uint32_t m_snaplen;
 
-	//
-	// Saved increased capture range
-	//
-	struct
-	{
-		uint16_t range_start;
-		uint16_t range_end;
-	} m_increased_snaplen_port_range;
+    //
+    // Saved increased capture range
+    //
+    struct
+    {
+	uint16_t range_start;
+	uint16_t range_end;
+    } m_increased_snaplen_port_range;
 
-	int32_t m_statsd_port;
+    int32_t m_statsd_port;
 
-	//
-	// Some thread table limits
-	//
-	uint32_t m_max_fdtable_size;
-	bool m_automatic_threadtable_purging = true;
-	uint64_t m_thread_timeout_ns = (uint64_t)1800 * ONE_SECOND_IN_NS;
-	uint64_t m_inactive_thread_scan_time_ns = (uint64_t)1200 * ONE_SECOND_IN_NS;
+    //
+    // Some thread table limits
+    //
+    uint32_t m_max_fdtable_size;
+    bool m_automatic_threadtable_purging = true;
+    uint64_t m_thread_timeout_ns = (uint64_t)1800 * ONE_SECOND_IN_NS;
+    uint64_t m_inactive_thread_scan_time_ns = (uint64_t)1200 * ONE_SECOND_IN_NS;
 
-	//
-	// Container limits
-	//
-	uint64_t m_inactive_container_scan_time_ns;
+    //
+    // Container limits
+    //
+    uint64_t m_inactive_container_scan_time_ns;
 
-	//
-	// Users/groups limits
-	//
-	uint64_t m_deleted_users_groups_scan_time_ns;
+    //
+    // Users/groups limits
+    //
+    uint64_t m_deleted_users_groups_scan_time_ns;
 
-	//
-	// How to render the data buffers
-	//
-	sinsp_evt::param_fmt m_buffer_format;
+    //
+    // How to render the data buffers
+    //
+    sinsp_evt::param_fmt m_buffer_format;
 
-	//
-	// The cycle-writer for files
-	//
-	cycle_writer* m_cycle_writer;
-	bool m_write_cycling;
+    //
+    // The cycle-writer for files
+    //
+    cycle_writer* m_cycle_writer;
+    bool m_write_cycling;
 
 #ifdef SIMULATE_DROP_MODE
-	//
-	// Some dropping infrastructure
-	//
-	bool m_isdropping;
+    //
+    // Some dropping infrastructure
+    //
+    bool m_isdropping;
 #endif
 
-	//
-	// App events
-	//
-	bool m_track_tracers_state;
-	list<sinsp_partial_tracer*> m_partial_tracers_list;
-	simple_lifo_queue<sinsp_partial_tracer>* m_partial_tracers_pool;
+    //
+    // App events
+    //
+    bool m_track_tracers_state;
+    list<sinsp_partial_tracer*> m_partial_tracers_list;
+    simple_lifo_queue<sinsp_partial_tracer>* m_partial_tracers_pool;
 
-	//
-	// Protocol decoding state
-	//
-	std::vector<sinsp_protodecoder*> m_decoders_reset_list;
+    //
+    // Protocol decoding state
+    //
+    std::vector<sinsp_protodecoder*> m_decoders_reset_list;
 
-	//
-	// meta event management for other sources like k8s, mesos.
-	//
-	sinsp_evt* m_metaevt;
-	meta_event_callback m_meta_event_callback;
-	void* m_meta_event_callback_data;
+    //
+    // meta event management for other sources like k8s, mesos.
+    //
+    sinsp_evt* m_metaevt;
+    meta_event_callback m_meta_event_callback;
+    void* m_meta_event_callback_data;
 
-	// A queue of pending internal state events:
-	// * 	container events. Written from async
-	// 	callbacks that occur after looking up container
-	// 	information, read from sinsp::next().
-	// *	user added/removed events
-	// * 	group added/removed events
+    // A queue of pending internal state events:
+    // * 	container events. Written from async
+    // 	callbacks that occur after looking up container
+    // 	information, read from sinsp::next().
+    // *	user added/removed events
+    // * 	group added/removed events
 #ifndef _WIN32
-	tbb::concurrent_queue<shared_ptr<sinsp_evt>> m_pending_state_evts;
+    tbb::concurrent_queue<shared_ptr<sinsp_evt>> m_pending_state_evts;
 #endif
 
-	// Holds an event dequeued from the above queue
-	std::shared_ptr<sinsp_evt> m_state_evt;
+    // Holds an event dequeued from the above queue
+    std::shared_ptr<sinsp_evt> m_state_evt;
 
-	//
-	// End of second housekeeping
-	//
-	bool m_get_procs_cpu_from_driver;
-	uint64_t m_next_flush_time_ns;
-	uint64_t m_last_procrequest_tod;
-	sinsp_proc_metainfo m_meinfo;
-	uint64_t m_next_stats_print_time_ns;
+    //
+    // End of second housekeeping
+    //
+    bool m_get_procs_cpu_from_driver;
+    uint64_t m_next_flush_time_ns;
+    uint64_t m_last_procrequest_tod;
+    sinsp_proc_metainfo m_meinfo;
+    uint64_t m_next_stats_print_time_ns;
 
-	static unsigned int m_num_possible_cpus;
+    static unsigned int m_num_possible_cpus;
 #if defined(HAS_CAPTURE)
-	int64_t m_self_pid;
+    int64_t m_self_pid;
 #endif
 
-	// Any thread with a comm in this set will not have its events
-	// returned in sinsp::next()
-	std::set<std::string> m_suppressed_comms;
-	//
-	// Internal manager for plugins
-	//
-	sinsp_plugin_manager* m_plugin_manager;
-	//
-	// The ID of the plugin to use as event input, or zero
-	// if no source plugin should be used as source
-	//
-	std::shared_ptr<sinsp_plugin_cap_sourcing> m_input_plugin;
-	//
-	// String with the parameters for the plugin to be used as input.
-	// These parameters will be passed to the open function of the plugin.
-	//
-	string m_input_plugin_open_params;
-	//
-	// An instance of scap_evt to be used during the next call to sinsp::next().
-	// If non-null, sinsp::next will use this pointer instead of invoking scap_next().
-	// After using this event, sinsp::next() will set this back to NULL.
-	// This is used internally during the state initialization phase.
-	scap_evt *m_replay_scap_evt;
-	//
-	// This is related to m_replay_scap_evt, and is used to store the additional cpuid
-	// information of the replayed scap event.
-	uint16_t m_replay_scap_cpuid;
+    // Any thread with a comm in this set will not have its events
+    // returned in sinsp::next()
+    std::set<std::string> m_suppressed_comms;
+    //
+    // Internal manager for plugins
+    //
+    sinsp_plugin_manager* m_plugin_manager;
+    //
+    // The ID of the plugin to use as event input, or zero
+    // if no source plugin should be used as source
+    //
+    std::shared_ptr<sinsp_plugin_cap_sourcing> m_input_plugin;
+    //
+    // String with the parameters for the plugin to be used as input.
+    // These parameters will be passed to the open function of the plugin.
+    //
+    string m_input_plugin_open_params;
+    //
+    // An instance of scap_evt to be used during the next call to sinsp::next().
+    // If non-null, sinsp::next will use this pointer instead of invoking
+    // scap_next(). After using this event, sinsp::next() will set this back to
+    // NULL. This is used internally during the state initialization phase.
+    scap_evt* m_replay_scap_evt;
+    //
+    // This is related to m_replay_scap_evt, and is used to store the additional
+    // cpuid information of the replayed scap event.
+    uint16_t m_replay_scap_cpuid;
 
-	bool m_inited;
-	static std::atomic<int> instance_count;
+    bool m_inited;
+    static std::atomic<int> instance_count;
 
-	friend class sinsp_parser;
-	friend class sinsp_analyzer;
-	friend class sinsp_analyzer_parsers;
-	friend class sinsp_evt;
-	friend class sinsp_threadinfo;
-	friend class sinsp_fdtable;
-	friend class sinsp_thread_manager;
-	friend class sinsp_container_manager;
-	friend class sinsp_dumper;
-	friend class sinsp_analyzer_fd_listener;
-	friend class sinsp_chisel;
-	friend class sinsp_tracerparser;
-	friend class sinsp_filter_check_event;
-	friend class sinsp_protodecoder;
-	friend class lua_cbacks;
-	friend class sinsp_filter_check_container;
-	friend class sinsp_worker;
-	friend class sinsp_table;
-	friend class curses_textbox;
-	friend class sinsp_filter_check_fd;
-	friend class sinsp_filter_check_k8s;
-	friend class sinsp_filter_check_mesos;
-	friend class sinsp_filter_check_evtin;
-	friend class sinsp_baseliner;
-	friend class sinsp_memory_dumper;
-	friend class sinsp_network_interfaces;
-	friend class test_helper;
-	friend class sinsp_usergroup_manager;
+    friend class sinsp_parser;
+    friend class sinsp_analyzer;
+    friend class sinsp_analyzer_parsers;
+    friend class sinsp_evt;
+    friend class sinsp_threadinfo;
+    friend class sinsp_fdtable;
+    friend class sinsp_thread_manager;
+    friend class sinsp_container_manager;
+    friend class sinsp_dumper;
+    friend class sinsp_analyzer_fd_listener;
+    friend class sinsp_chisel;
+    friend class sinsp_tracerparser;
+    friend class sinsp_filter_check_event;
+    friend class sinsp_protodecoder;
+    friend class lua_cbacks;
+    friend class sinsp_filter_check_container;
+    friend class sinsp_worker;
+    friend class sinsp_table;
+    friend class curses_textbox;
+    friend class sinsp_filter_check_fd;
+    friend class sinsp_filter_check_k8s;
+    friend class sinsp_filter_check_mesos;
+    friend class sinsp_filter_check_evtin;
+    friend class sinsp_baseliner;
+    friend class sinsp_memory_dumper;
+    friend class sinsp_network_interfaces;
+    friend class test_helper;
+    friend class sinsp_usergroup_manager;
 
-	template<class TKey,class THash,class TCompare> friend class sinsp_connection_manager;
+    template<class TKey, class THash, class TCompare>
+    friend class sinsp_connection_manager;
 };
 
 /*@}*/

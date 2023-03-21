@@ -28,30 +28,32 @@ struct udig_ring_buffer_status;
 //
 typedef struct scap_device
 {
-	int m_fd;
-	int m_bufinfo_fd; // used by udig
-	char* m_buffer;
-	uint32_t m_buffer_size; // used by udig
-	uint32_t m_lastreadsize;
-	char* m_sn_next_event; // Pointer to the next event available for scap_next
-	uint32_t m_sn_len; // Number of bytes available in the buffer pointed by m_sn_next_event
-	union
+    int m_fd;
+    int m_bufinfo_fd; // used by udig
+    char* m_buffer;
+    uint32_t m_buffer_size; // used by udig
+    uint32_t m_lastreadsize;
+    char* m_sn_next_event; // Pointer to the next event available for scap_next
+    uint32_t m_sn_len;	   // Number of bytes available in the buffer pointed by
+			   // m_sn_next_event
+    union
+    {
+	// Anonymous struct with ppm stuff
+	struct
 	{
-		// Anonymous struct with ppm stuff
-		struct
-		{
-			struct ppm_ring_buffer_info* m_bufinfo;
-			struct udig_ring_buffer_status* m_bufstatus; // used by udig
-		};
+	    struct ppm_ring_buffer_info* m_bufinfo;
+	    struct udig_ring_buffer_status* m_bufstatus; // used by udig
 	};
+    };
 } scap_device;
 
 struct scap_device_set
 {
-	scap_device* m_devs;
-	uint32_t m_ndevs;
-	uint64_t m_buffer_empty_wait_time_us;
-	char* m_lasterr;
+    scap_device* m_devs;
+    uint32_t m_ndevs;
+    uint64_t m_buffer_empty_wait_time_us;
+    char* m_lasterr;
 };
 
-int32_t devset_init(struct scap_device_set *devset, size_t num_devs, char *lasterr);
+int32_t devset_init(struct scap_device_set* devset, size_t num_devs,
+		    char* lasterr);

@@ -23,30 +23,29 @@ struct scap;
 
 struct source_plugin_engine
 {
-	char* m_lasterr;
+    char* m_lasterr;
 
-	// Total number of events sourced by the plugin
-	uint32_t m_nevts;
+    // Total number of events sourced by the plugin
+    uint32_t m_nevts;
 
-	scap_source_plugin* m_input_plugin;
-	uint8_t* m_input_plugin_evt_storage;
-	uint32_t m_input_plugin_evt_storage_len;
+    scap_source_plugin* m_input_plugin;
+    uint8_t* m_input_plugin_evt_storage;
+    uint32_t m_input_plugin_evt_storage_len;
 
-	// The number of items held in batch_evts
-	uint32_t m_input_plugin_batch_nevts;
+    // The number of items held in batch_evts
+    uint32_t m_input_plugin_batch_nevts;
 
-	// A set of events returned from next_batch. The array is
-	// allocated and must be free()d when done.
-	ss_plugin_event* m_input_plugin_batch_evts;
+    // A set of events returned from next_batch. The array is
+    // allocated and must be free()d when done.
+    ss_plugin_event* m_input_plugin_batch_evts;
 
-	// The current position into the above arrays (0-indexed),
-	// reflecting how many of the above items have been returned
-	// via a call to next().
-	uint32_t m_input_plugin_batch_idx;
+    // The current position into the above arrays (0-indexed),
+    // reflecting how many of the above items have been returned
+    // via a call to next().
+    uint32_t m_input_plugin_batch_idx;
 
-	// The return value from the last call to next_batch().
-	ss_plugin_rc m_input_plugin_last_batch_res;
-
+    // The return value from the last call to next_batch().
+    ss_plugin_rc m_input_plugin_last_batch_res;
 };
 
 #define SCAP_HANDLE_T struct source_plugin_engine

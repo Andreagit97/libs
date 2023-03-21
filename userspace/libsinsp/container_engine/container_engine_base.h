@@ -21,47 +21,46 @@ limitations under the License.
 
 class sinsp_threadinfo;
 
-namespace libsinsp {
-namespace container_engine {
+namespace libsinsp
+{
+namespace container_engine
+{
 
 /**
  * Base class for container engine. This provides the interfaces to
  * create a sinsp_container_info.
  */
-class container_engine_base {
-public:
-	container_engine_base(container_cache_interface &cache);
+class container_engine_base
+{
+    public:
+    container_engine_base(container_cache_interface& cache);
 
-	virtual ~container_engine_base() = default;
+    virtual ~container_engine_base() = default;
 
-	/**
-	 * Find a container associated with the given tinfo and add it to the
-	 * cache.
-	 */
-	virtual bool resolve(sinsp_threadinfo* tinfo,
-			     bool query_os_for_missing_info) = 0;
+    /**
+     * Find a container associated with the given tinfo and add it to the
+     * cache.
+     */
+    virtual bool resolve(sinsp_threadinfo* tinfo,
+			 bool query_os_for_missing_info) = 0;
 
-	/**
-	 * Update an existing container with the size of the container layer.
-	 * The size is not requested as the part of the initial request (in resolve)
-	 * because determining the size can take seconds.
-	 */
-	virtual void update_with_size(const std::string& container_id);
+    /**
+     * Update an existing container with the size of the container layer.
+     * The size is not requested as the part of the initial request (in resolve)
+     * because determining the size can take seconds.
+     */
+    virtual void update_with_size(const std::string& container_id);
 
-	virtual void cleanup();
+    virtual void cleanup();
 
-protected:
-	/**
-	 * Derived class accessor to the cache
-	 */
-	container_cache_interface& container_cache()
-	{
-		return m_cache;
-	}
+    protected:
+    /**
+     * Derived class accessor to the cache
+     */
+    container_cache_interface& container_cache() { return m_cache; }
 
-private:
-	container_cache_interface& m_cache;
+    private:
+    container_cache_interface& m_cache;
 };
-}
-}
-
+} // namespace container_engine
+} // namespace libsinsp

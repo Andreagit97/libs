@@ -22,14 +22,17 @@ limitations under the License.
 #endif
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-// this is passed by value everywhere so keep it small
-// it only contains a pointer to a struct containing the engine-specific bits
-struct scap_engine_handle {
+    // this is passed by value everywhere so keep it small
+    // it only contains a pointer to a struct containing the engine-specific
+    // bits
+    struct scap_engine_handle
+    {
 	SCAP_HANDLE_T* m_handle;
-};
+    };
 
 #ifdef __cplusplus
 }

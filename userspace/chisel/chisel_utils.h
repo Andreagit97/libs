@@ -25,7 +25,7 @@ limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 class chisel_initializer
 {
-public:
-	chisel_initializer();
-	~chisel_initializer();
+    public:
+    chisel_initializer();
+    ~chisel_initializer();
 };

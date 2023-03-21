@@ -27,92 +27,66 @@ namespace gvisor_config
 static const std::string s_default_socket_path = "/tmp/gvisor.sock";
 
 static const std::vector<std::string> s_gvisor_points = {
-	"container/start",
-	"syscall/openat/enter",
-	"syscall/openat/exit",
-	"syscall/execve/enter",
-	"syscall/execve/exit",
-	"syscall/socket/enter",
-	"syscall/socket/exit",
-	"syscall/connect/enter",
-	"syscall/connect/exit",
-	"syscall/chdir/enter",
-	"syscall/chdir/exit",
-	"syscall/setuid/enter",
-	"syscall/setuid/exit",
-	"syscall/setgid/enter",
-	"syscall/setgid/exit",
-	"syscall/setresuid/enter",
-	"syscall/setresuid/exit",
-	"syscall/setresgid/enter",
-	"syscall/setresgid/exit",
-	"syscall/chroot/enter",
-	"syscall/chroot/exit",
-	"syscall/dup/enter",
-	"syscall/dup/exit",
-	"syscall/dup2/enter",
-	"syscall/dup2/exit",
-	"syscall/dup3/enter",
-	"syscall/dup3/exit",
-	"syscall/prlimit64/enter",
-	"syscall/prlimit64/exit",
-	"syscall/signalfd/enter",
-	"syscall/signalfd/exit",
-	"syscall/signalfd4/enter",
-	"syscall/signalfd4/exit",
-	"sentry/clone",
-	"sentry/task_exit",
-	"sentry/execve",
-	"syscall/pipe/enter",
-	"syscall/pipe/exit",
-	"syscall/fcntl/enter",
-	"syscall/fcntl/exit",
-	"syscall/bind/enter",
-	"syscall/bind/exit",
-	"syscall/accept/enter",
-	"syscall/accept/exit"
-};
+	"container/start",	  "syscall/openat/enter",
+	"syscall/openat/exit",	  "syscall/execve/enter",
+	"syscall/execve/exit",	  "syscall/socket/enter",
+	"syscall/socket/exit",	  "syscall/connect/enter",
+	"syscall/connect/exit",	  "syscall/chdir/enter",
+	"syscall/chdir/exit",	  "syscall/setuid/enter",
+	"syscall/setuid/exit",	  "syscall/setgid/enter",
+	"syscall/setgid/exit",	  "syscall/setresuid/enter",
+	"syscall/setresuid/exit", "syscall/setresgid/enter",
+	"syscall/setresgid/exit", "syscall/chroot/enter",
+	"syscall/chroot/exit",	  "syscall/dup/enter",
+	"syscall/dup/exit",	  "syscall/dup2/enter",
+	"syscall/dup2/exit",	  "syscall/dup3/enter",
+	"syscall/dup3/exit",	  "syscall/prlimit64/enter",
+	"syscall/prlimit64/exit", "syscall/signalfd/enter",
+	"syscall/signalfd/exit",  "syscall/signalfd4/enter",
+	"syscall/signalfd4/exit", "sentry/clone",
+	"sentry/task_exit",	  "sentry/execve",
+	"syscall/pipe/enter",	  "syscall/pipe/exit",
+	"syscall/fcntl/enter",	  "syscall/fcntl/exit",
+	"syscall/bind/enter",	  "syscall/bind/exit",
+	"syscall/accept/enter",	  "syscall/accept/exit"};
 
 static const std::vector<std::string> s_context_fields = {
-	"cwd",
-	"credentials",
-	"container_id",
-	"thread_id",
-	"task_start_time",
-	"time",
+	"cwd",	     "credentials",	"container_id",
+	"thread_id", "task_start_time", "time",
 };
 
 std::string generate(std::string socket_path)
 {
-	Json::Value context_fields;
-	for(const auto &field : s_context_fields)
-	{
-		context_fields.append(field);
-	}
+    Json::Value context_fields;
+    for(const auto &field : s_context_fields)
+    {
+	context_fields.append(field);
+    }
 
-	Json::Value points;
-	for(const auto &point_name : s_gvisor_points)
-	{
-		Json::Value point;
-		point["name"] = point_name;
-		point["context_fields"] = context_fields;
-		points.append(point);
-	}
+    Json::Value points;
+    for(const auto &point_name : s_gvisor_points)
+    {
+	Json::Value point;
+	point["name"] = point_name;
+	point["context_fields"] = context_fields;
+	points.append(point);
+    }
 
-	Json::Value sinks, sink;
-	sink["name"] = "remote";
-	sink["config"]["endpoint"] = socket_path.empty() ? s_default_socket_path : socket_path;
-	sinks.append(sink);
+    Json::Value sinks, sink;
+    sink["name"] = "remote";
+    sink["config"]["endpoint"] =
+	    socket_path.empty() ? s_default_socket_path : socket_path;
+    sinks.append(sink);
 
-	Json::Value trace_session;
-	trace_session["name"] = "Default";
-	trace_session["points"] = points;
-	trace_session["sinks"] = sinks;
+    Json::Value trace_session;
+    trace_session["name"] = "Default";
+    trace_session["points"] = points;
+    trace_session["sinks"] = sinks;
 
-	Json::Value root;
-	root["trace_session"] = trace_session;
+    Json::Value root;
+    root["trace_session"] = trace_session;
 
-	return root.toStyledString();
+    return root.toStyledString();
 }
 
 } // namespace gvisor_config

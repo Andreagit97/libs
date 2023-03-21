@@ -25,22 +25,25 @@ class sinsp_threadinfo;
 #include "container_engine/container_engine_base.h"
 #include "container_engine/sinsp_container_type.h"
 
-namespace libsinsp {
-namespace container_engine {
+namespace libsinsp
+{
+namespace container_engine
+{
 class mesos : public container_engine_base
 {
-public:
-	mesos(container_cache_interface& cache) : container_engine_base(cache)
-	{}
+    public:
+    mesos(container_cache_interface &cache): container_engine_base(cache) {}
 
-	bool resolve(sinsp_threadinfo *tinfo, bool query_os_for_missing_info) override;
+    bool resolve(sinsp_threadinfo *tinfo,
+		 bool query_os_for_missing_info) override;
 
-	static bool set_mesos_task_id(sinsp_container_info& container, sinsp_threadinfo *tinfo);
+    static bool set_mesos_task_id(sinsp_container_info &container,
+				  sinsp_threadinfo *tinfo);
 
-protected:
-	bool match(sinsp_threadinfo *tinfo, sinsp_container_info& container_info);
+    protected:
+    bool match(sinsp_threadinfo *tinfo, sinsp_container_info &container_info);
 
-	static std::string get_env_mesos_task_id(sinsp_threadinfo *tinfo);
+    static std::string get_env_mesos_task_id(sinsp_threadinfo *tinfo);
 };
-}
-}
+} // namespace container_engine
+} // namespace libsinsp

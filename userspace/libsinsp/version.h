@@ -28,49 +28,50 @@ limitations under the License.
 */
 class sinsp_version
 {
-public:
-	inline sinsp_version() : m_valid(false) { }
+    public:
+    inline sinsp_version(): m_valid(false) {}
 
-	inline explicit sinsp_version(const std::string &version_str)
+    inline explicit sinsp_version(const std::string &version_str)
+    {
+	m_valid = sscanf(version_str.c_str(),
+			 "%" PRIu32 ".%" PRIu32 ".%" PRIu32, &m_version_major,
+			 &m_version_minor, &m_version_patch) == 3;
+    }
+
+    virtual ~sinsp_version() = default;
+
+    inline std::string as_string() const
+    {
+	return std::to_string(m_version_major) + "." +
+	       std::to_string(m_version_minor) + "." +
+	       std::to_string(m_version_patch);
+    }
+
+    inline bool check(const sinsp_version &requested) const
+    {
+	if(this->m_version_major != requested.m_version_major)
 	{
-		m_valid = sscanf(version_str.c_str(), "%" PRIu32 ".%" PRIu32 ".%" PRIu32,
-			&m_version_major, &m_version_minor, &m_version_patch) == 3;
+	    // major numbers disagree
+	    return false;
 	}
 
-	virtual ~sinsp_version() = default;
-
-	inline std::string as_string() const
+	if(this->m_version_minor < requested.m_version_minor)
 	{
-		return std::to_string(m_version_major)
-			+ "." + std::to_string(m_version_minor)
-			+ "." + std::to_string(m_version_patch);
+	    // framework's minor version is < requested one
+	    return false;
 	}
 
-	inline bool check(const sinsp_version &requested) const
+	if(this->m_version_minor == requested.m_version_minor &&
+	   this->m_version_patch < requested.m_version_patch)
 	{
-		if(this->m_version_major != requested.m_version_major)
-		{
-			// major numbers disagree
-			return false;
-		}
-
-		if(this->m_version_minor < requested.m_version_minor)
-		{
-			// framework's minor version is < requested one
-			return false;
-		}
-
-		if(this->m_version_minor == requested.m_version_minor
-			&& this->m_version_patch < requested.m_version_patch)
-		{
-			// framework's patch level is < requested one
-			return false;
-		}
-		return true;
+	    // framework's patch level is < requested one
+	    return false;
 	}
+	return true;
+    }
 
-	bool m_valid;
-	uint32_t m_version_major;
-	uint32_t m_version_minor;
-	uint32_t m_version_patch;
+    bool m_valid;
+    uint32_t m_version_major;
+    uint32_t m_version_minor;
+    uint32_t m_version_patch;
 };

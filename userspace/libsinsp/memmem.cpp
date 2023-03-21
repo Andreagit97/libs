@@ -18,31 +18,31 @@ limitations under the License.
 #ifndef _GNU_SOURCE
 #include <string.h>
 
-void *memmem(const void *haystack, size_t haystacklen,
-	const void *needle, size_t needlelen)
+void *memmem(const void *haystack, size_t haystacklen, const void *needle,
+	     size_t needlelen)
 {
-	const unsigned char *ptr;
-	const unsigned char *end;
+    const unsigned char *ptr;
+    const unsigned char *end;
 
-	if(needlelen == 0)
-	{
-		return (void *)haystack;
-	}
+    if(needlelen == 0)
+    {
+	return (void *)haystack;
+    }
 
-	if(haystacklen < needlelen)
-	{
-		return NULL;
-	}
-
-	end = (const unsigned char *)haystack + haystacklen - needlelen;
-	for(ptr = (const unsigned char *)haystack; ptr <= end; ptr++)
-	{
-		if(!memcmp(ptr, needle, needlelen))
-		{
-			return (void *)ptr;
-		}
-	}
-
+    if(haystacklen < needlelen)
+    {
 	return NULL;
+    }
+
+    end = (const unsigned char *)haystack + haystacklen - needlelen;
+    for(ptr = (const unsigned char *)haystack; ptr <= end; ptr++)
+    {
+	if(!memcmp(ptr, needle, needlelen))
+	{
+	    return (void *)ptr;
+	}
+    }
+
+    return NULL;
 }
 #endif

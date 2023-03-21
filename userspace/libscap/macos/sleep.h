@@ -19,7 +19,4 @@ limitations under the License.
 
 #include <unistd.h>
 
-static inline void sleep_ms(int ms)
-{
-	usleep(ms * 1000);
-}
+static inline void sleep_ms(int ms) { usleep(ms * 1000); }

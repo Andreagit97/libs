@@ -27,38 +27,40 @@ namespace
  */
 class null_callback : public user_event_logger::callback
 {
-public:
-	void log(const sinsp_user_event& evt,
-	         const user_event_logger::severity severity) override
-	{ }
+    public:
+    void log(const sinsp_user_event& evt,
+	     const user_event_logger::severity severity) override
+    {
+    }
 
-	bool is_null() const override { return true; }
+    bool is_null() const override { return true; }
 };
 
 /** The current callback handler. */
-user_event_logger::callback::ptr_t s_callback = std::make_shared<null_callback>();
+user_event_logger::callback::ptr_t s_callback =
+	std::make_shared<null_callback>();
 
 } // end namespace
 
 void user_event_logger::log(const sinsp_user_event& evt,
-                            const user_event_logger::severity severity)
+			    const user_event_logger::severity severity)
 {
-	s_callback->log(evt, severity);
+    s_callback->log(evt, severity);
 }
 
 void user_event_logger::register_callback(callback::ptr_t callback)
 {
-	if(callback)
-	{
-		s_callback = callback;
-	}
-	else
-	{
-		s_callback = std::make_shared<null_callback>();
-	}
+    if(callback)
+    {
+	s_callback = callback;
+    }
+    else
+    {
+	s_callback = std::make_shared<null_callback>();
+    }
 }
 
 const user_event_logger::callback& user_event_logger::get_callback()
 {
-	return *s_callback;
+    return *s_callback;
 }

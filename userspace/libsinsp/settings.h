@@ -70,7 +70,7 @@ limitations under the License.
 #define MAX_USER_EVT_BUFFER 65536
 
 //
-// Size the user event buffer is brought back once in a while 
+// Size the user event buffer is brought back once in a while
 //
 #define MIN_USER_EVT_BUFFER 256
 
@@ -87,7 +87,10 @@ limitations under the License.
 //
 // Port range to enable larger snaplen on
 //
-#define DEFAULT_INCREASE_SNAPLEN_PORT_RANGE {0, 0}
+#define DEFAULT_INCREASE_SNAPLEN_PORT_RANGE                                    \
+    {                                                                          \
+	0, 0                                                                   \
+    }
 
 //
 // FD class customized with the storage we need

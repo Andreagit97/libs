@@ -43,17 +43,17 @@ limitations under the License.
 //     ListValue           ::= '(' (StrValue (',' StrValue)*)* ')'
 //                             | Identifier
 //     CheckField          ::= FieldName('[' FieldArg ']')?
-//     FieldArg            ::= QuotedStr | FieldArgBareStr 
+//     FieldArg            ::= QuotedStr | FieldArgBareStr
 //     NumValue            ::= HexNumber | Number
 //     StrValue            ::= QuotedStr | BareStr
-// 
+//
 // Supported Check Operators (EBNF Syntax):
 //     UnaryOperator       ::= 'exists'
-//     NumOperator         ::= '<=' | '<' | '>=' | '>' 
+//     NumOperator         ::= '<=' | '<' | '>=' | '>'
 //     StrOperator         ::= '==' | '=' | '!=' | 'glob ' | 'contains '
 //                             | 'icontains ' | 'startswith ' | 'endswith '
-//     ListOperator        ::= 'intersects' | 'in' | 'pmatch' 
-// 
+//     ListOperator        ::= 'intersects' | 'in' | 'pmatch'
+//
 // Tokens (Regular Expressions):
 //     Identifier          ::= [a-zA-Z]+[a-zA-Z0-9_]*
 //     FieldName           ::= [a-zA-Z]+[a-zA-Z0-9_]*(\.[a-zA-Z]+[a-zA-Z0-9_]*)+
@@ -64,8 +64,10 @@ limitations under the License.
 //     BareStr             ::= [^ \b\t\n\r\(\),="']+
 //
 
-namespace libsinsp {
-namespace filter {
+namespace libsinsp
+{
+namespace filter
+{
 
 /*!
 	\brief This class parses a sinsp filter string with a context-free
@@ -73,118 +75,118 @@ namespace filter {
 */
 class SINSP_PUBLIC parser
 {
-public:
-	/*!
-		\brief A struct containing info about the position of the parser
-		relatively to the string input. For example, this can either be used
-		to retrieve context information when an exception is thrown.
-	*/
-	struct pos_info
+    public:
+    /*!
+	    \brief A struct containing info about the position of the parser
+	    relatively to the string input. For example, this can either be used
+	    to retrieve context information when an exception is thrown.
+    */
+    struct pos_info
+    {
+	inline void reset()
 	{
-		inline void reset() 
-		{
-			idx = 0;
-			line = 1;
-			col = 1;
-		}
-		
-		inline std::string as_string() const
-		{
-			return "index " + std::to_string(idx) 
-				+ ", line " + std::to_string(line) 
-				+ ", column " + std::to_string(col);
-		}
+	    idx = 0;
+	    line = 1;
+	    col = 1;
+	}
 
-		uint32_t idx;
-		uint32_t line;
-		uint32_t col;
-	};
+	inline std::string as_string() const
+	{
+	    return "index " + std::to_string(idx) + ", line " +
+		   std::to_string(line) + ", column " + std::to_string(col);
+	}
 
-	/*!
-		\brief Returns the set of filtering operators supported by libsinsp
-	*/
-	static std::vector<std::string> supported_operators(bool list_only=false);
+	uint32_t idx;
+	uint32_t line;
+	uint32_t col;
+    };
 
-	/*!
-		\brief Constructs the parser with a given filter string input
-		\param input The filter string to parse.
-	*/
-	explicit parser(const std::string& input);
+    /*!
+	    \brief Returns the set of filtering operators supported by libsinsp
+    */
+    static std::vector<std::string> supported_operators(bool list_only = false);
 
-	/*!
-		\brief Retrieves the parser position info.
-		\param pos pos_info struct in which the info is written.
-	*/
-	void get_pos(pos_info& pos) const;
+    /*!
+	    \brief Constructs the parser with a given filter string input
+	    \param input The filter string to parse.
+    */
+    explicit parser(const std::string& input);
 
-	/*!
-		\brief Retrieves the parser position info.
-		\return pos_info struct in which the info is written.
-	*/
-	pos_info get_pos() const;
+    /*!
+	    \brief Retrieves the parser position info.
+	    \param pos pos_info struct in which the info is written.
+    */
+    void get_pos(pos_info& pos) const;
 
-	/*!
-		\brief Sets the partial parsing option. Default is true.
-		\note Parsing the input partially means that the parsing can succeed
-		without reaching the end of the input. In other word, this allows
-		parsing strings that have a valid filter as their prefix.
-	*/
-	void set_parse_partial(bool parse_partial);
+    /*!
+	    \brief Retrieves the parser position info.
+	    \return pos_info struct in which the info is written.
+    */
+    pos_info get_pos() const;
 
-	/*!
-		\brief Sets the max depth of the recursion. Default is 100.
-		\note The parser is implemented as a recursive descent parser, so the
-		depth of the recursion is capped to a max level to prevent stack abuse.
-	*/
-	void set_max_depth(uint32_t max_depth);
+    /*!
+	    \brief Sets the partial parsing option. Default is true.
+	    \note Parsing the input partially means that the parsing can succeed
+	    without reaching the end of the input. In other word, this allows
+	    parsing strings that have a valid filter as their prefix.
+    */
+    void set_parse_partial(bool parse_partial);
 
-	/*!
-		\brief Parses the input and returns an AST.
-		\note Throws a sinsp_exception in case of parsing errors.
-		\return Pointer to a expr struct representing the the parsed
-		AST. The resulting pointer is owned by the caller and must be deleted
-		by it. The pointer is automatically deleted in case of exception.
-		On delete, each node of the AST deletes all its subnodes.
-	*/
-	ast::expr* parse();
+    /*!
+	    \brief Sets the max depth of the recursion. Default is 100.
+	    \note The parser is implemented as a recursive descent parser, so
+       the depth of the recursion is capped to a max level to prevent stack
+       abuse.
+    */
+    void set_max_depth(uint32_t max_depth);
 
-private:
-	ast::expr* parse_or();
-	ast::expr* parse_and();
-	ast::expr* parse_not();
-	ast::expr* parse_embedded_remainder();
-	ast::expr* parse_check();
-	ast::expr* parse_list_value();
-	ast::value_expr* parse_num_value();
-	ast::value_expr* parse_str_value();
-	bool lex_blank();
-	bool lex_identifier();
-	bool lex_field_name();
-	bool lex_field_arg_bare_str();
-	bool lex_hex_num();
-	bool lex_num();
-	bool lex_quoted_str();
-	bool lex_bare_str();
-	bool lex_unary_op();
-	bool lex_num_op();
-	bool lex_str_op();
-	bool lex_list_op();
-	bool lex_helper_rgx(std::string rgx);
-	bool lex_helper_str(const std::string& str);
-	bool lex_helper_str_list(const std::vector<std::string>& list);
-	void depth_push();
-	void depth_pop();
-	const char* cursor();
-	std::string escape_str(const std::string& str);
-	std::string trim_str(std::string str);
+    /*!
+	    \brief Parses the input and returns an AST.
+	    \note Throws a sinsp_exception in case of parsing errors.
+	    \return Pointer to a expr struct representing the the parsed
+	    AST. The resulting pointer is owned by the caller and must be
+       deleted by it. The pointer is automatically deleted in case of exception.
+	    On delete, each node of the AST deletes all its subnodes.
+    */
+    ast::expr* parse();
 
-	bool m_parse_partial;
-	uint32_t m_depth;
-	uint32_t m_max_depth;
-	pos_info m_pos;
-	std::string m_input;
-	std::string m_last_token;
+    private:
+    ast::expr* parse_or();
+    ast::expr* parse_and();
+    ast::expr* parse_not();
+    ast::expr* parse_embedded_remainder();
+    ast::expr* parse_check();
+    ast::expr* parse_list_value();
+    ast::value_expr* parse_num_value();
+    ast::value_expr* parse_str_value();
+    bool lex_blank();
+    bool lex_identifier();
+    bool lex_field_name();
+    bool lex_field_arg_bare_str();
+    bool lex_hex_num();
+    bool lex_num();
+    bool lex_quoted_str();
+    bool lex_bare_str();
+    bool lex_unary_op();
+    bool lex_num_op();
+    bool lex_str_op();
+    bool lex_list_op();
+    bool lex_helper_rgx(std::string rgx);
+    bool lex_helper_str(const std::string& str);
+    bool lex_helper_str_list(const std::vector<std::string>& list);
+    void depth_push();
+    void depth_pop();
+    const char* cursor();
+    std::string escape_str(const std::string& str);
+    std::string trim_str(std::string str);
+
+    bool m_parse_partial;
+    uint32_t m_depth;
+    uint32_t m_max_depth;
+    pos_info m_pos;
+    std::string m_input;
+    std::string m_last_token;
 };
 
-}
-}
+} // namespace filter
+} // namespace libsinsp

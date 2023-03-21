@@ -23,13 +23,13 @@ struct scap;
 
 struct udig_engine
 {
-	struct scap_device_set m_dev_set;
+    struct scap_device_set m_dev_set;
 
-	char* m_lasterr;
-	bool m_udig_capturing;
+    char* m_lasterr;
+    bool m_udig_capturing;
 #ifdef _WIN32
-	HANDLE m_win_buf_handle;
-	HANDLE m_win_descs_handle;
+    HANDLE m_win_buf_handle;
+    HANDLE m_win_descs_handle;
 #endif
 };
 

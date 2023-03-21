@@ -18,18 +18,17 @@ limitations under the License.
 #pragma once
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-typedef struct scap scap_t;
-typedef struct scap_threadinfo scap_threadinfo;
-typedef struct scap_fdinfo scap_fdinfo;
+    typedef struct scap scap_t;
+    typedef struct scap_threadinfo scap_threadinfo;
+    typedef struct scap_fdinfo scap_fdinfo;
 
-typedef void (*proc_entry_callback)(void* context,
-				    scap_t* handle,
-				    int64_t tid,
-				    scap_threadinfo* tinfo,
-				    scap_fdinfo* fdinfo);
+    typedef void (*proc_entry_callback)(void* context, scap_t* handle,
+					int64_t tid, scap_threadinfo* tinfo,
+					scap_fdinfo* fdinfo);
 
 #ifdef __cplusplus
 }

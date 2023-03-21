@@ -22,9 +22,12 @@ limitations under the License.
 #include <algorithm>
 #include "../sinsp_public.h"
 
-namespace libsinsp {
-namespace filter {
-namespace ast {
+namespace libsinsp
+{
+namespace filter
+{
+namespace ast
+{
 
 struct expr;
 struct and_expr;
@@ -56,19 +59,16 @@ struct SINSP_PUBLIC expr_visitor
     avoid overriding empty methods if they are not interested
     in a specific type of AST node
 */
-struct SINSP_PUBLIC base_expr_visitor: public expr_visitor
+struct SINSP_PUBLIC base_expr_visitor : public expr_visitor
 {
-public:
+    public:
     /*!
-        \brief Can be set to true by subclasses to instruct the
-        visitor that the exploration can be stopped, so
-        that the recursion gets rewinded and no more nodes
-        are explored.
+	\brief Can be set to true by subclasses to instruct the
+	visitor that the exploration can be stopped, so
+	that the recursion gets rewinded and no more nodes
+	are explored.
     */
-    inline void stop(bool v)
-    {
-        m_should_stop_visit = v;
-    }
+    inline void stop(bool v) { m_should_stop_visit = v; }
 
     virtual void visit(and_expr*) override;
     virtual void visit(or_expr*) override;
@@ -78,7 +78,7 @@ public:
     virtual void visit(unary_check_expr*) override;
     virtual void visit(binary_check_expr*) override;
 
-private:
+    private:
     bool m_should_stop_visit = false;
 };
 
@@ -100,150 +100,129 @@ inline bool compare(const expr* left, const expr* right)
     return left->is_equal(right);
 };
 
-struct SINSP_PUBLIC and_expr: expr
+struct SINSP_PUBLIC and_expr : expr
 {
-    and_expr() { }
+    and_expr() {}
 
-    explicit and_expr(const std::vector<expr*>& c): children(c) { }
+    explicit and_expr(const std::vector<expr*>& c): children(c) {}
 
     ~and_expr()
     {
-        for (auto &c : children)
-        {
-            delete c;
-        }
+	for(auto& c : children)
+	{
+	    delete c;
+	}
     }
 
-    void accept(expr_visitor* v) override
-    {
-        v->visit(this);
-    };
+    void accept(expr_visitor* v) override { v->visit(this); };
 
     bool is_equal(const expr* other) const override
     {
-        auto o = dynamic_cast<const and_expr*>(other);
-        return o != nullptr && std::equal(
-            children.begin(), children.end(), 
-            o->children.begin(), compare);
+	auto o = dynamic_cast<const and_expr*>(other);
+	return o != nullptr && std::equal(children.begin(), children.end(),
+					  o->children.begin(), compare);
     }
 
     std::vector<expr*> children;
 };
 
-struct SINSP_PUBLIC or_expr: expr
+struct SINSP_PUBLIC or_expr : expr
 {
-    or_expr() { }
+    or_expr() {}
 
-    explicit or_expr(const std::vector<expr*>& c): children(c) { }
+    explicit or_expr(const std::vector<expr*>& c): children(c) {}
 
     ~or_expr()
     {
-        for (auto &c : children)
-        {
-            delete c;
-        }
+	for(auto& c : children)
+	{
+	    delete c;
+	}
     }
 
-    void accept(expr_visitor* v) override
-    {
-        v->visit(this);
-    };
+    void accept(expr_visitor* v) override { v->visit(this); };
 
     bool is_equal(const expr* other) const override
     {
-        auto o = dynamic_cast<const or_expr*>(other);
-        return o != nullptr && std::equal(
-            children.begin(), children.end(), 
-            o->children.begin(), compare);
+	auto o = dynamic_cast<const or_expr*>(other);
+	return o != nullptr && std::equal(children.begin(), children.end(),
+					  o->children.begin(), compare);
     }
 
     std::vector<expr*> children;
 };
 
-struct SINSP_PUBLIC not_expr: expr
+struct SINSP_PUBLIC not_expr : expr
 {
-    not_expr() { }
+    not_expr() {}
 
-    explicit not_expr(expr* c): child(c) { }
+    explicit not_expr(expr* c): child(c) {}
 
-    ~not_expr()
-    {
-        delete child;
-    }
+    ~not_expr() { delete child; }
 
-    void accept(expr_visitor* v) override
-    {
-        v->visit(this);
-    };
+    void accept(expr_visitor* v) override { v->visit(this); };
 
     bool is_equal(const expr* other) const override
     {
-        auto o = dynamic_cast<const not_expr*>(other);
-        return o != nullptr && child->is_equal(o->child);
+	auto o = dynamic_cast<const not_expr*>(other);
+	return o != nullptr && child->is_equal(o->child);
     }
 
     expr* child;
 };
 
-struct SINSP_PUBLIC value_expr: expr
+struct SINSP_PUBLIC value_expr : expr
 {
-    value_expr() { }
+    value_expr() {}
 
-    explicit value_expr(const std::string& v): value(v) { }
+    explicit value_expr(const std::string& v): value(v) {}
 
-    void accept(expr_visitor* v) override
-    {
-        v->visit(this);
-    };
+    void accept(expr_visitor* v) override { v->visit(this); };
 
     bool is_equal(const expr* other) const override
     {
-        auto o = dynamic_cast<const value_expr*>(other);
-        return o != nullptr && value == o->value;
+	auto o = dynamic_cast<const value_expr*>(other);
+	return o != nullptr && value == o->value;
     }
 
     std::string value;
 };
 
-struct SINSP_PUBLIC list_expr: expr
+struct SINSP_PUBLIC list_expr : expr
 {
-    list_expr() { }
+    list_expr() {}
 
-    explicit list_expr(const std::vector<std::string>& v): values(v) { }
+    explicit list_expr(const std::vector<std::string>& v): values(v) {}
 
-    void accept(expr_visitor* v) override
-    {
-        v->visit(this);
-    };
+    void accept(expr_visitor* v) override { v->visit(this); };
 
     bool is_equal(const expr* other) const override
     {
-        auto o = dynamic_cast<const list_expr*>(other);
-        return o != nullptr && values == o->values;
+	auto o = dynamic_cast<const list_expr*>(other);
+	return o != nullptr && values == o->values;
     }
 
     std::vector<std::string> values;
 };
 
-struct SINSP_PUBLIC unary_check_expr: expr
+struct SINSP_PUBLIC unary_check_expr : expr
 {
-    unary_check_expr() { }
+    unary_check_expr() {}
 
-    unary_check_expr(
-        const std::string& f,
-        const std::string& a,
-        const std::string& o): field(f), arg(a), op(o) { }
-
-    void accept(expr_visitor* v) override
+    unary_check_expr(const std::string& f, const std::string& a,
+		     const std::string& o):
+	    field(f),
+	    arg(a), op(o)
     {
-        v->visit(this);
-    };
+    }
+
+    void accept(expr_visitor* v) override { v->visit(this); };
 
     bool is_equal(const expr* other) const override
     {
-        auto o = dynamic_cast<const unary_check_expr*>(other);
-        return o != nullptr && field == o->field
-            && arg == o->arg && op == o->op;
+	auto o = dynamic_cast<const unary_check_expr*>(other);
+	return o != nullptr && field == o->field && arg == o->arg &&
+	       op == o->op;
     }
 
     std::string field;
@@ -251,31 +230,26 @@ struct SINSP_PUBLIC unary_check_expr: expr
     std::string op;
 };
 
-struct SINSP_PUBLIC binary_check_expr: expr
+struct SINSP_PUBLIC binary_check_expr : expr
 {
-    binary_check_expr() { }
+    binary_check_expr() {}
 
-    binary_check_expr(
-        const std::string& f,
-        const std::string& a,
-        const std::string& o,
-        expr* v): field(f), arg(a), op(o), value(v) { }
-
-    ~binary_check_expr()
+    binary_check_expr(const std::string& f, const std::string& a,
+		      const std::string& o, expr* v):
+	    field(f),
+	    arg(a), op(o), value(v)
     {
-        delete value;
     }
 
-    void accept(expr_visitor* v) override
-    {
-        v->visit(this);
-    };
+    ~binary_check_expr() { delete value; }
+
+    void accept(expr_visitor* v) override { v->visit(this); };
 
     bool is_equal(const expr* other) const override
     {
-        auto o = dynamic_cast<const binary_check_expr*>(other);
-        return o != nullptr && field == o->field
-            && arg == o->arg && op == o->op && value->is_equal(o->value);
+	auto o = dynamic_cast<const binary_check_expr*>(other);
+	return o != nullptr && field == o->field && arg == o->arg &&
+	       op == o->op && value->is_equal(o->value);
     }
 
     std::string field;
@@ -291,6 +265,6 @@ struct SINSP_PUBLIC binary_check_expr: expr
 */
 expr* clone(expr* e);
 
-}
-}
-}
+} // namespace ast
+} // namespace filter
+} // namespace libsinsp

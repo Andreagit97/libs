@@ -22,23 +22,18 @@ limitations under the License.
 namespace internal_metrics
 {
 
-counter::~counter()
-{
-}
+counter::~counter() {}
 
-counter::counter()
-{
-	m_value = 0;
-}
+counter::counter() { m_value = 0; }
 
 void registry::clear_all_metrics()
 {
-	for(metric_map_iterator_t it = get_metrics().begin(); it != get_metrics().end(); it++)
-	{
-		it->second->clear();
-	}
-
+    for(metric_map_iterator_t it = get_metrics().begin();
+	it != get_metrics().end(); it++)
+    {
+	it->second->clear();
+    }
 }
 
-}
+} // namespace internal_metrics
 #endif

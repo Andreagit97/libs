@@ -33,14 +33,13 @@ typedef struct wh_t wh_t;
  */
 class SINSP_PUBLIC wmi_handle_source
 {
-public:
-	virtual ~wmi_handle_source() = default;
-
+    public:
+    virtual ~wmi_handle_source() = default;
 
 #ifdef CYGWING_AGENT
-	/**
-	 * Return a wmi handle
-	 */
-	virtual wh_t* get_wmi_handle() = 0;
+    /**
+     * Return a wmi handle
+     */
+    virtual wh_t* get_wmi_handle() = 0;
 #endif
 };

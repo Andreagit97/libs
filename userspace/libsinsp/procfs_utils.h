@@ -3,13 +3,16 @@
 #include <istream>
 #include <string>
 
-namespace libsinsp {
-namespace procfs_utils {
+namespace libsinsp
+{
+namespace procfs_utils
+{
 
 constexpr const int NO_MATCH = -1;
 
 /**
- * @brief Parse /proc/<pid>/uid_map to find the uid that root in the userns maps to
+ * @brief Parse /proc/<pid>/uid_map to find the uid that root in the userns maps
+ * to
  * @param uid_map a stream with the contents of /proc/<pid>/uid_map
  * @return the uid of the userns owner
  *
@@ -27,5 +30,5 @@ int get_userns_root_uid(std::istream& uid_map);
  */
 std::string get_systemd_cgroup(std::istream& cgroups);
 
-}
-}
+} // namespace procfs_utils
+} // namespace libsinsp

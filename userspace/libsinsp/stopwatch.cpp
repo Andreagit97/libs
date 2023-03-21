@@ -22,7 +22,4 @@ limitations under the License.
 
 #include "stopwatch.h"
 
-sinsp_stopwatch::sinsp_stopwatch()
-{
-	start();
-}
+sinsp_stopwatch::sinsp_stopwatch() { start(); }

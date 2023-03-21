@@ -17,5 +17,7 @@ limitations under the License.
 
 #pragma once
 
-void fill_syscalls_of_interest(interesting_ppm_sc_set *ppm_sc_of_interest, bool (*syscalls_of_interest)[SYSCALL_TABLE_SIZE]);
+void fill_syscalls_of_interest(
+	interesting_ppm_sc_set *ppm_sc_of_interest,
+	bool (*syscalls_of_interest)[SYSCALL_TABLE_SIZE]);
 int32_t check_api_compatibility(scap_t *handle, char *error);

@@ -28,201 +28,217 @@ limitations under the License.
 
 static int32_t plugin_rc_to_scap_rc(ss_plugin_rc plugin_rc)
 {
-	switch(plugin_rc)
-	{
-	case SS_PLUGIN_SUCCESS:
-		return SCAP_SUCCESS;
-		break;
-	case SS_PLUGIN_FAILURE:
-		return SCAP_FAILURE;
-		break;
-	case SS_PLUGIN_TIMEOUT:
-		return SCAP_TIMEOUT;
-		break;
-	case SS_PLUGIN_EOF:
-		return SCAP_EOF;
-		break;
-	case SS_PLUGIN_NOT_SUPPORTED:
-		return SCAP_NOT_SUPPORTED;
-		break;
-	default:
-		ASSERT(false);
-		return SCAP_FAILURE;
-	}
-
+    switch(plugin_rc)
+    {
+    case SS_PLUGIN_SUCCESS:
+	return SCAP_SUCCESS;
+	break;
+    case SS_PLUGIN_FAILURE:
+	return SCAP_FAILURE;
+	break;
+    case SS_PLUGIN_TIMEOUT:
+	return SCAP_TIMEOUT;
+	break;
+    case SS_PLUGIN_EOF:
+	return SCAP_EOF;
+	break;
+    case SS_PLUGIN_NOT_SUPPORTED:
+	return SCAP_NOT_SUPPORTED;
+	break;
+    default:
 	ASSERT(false);
 	return SCAP_FAILURE;
+    }
+
+    ASSERT(false);
+    return SCAP_FAILURE;
 }
 
-static struct source_plugin_engine* alloc_handle(scap_t* main_handle, char* lasterr_ptr)
+static struct source_plugin_engine *alloc_handle(scap_t *main_handle,
+						 char *lasterr_ptr)
 {
-	struct source_plugin_engine *engine = calloc(1, sizeof(struct source_plugin_engine));
-	if(engine)
-	{
-		engine->m_lasterr = lasterr_ptr;
-	}
-	return engine;
+    struct source_plugin_engine *engine =
+	    calloc(1, sizeof(struct source_plugin_engine));
+    if(engine)
+    {
+	engine->m_lasterr = lasterr_ptr;
+    }
+    return engine;
 }
 
-static int32_t init(scap_t* main_handle, scap_open_args* open_args)
+static int32_t init(scap_t *main_handle, scap_open_args *open_args)
 {
-	int32_t rc;
-	struct source_plugin_engine *handle = main_handle->m_engine.m_handle;
-	handle->m_input_plugin = open_args->input_plugin;
+    int32_t rc;
+    struct source_plugin_engine *handle = main_handle->m_engine.m_handle;
+    handle->m_input_plugin = open_args->input_plugin;
 
-	// Set the rc to SCAP_FAILURE now, so in the unlikely event
-	// that a plugin doesn't not actually set a rc, that it gets
-	// treated as a failure.
-	ss_plugin_rc plugin_rc = SCAP_FAILURE;
+    // Set the rc to SCAP_FAILURE now, so in the unlikely event
+    // that a plugin doesn't not actually set a rc, that it gets
+    // treated as a failure.
+    ss_plugin_rc plugin_rc = SCAP_FAILURE;
 
-	handle->m_input_plugin->handle = handle->m_input_plugin->open(handle->m_input_plugin->state,
-	                                                              open_args->input_plugin_params,
-	                                                              &plugin_rc);
+    handle->m_input_plugin->handle = handle->m_input_plugin->open(
+	    handle->m_input_plugin->state, open_args->input_plugin_params,
+	    &plugin_rc);
 
-	rc = plugin_rc_to_scap_rc(plugin_rc);
-	handle->m_nevts = 0;
-	handle->m_input_plugin_batch_nevts = 0;
-	handle->m_input_plugin_batch_evts = NULL;
-	handle->m_input_plugin_batch_idx = 0;
-	handle->m_input_plugin_last_batch_res = SCAP_SUCCESS;
+    rc = plugin_rc_to_scap_rc(plugin_rc);
+    handle->m_nevts = 0;
+    handle->m_input_plugin_batch_nevts = 0;
+    handle->m_input_plugin_batch_evts = NULL;
+    handle->m_input_plugin_batch_idx = 0;
+    handle->m_input_plugin_last_batch_res = SCAP_SUCCESS;
 
-	if(rc != SCAP_SUCCESS)
-	{
-		const char *errstr = handle->m_input_plugin->get_last_error(handle->m_input_plugin->state);
-		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "%s", errstr);
-	}
+    if(rc != SCAP_SUCCESS)
+    {
+	const char *errstr = handle->m_input_plugin->get_last_error(
+		handle->m_input_plugin->state);
+	snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "%s", errstr);
+    }
 
-	return rc;
+    return rc;
 }
 
 static int close_engine(struct scap_engine_handle engine)
 {
-	struct source_plugin_engine *handle = engine.m_handle;
+    struct source_plugin_engine *handle = engine.m_handle;
 
-	handle->m_input_plugin->close(handle->m_input_plugin->state, handle->m_input_plugin->handle);
-	handle->m_input_plugin->handle = NULL;
-	return SCAP_SUCCESS;
+    handle->m_input_plugin->close(handle->m_input_plugin->state,
+				  handle->m_input_plugin->handle);
+    handle->m_input_plugin->handle = NULL;
+    return SCAP_SUCCESS;
 }
 
-static int32_t next(struct scap_engine_handle engine, OUT scap_evt** pevent, OUT uint16_t* pcpuid)
+static int32_t next(struct scap_engine_handle engine, OUT scap_evt **pevent,
+		    OUT uint16_t *pcpuid)
 {
-	struct source_plugin_engine *handle = engine.m_handle;
-	char *lasterr = engine.m_handle->m_lasterr;
-	ss_plugin_event *plugin_evt;
-	int32_t res = SCAP_FAILURE;
+    struct source_plugin_engine *handle = engine.m_handle;
+    char *lasterr = engine.m_handle->m_lasterr;
+    ss_plugin_event *plugin_evt;
+    int32_t res = SCAP_FAILURE;
 
-	if(handle->m_input_plugin_batch_idx >= handle->m_input_plugin_batch_nevts)
+    if(handle->m_input_plugin_batch_idx >= handle->m_input_plugin_batch_nevts)
+    {
+	if(handle->m_input_plugin_last_batch_res != SS_PLUGIN_SUCCESS)
 	{
-		if(handle->m_input_plugin_last_batch_res != SS_PLUGIN_SUCCESS)
-		{
-			if(handle->m_input_plugin_last_batch_res != SCAP_TIMEOUT && handle->m_input_plugin_last_batch_res != SCAP_EOF)
-			{
-				const char *errstr = handle->m_input_plugin->get_last_error(handle->m_input_plugin->state);
-				strlcpy(lasterr, errstr, SCAP_LASTERR_SIZE);
-			}
-			int32_t tres = handle->m_input_plugin_last_batch_res;
-			handle->m_input_plugin_last_batch_res = SCAP_SUCCESS;
-			return tres;
-		}
-
-		int32_t plugin_res = handle->m_input_plugin->next_batch(handle->m_input_plugin->state,
-									handle->m_input_plugin->handle,
-									&(handle->m_input_plugin_batch_nevts),
-									&(handle->m_input_plugin_batch_evts));
-		handle->m_input_plugin_last_batch_res = plugin_rc_to_scap_rc(plugin_res);
-
-		if(handle->m_input_plugin_batch_nevts == 0)
-		{
-			if(handle->m_input_plugin_last_batch_res == SCAP_SUCCESS)
-			{
-				snprintf(lasterr, SCAP_LASTERR_SIZE, "unexpected 0 size event returned by plugin %s", handle->m_input_plugin->name);
-				ASSERT(false);
-				return SCAP_FAILURE;
-			}
-			else
-			{
-				if(handle->m_input_plugin_last_batch_res != SCAP_TIMEOUT && handle->m_input_plugin_last_batch_res != SCAP_EOF)
-				{
-					const char *errstr = handle->m_input_plugin->get_last_error(handle->m_input_plugin->state);
-					snprintf(lasterr, SCAP_LASTERR_SIZE, "%s", errstr);
-				}
-				return handle->m_input_plugin_last_batch_res;
-			}
-		}
-
-		handle->m_input_plugin_batch_idx = 0;
+	    if(handle->m_input_plugin_last_batch_res != SCAP_TIMEOUT &&
+	       handle->m_input_plugin_last_batch_res != SCAP_EOF)
+	    {
+		const char *errstr = handle->m_input_plugin->get_last_error(
+			handle->m_input_plugin->state);
+		strlcpy(lasterr, errstr, SCAP_LASTERR_SIZE);
+	    }
+	    int32_t tres = handle->m_input_plugin_last_batch_res;
+	    handle->m_input_plugin_last_batch_res = SCAP_SUCCESS;
+	    return tres;
 	}
 
-	uint32_t pos = handle->m_input_plugin_batch_idx;
+	int32_t plugin_res = handle->m_input_plugin->next_batch(
+		handle->m_input_plugin->state, handle->m_input_plugin->handle,
+		&(handle->m_input_plugin_batch_nevts),
+		&(handle->m_input_plugin_batch_evts));
+	handle->m_input_plugin_last_batch_res =
+		plugin_rc_to_scap_rc(plugin_res);
 
-	plugin_evt = &(handle->m_input_plugin_batch_evts[pos]);
-
-	handle->m_input_plugin_batch_idx++;
-
-	res = SCAP_SUCCESS;
-
-	/*
-	 * | scap_evt | len_id (4B) | len_pl (4B) | id | payload |
-	 * Note: we need to use 4B for len_id too because the PPME_PLUGINEVENT_E has
-	 * EF_LARGE_PAYLOAD flag!
-	 */
-	uint32_t reqsize = sizeof(scap_evt) + 4 + 4 + 4 + plugin_evt->datalen;
-	if(handle->m_input_plugin_evt_storage_len < reqsize)
+	if(handle->m_input_plugin_batch_nevts == 0)
 	{
-		uint8_t *tmp = (uint8_t*)realloc(handle->m_input_plugin_evt_storage, reqsize);
-		if (tmp)
+	    if(handle->m_input_plugin_last_batch_res == SCAP_SUCCESS)
+	    {
+		snprintf(lasterr, SCAP_LASTERR_SIZE,
+			 "unexpected 0 size event returned by plugin %s",
+			 handle->m_input_plugin->name);
+		ASSERT(false);
+		return SCAP_FAILURE;
+	    }
+	    else
+	    {
+		if(handle->m_input_plugin_last_batch_res != SCAP_TIMEOUT &&
+		   handle->m_input_plugin_last_batch_res != SCAP_EOF)
 		{
-			handle->m_input_plugin_evt_storage = tmp;
-			handle->m_input_plugin_evt_storage_len = reqsize;
+		    const char *errstr = handle->m_input_plugin->get_last_error(
+			    handle->m_input_plugin->state);
+		    snprintf(lasterr, SCAP_LASTERR_SIZE, "%s", errstr);
 		}
-		else
-		{
-			snprintf(lasterr, SCAP_LASTERR_SIZE, "%s", "failed to alloc space for plugin storage");
-			ASSERT(false);
-			return SCAP_FAILURE;
-		}
+		return handle->m_input_plugin_last_batch_res;
+	    }
 	}
 
-	scap_evt* evt = (scap_evt*)handle->m_input_plugin_evt_storage;
-	evt->len = reqsize;
-	evt->tid = -1;
-	evt->type = PPME_PLUGINEVENT_E;
-	evt->nparams = 2;
+	handle->m_input_plugin_batch_idx = 0;
+    }
 
-	uint8_t* buf = handle->m_input_plugin_evt_storage + sizeof(scap_evt);
+    uint32_t pos = handle->m_input_plugin_batch_idx;
 
-	const uint32_t plugin_id_size = 4;
-	memcpy(buf, &plugin_id_size, sizeof(plugin_id_size));
-	buf += sizeof(plugin_id_size);
+    plugin_evt = &(handle->m_input_plugin_batch_evts[pos]);
 
-	uint32_t datalen = plugin_evt->datalen;
-	memcpy(buf, &(datalen), sizeof(datalen));
-	buf += sizeof(datalen);
+    handle->m_input_plugin_batch_idx++;
 
-	memcpy(buf, &(handle->m_input_plugin->id), sizeof(handle->m_input_plugin->id));
-	buf += sizeof(handle->m_input_plugin->id);
+    res = SCAP_SUCCESS;
 
-	memcpy(buf, plugin_evt->data, plugin_evt->datalen);
-
-	if(plugin_evt->ts != UINT64_MAX)
+    /*
+     * | scap_evt | len_id (4B) | len_pl (4B) | id | payload |
+     * Note: we need to use 4B for len_id too because the PPME_PLUGINEVENT_E has
+     * EF_LARGE_PAYLOAD flag!
+     */
+    uint32_t reqsize = sizeof(scap_evt) + 4 + 4 + 4 + plugin_evt->datalen;
+    if(handle->m_input_plugin_evt_storage_len < reqsize)
+    {
+	uint8_t *tmp =
+		(uint8_t *)realloc(handle->m_input_plugin_evt_storage, reqsize);
+	if(tmp)
 	{
-		evt->ts = plugin_evt->ts;
+	    handle->m_input_plugin_evt_storage = tmp;
+	    handle->m_input_plugin_evt_storage_len = reqsize;
 	}
 	else
 	{
-		evt->ts = get_timestamp_ns();
+	    snprintf(lasterr, SCAP_LASTERR_SIZE, "%s",
+		     "failed to alloc space for plugin storage");
+	    ASSERT(false);
+	    return SCAP_FAILURE;
 	}
+    }
 
-	handle->m_nevts++;
-	*pevent = evt;
-	return res;
+    scap_evt *evt = (scap_evt *)handle->m_input_plugin_evt_storage;
+    evt->len = reqsize;
+    evt->tid = -1;
+    evt->type = PPME_PLUGINEVENT_E;
+    evt->nparams = 2;
+
+    uint8_t *buf = handle->m_input_plugin_evt_storage + sizeof(scap_evt);
+
+    const uint32_t plugin_id_size = 4;
+    memcpy(buf, &plugin_id_size, sizeof(plugin_id_size));
+    buf += sizeof(plugin_id_size);
+
+    uint32_t datalen = plugin_evt->datalen;
+    memcpy(buf, &(datalen), sizeof(datalen));
+    buf += sizeof(datalen);
+
+    memcpy(buf, &(handle->m_input_plugin->id),
+	   sizeof(handle->m_input_plugin->id));
+    buf += sizeof(handle->m_input_plugin->id);
+
+    memcpy(buf, plugin_evt->data, plugin_evt->datalen);
+
+    if(plugin_evt->ts != UINT64_MAX)
+    {
+	evt->ts = plugin_evt->ts;
+    }
+    else
+    {
+	evt->ts = get_timestamp_ns();
+    }
+
+    handle->m_nevts++;
+    *pevent = evt;
+    return res;
 }
 
-static int32_t get_stats(struct scap_engine_handle engine, OUT scap_stats* stats)
+static int32_t get_stats(struct scap_engine_handle engine,
+			 OUT scap_stats *stats)
 {
-	struct source_plugin_engine *handle = engine.m_handle;
-	stats->n_evts = handle->m_nevts;
-	return SCAP_SUCCESS;
+    struct source_plugin_engine *handle = engine.m_handle;
+    stats->n_evts = handle->m_nevts;
+    return SCAP_SUCCESS;
 }
 
 const struct scap_vtable scap_source_plugin_engine = {

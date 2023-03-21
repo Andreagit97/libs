@@ -18,11 +18,14 @@ limitations under the License.
 #pragma once
 //
 // If this check is used by a filter, extract the constant to compare it to
-// Doesn't return the field length because the filtering engine can calculate it.
+// Doesn't return the field length because the filtering engine can calculate
+// it.
 //
 
 class sinsp_filter_value_parser
 {
- public:
-	static size_t string_to_rawval(const char* str, uint32_t len, uint8_t *storage, string::size_type max_len, ppm_param_type ptype);
+    public:
+    static size_t string_to_rawval(const char* str, uint32_t len,
+				   uint8_t* storage, string::size_type max_len,
+				   ppm_param_type ptype);
 };

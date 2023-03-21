@@ -27,29 +27,31 @@ limitations under the License.
 #include "gettimeofday.h"
 #include "sleep.h"
 
-static struct nodriver_engine* alloc_handle(scap_t* main_handle, char* lasterr_ptr)
+static struct nodriver_engine* alloc_handle(scap_t* main_handle,
+					    char* lasterr_ptr)
 {
-	struct nodriver_engine *engine = calloc(1, sizeof(struct nodriver_engine));
-	if(engine)
-	{
-		engine->m_lasterr = lasterr_ptr;
-	}
-	return engine;
+    struct nodriver_engine* engine = calloc(1, sizeof(struct nodriver_engine));
+    if(engine)
+    {
+	engine->m_lasterr = lasterr_ptr;
+    }
+    return engine;
 }
 
-static int32_t next(struct scap_engine_handle handle, scap_evt** pevent, uint16_t* pcpuid)
+static int32_t next(struct scap_engine_handle handle, scap_evt** pevent,
+		    uint16_t* pcpuid)
 {
-	static scap_evt evt;
-	evt.len = 0;
-	evt.tid = -1;
-	evt.type = PPME_SCAPEVENT_X;
-	evt.nparams = 0;
+    static scap_evt evt;
+    evt.len = 0;
+    evt.tid = -1;
+    evt.type = PPME_SCAPEVENT_X;
+    evt.nparams = 0;
 
-	sleep_ms(100);
+    sleep_ms(100);
 
-	evt.ts = get_timestamp_ns();
-	*pevent = &evt;
-	return SCAP_SUCCESS;
+    evt.ts = get_timestamp_ns();
+    *pevent = &evt;
+    return SCAP_SUCCESS;
 }
 
 const struct scap_vtable scap_nodriver_engine = {

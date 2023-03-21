@@ -56,14 +56,13 @@ limitations under the License.
 #define PATH_MAX 4096
 #endif
 
-const chiseldir_info g_chisel_dirs_array[] =
-	{
-		{false, ""}, // file as is
+const chiseldir_info g_chisel_dirs_array[] = {
+	{false, ""}, // file as is
 #ifdef _WIN32
-		{false, "c:/sysdig/chisels/"},
+	{false, "c:/sysdig/chisels/"},
 #endif
-		{false, "./chisels/"},
-		{true, "~/.chisels/"},
+	{false, "./chisels/"},
+	{true, "~/.chisels/"},
 };
 
 vector<chiseldir_info>* g_chisel_dirs = NULL;
@@ -72,27 +71,27 @@ chisel_initializer g_chisel_initializer;
 #ifndef _WIN32
 static std::string realpath_ex(const std::string& path)
 {
-	char *home;
-	char* resolved;
+    char* home;
+    char* resolved;
 
-	if(!path.empty() && path[0]=='~' && (home = getenv("HOME")))
-	{
-		std::string expanded_home = home;
-		expanded_home += path.c_str()+1;
-		resolved = realpath(expanded_home.c_str(), nullptr);
-	}
-	else
-	{
-		resolved = realpath(path.c_str(), nullptr);
-	}
+    if(!path.empty() && path[0] == '~' && (home = getenv("HOME")))
+    {
+	std::string expanded_home = home;
+	expanded_home += path.c_str() + 1;
+	resolved = realpath(expanded_home.c_str(), nullptr);
+    }
+    else
+    {
+	resolved = realpath(path.c_str(), nullptr);
+    }
 
-	if (!resolved)
-	{
-		return "";
-	}
-	std::string ret = resolved;
-	free(resolved);
-	return resolved;
+    if(!resolved)
+    {
+	return "";
+    }
+    std::string ret = resolved;
+    free(resolved);
+    return resolved;
 }
 #endif
 
@@ -101,69 +100,71 @@ static std::string realpath_ex(const std::string& path)
 //
 chisel_initializer::chisel_initializer()
 {
-	//
-	// Init the chisel directory list
-	//
-	g_chisel_dirs = NULL;
-	g_chisel_dirs = new vector<chiseldir_info>();
+    //
+    // Init the chisel directory list
+    //
+    g_chisel_dirs = NULL;
+    g_chisel_dirs = new vector<chiseldir_info>();
 
-	for(uint32_t j = 0; j < sizeof(g_chisel_dirs_array) / sizeof(g_chisel_dirs_array[0]); j++)
+    for(uint32_t j = 0;
+	j < sizeof(g_chisel_dirs_array) / sizeof(g_chisel_dirs_array[0]); j++)
+    {
+	if(g_chisel_dirs_array[j].m_need_to_resolve)
 	{
-		if(g_chisel_dirs_array[j].m_need_to_resolve)
-		{
 #ifndef _WIN32
-			std::string resolved_path = realpath_ex(g_chisel_dirs_array[j].m_dir);
-			if(!resolved_path.empty())
-			{
-				if(resolved_path[resolved_path.size() - 1] != '/')
-				{
-					resolved_path += '/';
-				}
-
-				chiseldir_info cdi;
-				cdi.m_need_to_resolve = false;
-				cdi.m_dir = std::move(resolved_path);
-				g_chisel_dirs->push_back(cdi);
-			}
-#else
-			g_chisel_dirs->push_back(g_chisel_dirs_array[j]);
-#endif
-		}
-		else
+	    std::string resolved_path =
+		    realpath_ex(g_chisel_dirs_array[j].m_dir);
+	    if(!resolved_path.empty())
+	    {
+		if(resolved_path[resolved_path.size() - 1] != '/')
 		{
-			g_chisel_dirs->push_back(g_chisel_dirs_array[j]);
+		    resolved_path += '/';
 		}
+
+		chiseldir_info cdi;
+		cdi.m_need_to_resolve = false;
+		cdi.m_dir = std::move(resolved_path);
+		g_chisel_dirs->push_back(cdi);
+	    }
+#else
+	    g_chisel_dirs->push_back(g_chisel_dirs_array[j]);
+#endif
 	}
+	else
+	{
+	    g_chisel_dirs->push_back(g_chisel_dirs_array[j]);
+	}
+    }
 }
 
 chisel_initializer::~chisel_initializer()
 {
-	if(g_chisel_dirs)
-	{
-		delete g_chisel_dirs;
-	}
+    if(g_chisel_dirs)
+    {
+	delete g_chisel_dirs;
+    }
 }
 
 void chisel_add_dir(string dirname, bool front_add)
 {
-	trim(dirname);
+    trim(dirname);
 
-	if(dirname[dirname.size() -1] != '/')
-	{
-		dirname += "/";
-	}
+    if(dirname[dirname.size() - 1] != '/')
+    {
+	dirname += "/";
+    }
 
-	chiseldir_info ncdi;
+    chiseldir_info ncdi;
 
-	ncdi.m_dir = std::move(dirname);
-	ncdi.m_need_to_resolve = false;
+    ncdi.m_dir = std::move(dirname);
+    ncdi.m_need_to_resolve = false;
 
-	if(front_add)
-	{
-		g_chisel_dirs->insert(g_chisel_dirs->begin(), ncdi);
-	}
-	else
-	{
-		g_chisel_dirs->push_back(ncdi);
-	}
+    if(front_add)
+    {
+	g_chisel_dirs->insert(g_chisel_dirs->begin(), ncdi);
+    }
+    else
+    {
+	g_chisel_dirs->push_back(ncdi);
+    }
 }

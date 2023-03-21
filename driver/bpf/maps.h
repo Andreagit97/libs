@@ -9,14 +9,15 @@ or GPL2.txt for full copies of the license.
 #ifndef __MAPS_H
 #define __MAPS_H
 
-struct bpf_map_def {
-	unsigned int type;
-	unsigned int key_size;
-	unsigned int value_size;
-	unsigned int max_entries;
-	unsigned int map_flags;
-	unsigned int inner_map_idx;
-	unsigned int numa_node;
+struct bpf_map_def
+{
+    unsigned int type;
+    unsigned int key_size;
+    unsigned int value_size;
+    unsigned int max_entries;
+    unsigned int map_flags;
+    unsigned int inner_map_idx;
+    unsigned int numa_node;
 };
 
 #ifdef __KERNEL__

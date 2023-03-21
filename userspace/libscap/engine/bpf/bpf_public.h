@@ -17,10 +17,11 @@ limitations under the License.
 #pragma once
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-const char *scap_get_bpf_probe_from_env();
+    const char *scap_get_bpf_probe_from_env();
 
 #ifdef __cplusplus
 };

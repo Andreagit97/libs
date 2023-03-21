@@ -24,12 +24,12 @@ limitations under the License.
 */
 class sinsp_exception : public std::runtime_error
 {
-public:
-	sinsp_exception(const std::string& error_str):
-		std::runtime_error(error_str)
-	{ }
+    public:
+    sinsp_exception(const std::string& error_str): std::runtime_error(error_str)
+    {
+    }
 
-	sinsp_exception(const char* const error_str):
-		std::runtime_error(error_str)
-	{ }
+    sinsp_exception(const char* const error_str): std::runtime_error(error_str)
+    {
+    }
 };

@@ -30,27 +30,28 @@ class sinsp;
 //
 class filter_check_list
 {
-public:
-	filter_check_list();
-	~filter_check_list();
-	void add_filter_check(sinsp_filter_check* filter_check);
-	void get_all_fields(std::vector<const filter_check_info*>& list);
-	sinsp_filter_check* new_filter_check_from_another(sinsp_filter_check *chk);
-	sinsp_filter_check* new_filter_check_from_fldname(const std::string& name, sinsp* inspector, bool do_exact_check);
+    public:
+    filter_check_list();
+    ~filter_check_list();
+    void add_filter_check(sinsp_filter_check* filter_check);
+    void get_all_fields(std::vector<const filter_check_info*>& list);
+    sinsp_filter_check* new_filter_check_from_another(sinsp_filter_check* chk);
+    sinsp_filter_check* new_filter_check_from_fldname(const std::string& name,
+						      sinsp* inspector,
+						      bool do_exact_check);
 
-protected:
-	std::vector<sinsp_filter_check*> m_check_list;
+    protected:
+    std::vector<sinsp_filter_check*> m_check_list;
 };
 
 //
 // This bakes in the "default" set of filterchecks that work with syscalls
 class sinsp_filter_check_list : public filter_check_list
 {
-public:
-	sinsp_filter_check_list();
-	virtual ~sinsp_filter_check_list();
+    public:
+    sinsp_filter_check_list();
+    virtual ~sinsp_filter_check_list();
 };
 
 // This is the "default" filter check list
 extern sinsp_filter_check_list g_filterlist;
-

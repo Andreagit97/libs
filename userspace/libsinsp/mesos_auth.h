@@ -25,34 +25,35 @@ limitations under the License.
 #include "mesos_http.h"
 #include "uri.h"
 
-static const uint64_t DCOS_ENTERPRISE_TOKEN_REFRESH_S = 60*60*24; // 1 day
+static const uint64_t DCOS_ENTERPRISE_TOKEN_REFRESH_S = 60 * 60 * 24; // 1 day
 
 class mesos_auth
 {
-public:
-	mesos_auth(const uri::credentials_t& dcos_enterprise_credentials = uri::credentials_t(),
-		   std::string auth_hostname = "localhost",
-		   int token_refresh_interval = DCOS_ENTERPRISE_TOKEN_REFRESH_S);
-	virtual ~mesos_auth();
+    public:
+    mesos_auth(const uri::credentials_t& dcos_enterprise_credentials =
+		       uri::credentials_t(),
+	       std::string auth_hostname = "localhost",
+	       int token_refresh_interval = DCOS_ENTERPRISE_TOKEN_REFRESH_S);
+    virtual ~mesos_auth();
 
-	virtual void refresh_token();
+    virtual void refresh_token();
 
-	// Return the current token. The token may expire at any time
-	// after the token has been returned, so it's best to call
-	// get_token periodically, which will internally refresh the
-	// token if necessary.
-	std::string get_token();
+    // Return the current token. The token may expire at any time
+    // after the token has been returned, so it's best to call
+    // get_token periodically, which will internally refresh the
+    // token if necessary.
+    std::string get_token();
 
-protected:
-	std::string             m_token;
+    protected:
+    std::string m_token;
 
-private:
-	void authenticate();
+    private:
+    void authenticate();
 
-	const uri::credentials_t m_dcos_enterprise_credentials;
-	uri m_auth_uri;
-	int m_token_refresh_interval;
-	time_t m_last_token_refresh_s;
+    const uri::credentials_t m_dcos_enterprise_credentials;
+    uri m_auth_uri;
+    int m_token_refresh_interval;
+    time_t m_last_token_refresh_s;
 };
 
 #endif // MINIMAL_BUILD

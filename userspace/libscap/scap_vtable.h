@@ -23,30 +23,33 @@ limitations under the License.
 #include "scap_open.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-struct scap_stats;
-typedef struct scap scap_t;
-typedef struct ppm_evt_hdr scap_evt;
+    struct scap_stats;
+    typedef struct scap scap_t;
+    typedef struct ppm_evt_hdr scap_evt;
 
-/*
- * magic constants, matching the kmod-only ioctl numbers defined as:
-#define PPM_IOCTL_MAGIC	's'
-#define PPM_IOCTL_MASK_ZERO_EVENTS _IO(PPM_IOCTL_MAGIC, 5)
-#define PPM_IOCTL_MASK_SET_EVENT   _IO(PPM_IOCTL_MAGIC, 6)
-#define PPM_IOCTL_MASK_UNSET_EVENT _IO(PPM_IOCTL_MAGIC, 7)
- */
-enum scap_eventmask_op {
-	SCAP_EVENTMASK_ZERO = 0x7305, //< disable all events
-	SCAP_EVENTMASK_SET = 0x7306, //< enable an event
+    /*
+     * magic constants, matching the kmod-only ioctl numbers defined as:
+    #define PPM_IOCTL_MAGIC	's'
+    #define PPM_IOCTL_MASK_ZERO_EVENTS _IO(PPM_IOCTL_MAGIC, 5)
+    #define PPM_IOCTL_MASK_SET_EVENT   _IO(PPM_IOCTL_MAGIC, 6)
+    #define PPM_IOCTL_MASK_UNSET_EVENT _IO(PPM_IOCTL_MAGIC, 7)
+     */
+    enum scap_eventmask_op
+    {
+	SCAP_EVENTMASK_ZERO = 0x7305,  //< disable all events
+	SCAP_EVENTMASK_SET = 0x7306,   //< enable an event
 	SCAP_EVENTMASK_UNSET = 0x7307, //< disable an event
-};
+    };
 
-/**
- * @brief settings configurable for scap engines
- */
-enum scap_setting {
+    /**
+     * @brief settings configurable for scap engines
+     */
+    enum scap_setting
+    {
 	/**
 	 * @brief sampling ratio
 	 * arg1: sampling ratio (power of 2, <= 128)
@@ -95,13 +98,14 @@ enum scap_setting {
 	 * arg1: statsd port
 	 */
 	SCAP_STATSD_PORT,
-};
+    };
 
-struct scap_vtable {
+    struct scap_vtable
+    {
 	/**
 	 * @brief name of the engine
 	 */
-	const char* name;
+	const char *name;
 
 	/**
 	 * @brief one of the SCAP_MODE_* constants, designating the purpose
@@ -118,7 +122,7 @@ struct scap_vtable {
 	 * the `mode` field. If it is *not* NULL, the mode is checked before
 	 * calling `match()`.
 	 */
-	bool (*match)(scap_open_args* open_args);
+	bool (*match)(scap_open_args *open_args);
 
 	/**
 	 * @brief allocate an engine-specific handle
@@ -128,7 +132,7 @@ struct scap_vtable {
 	 *                    in the engine handle for easier access
 	 * @return pointer to the newly allocated handle or NULL
 	 */
-	SCAP_HANDLE_T* (*alloc_handle)(scap_t* main_handle, char *lasterr_ptr);
+	SCAP_HANDLE_T *(*alloc_handle)(scap_t *main_handle, char *lasterr_ptr);
 
 	/**
 	 * @brief perform engine-specific initialization
@@ -136,7 +140,7 @@ struct scap_vtable {
 	 * @param open_args a scap open request structure
 	 * @return SCAP_SUCCESS or a failure code
 	 */
-	int32_t (*init)(scap_t* main_handle, scap_open_args* open_args);
+	int32_t (*init)(scap_t *main_handle, scap_open_args *open_args);
 
 	/**
 	 * @brief free the engine-specific handle
@@ -167,7 +171,8 @@ struct scap_vtable {
 	 * The memory pointed to by *pevent must be owned by the engine
 	 * and must remain valid at least until the next call to next()
 	 */
-	int32_t (*next)(struct scap_engine_handle engine, scap_evt **pevent, uint16_t *pcpuid);
+	int32_t (*next)(struct scap_engine_handle engine, scap_evt **pevent,
+			uint16_t *pcpuid);
 
 	/**
 	 * @brief start a capture
@@ -192,7 +197,9 @@ struct scap_vtable {
 	 * @param arg2 setting-specific value
 	 * @return SCAP_SUCCESS or a failure code
 	 */
-	int32_t (*configure)(struct scap_engine_handle engine, enum scap_setting setting, unsigned long arg1, unsigned long arg2);
+	int32_t (*configure)(struct scap_engine_handle engine,
+			     enum scap_setting setting, unsigned long arg1,
+			     unsigned long arg2);
 
 	/**
 	 * @brief get engine statistics
@@ -200,7 +207,8 @@ struct scap_vtable {
 	 * @param stats the stats struct to be filled
 	 * @return SCAP_SUCCESS or a failure code
 	 */
-	int32_t (*get_stats)(struct scap_engine_handle engine, struct scap_stats *stats);
+	int32_t (*get_stats)(struct scap_engine_handle engine,
+			     struct scap_stats *stats);
 
 	/**
 	 * @brief get the number of tracepoint hits
@@ -208,7 +216,8 @@ struct scap_vtable {
 	 * @param ret [out] the number of hits
 	 * @return SCAP_SUCCESS or a failure code
 	 */
-	int32_t (*get_n_tracepoint_hit)(struct scap_engine_handle engine, long *ret);
+	int32_t (*get_n_tracepoint_hit)(struct scap_engine_handle engine,
+					long *ret);
 
 	/**
 	 * @brief get the number of used devices
@@ -225,7 +234,8 @@ struct scap_vtable {
 	uint64_t (*get_max_buf_used)(struct scap_engine_handle engine);
 
 	/**
-	 * @brief get the list of all threads in the system, with their cpu usage
+	 * @brief get the list of all threads in the system, with their cpu
+	 * usage
 	 * @param engine wraps the pointer to the engine-specific handle
 	 * @param procinfo_p pointer to pointer to the resulting list
 	 * @param lasterr pointer to a buffer of SCAP_LASTERR_SIZE bytes
@@ -235,29 +245,36 @@ struct scap_vtable {
 	 * `procinfo_p` must not be NULL, but `*procinfo_p` may be; the returned
 	 * list will be (re)allocated on demand
 	 */
-	int32_t (*get_threadlist)(struct scap_engine_handle engine, struct ppm_proclist_info **procinfo_p, char *lasterr);
+	int32_t (*get_threadlist)(struct scap_engine_handle engine,
+				  struct ppm_proclist_info **procinfo_p,
+				  char *lasterr);
 
 	/**
 	 * @brief get information about all threads in the system
 	 * @param engine wraps the pointer to the engine-specific handle
 	 * @param n [out] the number of scap_threadinfo structures returned
 	 * @param tinfos [out] an array of scap_threadinfo structures
-	 * 				 that represent the state of the system, owned by the engine
+	 * 				 that represent the state of the system,
+	 * owned by the engine
 	 * @return SCAP_SUCCESS or a failure code
 	 *
 	 */
-	int32_t (*get_threadinfos)(struct scap_engine_handle engine, uint64_t *n, const scap_threadinfo **tinfos);
+	int32_t (*get_threadinfos)(struct scap_engine_handle engine,
+				   uint64_t *n, const scap_threadinfo **tinfos);
 
 	/**
-	 * @brief get information about file descriptors for a thread that was identified by get_threadinfos
+	 * @brief get information about file descriptors for a thread that was
+	 * identified by get_threadinfos
 	 * @param engine wraps the pointer to the engine-specific handle
 	 * @param tinfo a thread pointer returned by get_threadinfos
-	 * @param n [out] the number of scap_fdinfo structures returned 
+	 * @param n [out] the number of scap_fdinfo structures returned
 	 * @param fdinfos [out] an array of scap_fdinfo structures
 	 * @return SCAP_SUCCESS or a failure code
 	 *
 	 */
-	int32_t (*get_fdinfos)(struct scap_engine_handle engine, const scap_threadinfo *tinfo, uint64_t *n, const scap_fdinfo **fdinfos);
+	int32_t (*get_fdinfos)(struct scap_engine_handle engine,
+			       const scap_threadinfo *tinfo, uint64_t *n,
+			       const scap_fdinfo **fdinfos);
 
 	/**
 	 * @brief get the vpid of a process
@@ -269,7 +286,8 @@ struct scap_vtable {
 	 * `vpid` is the pid as seen by the process itself, i.e. within its
 	 * PID namespace
 	 */
-	int32_t (*get_vpid)(struct scap_engine_handle engine, uint64_t pid, int64_t *vpid);
+	int32_t (*get_vpid)(struct scap_engine_handle engine, uint64_t pid,
+			    int64_t *vpid);
 
 	/**
 	 * @brief get the vtid of a process
@@ -281,7 +299,8 @@ struct scap_vtable {
 	 * `vtid` is the tid as seen by the process itself, i.e. within its
 	 * PID namespace
 	 */
-	int32_t (*get_vtid)(struct scap_engine_handle engine, uint64_t tid, int64_t *vtid);
+	int32_t (*get_vtid)(struct scap_engine_handle engine, uint64_t tid,
+			    int64_t *vtid);
 
 	/**
 	 * @brief get the current process id in the init pid namespace
@@ -290,8 +309,9 @@ struct scap_vtable {
 	 * @param error a SCAP_LASTERR_SIZE buffer for error messages
 	 * @return SCAP_SUCCESS or a failure code
 	 */
-	int32_t (*getpid_global)(struct scap_engine_handle engine, int64_t* pid, char* error);
-};
+	int32_t (*getpid_global)(struct scap_engine_handle engine, int64_t *pid,
+				 char *error);
+    };
 
 #ifdef __cplusplus
 }

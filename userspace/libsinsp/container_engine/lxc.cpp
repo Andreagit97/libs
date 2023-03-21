@@ -20,51 +20,52 @@ limitations under the License.
 
 using namespace libsinsp::container_engine;
 
-bool lxc::resolve(sinsp_threadinfo *tinfo, bool query_os_for_missing_info)
+bool lxc::resolve(sinsp_threadinfo* tinfo, bool query_os_for_missing_info)
 {
-	auto container = sinsp_container_info();
-	bool matches = false;
+    auto container = sinsp_container_info();
+    bool matches = false;
 
-	for(const auto& it : tinfo->m_cgroups)
+    for(const auto& it : tinfo->m_cgroups)
+    {
+	//
+	// Non-systemd LXC
+	//
+	const auto& cgroup = it.second;
+	size_t pos = cgroup.find("/lxc/");
+	if(pos != std::string::npos)
 	{
-		//
-		// Non-systemd LXC
-		//
-		const auto& cgroup = it.second;
-		size_t pos = cgroup.find("/lxc/");
-		if(pos != std::string::npos)
-		{
-			auto id_start = pos + sizeof("/lxc/") - 1;
-			auto id_end = cgroup.find('/', id_start);
-			container.m_type = CT_LXC;
-			container.m_id = cgroup.substr(id_start, id_end - id_start);
-			matches = true;
-			break;
-		}
-
-		pos = cgroup.find("/lxc.payload/");
-		if(pos != std::string::npos)
-		{
-			auto id_start = pos + sizeof("/lxc.payload/") - 1;
-			auto id_end = cgroup.find('/', id_start);
-			container.m_type = CT_LXC;
-			container.m_id = cgroup.substr(id_start, id_end - id_start);
-			matches = true;
-			break;
-		}
+	    auto id_start = pos + sizeof("/lxc/") - 1;
+	    auto id_end = cgroup.find('/', id_start);
+	    container.m_type = CT_LXC;
+	    container.m_id = cgroup.substr(id_start, id_end - id_start);
+	    matches = true;
+	    break;
 	}
 
-	if (!matches)
+	pos = cgroup.find("/lxc.payload/");
+	if(pos != std::string::npos)
 	{
-		return false;
+	    auto id_start = pos + sizeof("/lxc.payload/") - 1;
+	    auto id_end = cgroup.find('/', id_start);
+	    container.m_type = CT_LXC;
+	    container.m_id = cgroup.substr(id_start, id_end - id_start);
+	    matches = true;
+	    break;
 	}
+    }
 
-	tinfo->m_container_id = container.m_id;
-	if (container_cache().should_lookup(container.m_id, CT_LXC))
-	{
-		container.m_name = container.m_id;
-		container_cache().add_container(std::make_shared<sinsp_container_info>(container), tinfo);
-		container_cache().notify_new_container(container, tinfo);
-	}
-	return true;
+    if(!matches)
+    {
+	return false;
+    }
+
+    tinfo->m_container_id = container.m_id;
+    if(container_cache().should_lookup(container.m_id, CT_LXC))
+    {
+	container.m_name = container.m_id;
+	container_cache().add_container(
+		std::make_shared<sinsp_container_info>(container), tinfo);
+	container_cache().notify_new_container(container, tinfo);
+    }
+    return true;
 }

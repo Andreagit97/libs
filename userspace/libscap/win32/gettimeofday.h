@@ -22,18 +22,17 @@ limitations under the License.
 
 static inline uint64_t get_timestamp_ns()
 {
-	uint64_t ts;
+    uint64_t ts;
 
-	FILETIME ft;
-	static const uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
+    FILETIME ft;
+    static const uint64_t EPOCH = ((uint64_t)116444736000000000ULL);
 
-	GetSystemTimePreciseAsFileTime(&ft);
+    GetSystemTimePreciseAsFileTime(&ft);
 
-	uint64_t ftl = (((uint64_t)ft.dwHighDateTime) << 32) + ft.dwLowDateTime;
-	ftl -= EPOCH;
+    uint64_t ftl = (((uint64_t)ft.dwHighDateTime) << 32) + ft.dwLowDateTime;
+    ftl -= EPOCH;
 
-	ts = ftl * 100;
+    ts = ftl * 100;
 
-	return ts;
+    return ts;
 }
-

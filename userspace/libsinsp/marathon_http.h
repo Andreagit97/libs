@@ -29,19 +29,20 @@ limitations under the License.
 
 class marathon_http : public mesos_http
 {
-public:
-	typedef std::shared_ptr<marathon_http> ptr_t;
+    public:
+    typedef std::shared_ptr<marathon_http> ptr_t;
 
-	marathon_http(mesos& m, const uri& url, bool discover_marathon, int timeout_ms = 5000L, const string& token = "");
+    marathon_http(mesos& m, const uri& url, bool discover_marathon,
+		  int timeout_ms = 5000L, const string& token = "");
 
-	~marathon_http();
+    ~marathon_http();
 
-	bool refresh_data();
+    bool refresh_data();
 
-	std::string get_groups(const std::string& group_id);
+    std::string get_groups(const std::string& group_id);
 
-private:
-	std::string m_data;
+    private:
+    std::string m_data;
 };
 
 #endif // HAS_CAPTURE

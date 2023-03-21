@@ -23,8 +23,8 @@ limitations under the License.
 */
 class sinsp_capture_interrupt_exception : public sinsp_exception
 {
-public:
-	sinsp_capture_interrupt_exception():
-		sinsp_exception("capture interrupted")
-	{ }
+    public:
+    sinsp_capture_interrupt_exception(): sinsp_exception("capture interrupted")
+    {
+    }
 };

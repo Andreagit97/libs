@@ -15,7 +15,8 @@ or GPL2.txt for full copies of the license.
 #endif
 
 /*
- * Our Own ASSERT implementation, so we can easily switch among BUG_ON, WARN_ON and nothing
+ * Our Own ASSERT implementation, so we can easily switch among BUG_ON, WARN_ON
+ * and nothing
  */
 #ifndef UDIG
 #ifdef _DEBUG
@@ -30,10 +31,10 @@ or GPL2.txt for full copies of the license.
  * Global defines
  */
 #define CAPTURE_CONTEXT_SWITCHES
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 32))
+#if(LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 32))
 #define CAPTURE_SIGNAL_DELIVERIES
 #endif
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 12, 0)) && defined(CONFIG_X86)
+#if(LINUX_VERSION_CODE > KERNEL_VERSION(3, 12, 0)) && defined(CONFIG_X86)
 #define CAPTURE_PAGE_FAULTS
 #endif
 #endif // UDIG
@@ -51,43 +52,45 @@ typedef u64 nanoseconds;
  * The ring descriptor.
  * We have one of these for each CPU.
  */
-struct ppm_ring_buffer_context {
-	bool cpu_online;
-	bool open;
-	bool capture_enabled;
-	struct ppm_ring_buffer_info *info;
-	char *buffer;
+struct ppm_ring_buffer_context
+{
+    bool cpu_online;
+    bool open;
+    bool capture_enabled;
+    struct ppm_ring_buffer_info *info;
+    char *buffer;
 #ifndef WDIG
-	nanoseconds last_print_time;
+    nanoseconds last_print_time;
 #endif
-	u32 nevents;
+    u32 nevents;
 #ifndef UDIG
-	atomic_t preempt_count;
-#endif	
-	char *str_storage;	/* String storage. Size is one page. */
+    atomic_t preempt_count;
+#endif
+    char *str_storage; /* String storage. Size is one page. */
 };
 
 #ifndef UDIG
-struct ppm_consumer_t {
-	struct task_struct *consumer_id;
+struct ppm_consumer_t
+{
+    struct task_struct *consumer_id;
 #ifdef __percpu
-	struct ppm_ring_buffer_context __percpu *ring_buffers;
+    struct ppm_ring_buffer_context __percpu *ring_buffers;
 #else
-	struct ppm_ring_buffer_context *ring_buffers;
+    struct ppm_ring_buffer_context *ring_buffers;
 #endif
-	u32 snaplen;
-	u32 sampling_ratio;
-	bool do_dynamic_snaplen;
-	u32 sampling_interval;
-	int is_dropping;
-	int dropping_mode;
-	volatile int need_to_insert_drop_e;
-	volatile int need_to_insert_drop_x;
-	struct list_head node;
-	uint16_t fullcapture_port_range_start;
-	uint16_t fullcapture_port_range_end;
-	uint16_t statsd_port;
-	DECLARE_BITMAP(events_mask, PPM_EVENT_MAX);
+    u32 snaplen;
+    u32 sampling_ratio;
+    bool do_dynamic_snaplen;
+    u32 sampling_interval;
+    int is_dropping;
+    int dropping_mode;
+    volatile int need_to_insert_drop_e;
+    volatile int need_to_insert_drop_x;
+    struct list_head node;
+    uint16_t fullcapture_port_range_start;
+    uint16_t fullcapture_port_range_end;
+    uint16_t statsd_port;
+    DECLARE_BITMAP(events_mask, PPM_EVENT_MAX);
 };
 #endif // UDIG
 
@@ -105,9 +108,11 @@ typedef unsigned long syscall_arg_t;
  * These are analogous to get_user(), copy_from_user() and strncpy_from_user(),
  * but they can't sleep, barf on page fault or be preempted
  */
-#define ppm_get_user(x, ptr) (ppm_copy_from_user(&x, ptr, sizeof(x)) ? -EFAULT : 0)
+#define ppm_get_user(x, ptr)                                                   \
+    (ppm_copy_from_user(&x, ptr, sizeof(x)) ? -EFAULT : 0)
 #ifndef UDIG
-unsigned long ppm_copy_from_user(void *to, const void __user *from, unsigned long n);
+unsigned long ppm_copy_from_user(void *to, const void __user *from,
+				 unsigned long n);
 long ppm_strncpy_from_user(char *to, const char __user *from, unsigned long n);
 #endif // UDIG
 
@@ -116,17 +121,17 @@ long ppm_strncpy_from_user(char *to, const char __user *from, unsigned long n);
  */
 
 #ifdef CONFIG_MIPS
-  #define SYSCALL_TABLE_ID0 __NR_Linux
+#define SYSCALL_TABLE_ID0 __NR_Linux
 #elif defined CONFIG_ARM
-  #define SYSCALL_TABLE_ID0 __NR_SYSCALL_BASE
+#define SYSCALL_TABLE_ID0 __NR_SYSCALL_BASE
 #elif defined CONFIG_X86 || defined CONFIG_SUPERH
-  #define SYSCALL_TABLE_ID0 0
+#define SYSCALL_TABLE_ID0 0
 #elif defined CONFIG_PPC64
-  #define SYSCALL_TABLE_ID0 0
+#define SYSCALL_TABLE_ID0 0
 #elif defined CONFIG_S390
-  #define SYSCALL_TABLE_ID0 0
+#define SYSCALL_TABLE_ID0 0
 #elif defined CONFIG_ARM64
-  #define SYSCALL_TABLE_ID0 0
+#define SYSCALL_TABLE_ID0 0
 #endif
 
 extern const struct syscall_evt_pair g_syscall_table[];
@@ -139,7 +144,9 @@ extern const enum ppm_syscall_code g_syscall_ia32_code_routing_table[];
 #endif
 
 #ifndef UDIG
-extern void ppm_syscall_get_arguments(struct task_struct *task, struct pt_regs *regs, unsigned long *args);
+extern void ppm_syscall_get_arguments(struct task_struct *task,
+				      struct pt_regs *regs,
+				      unsigned long *args);
 #endif
 
 #define NS_TO_SEC(_ns) ((_ns) / 1000000000)

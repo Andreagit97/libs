@@ -28,27 +28,26 @@ class sinsp;
 
 class k8s_namespace_handler : public k8s_handler
 {
-public:
-	k8s_namespace_handler(k8s_state_t& state
+    public:
+    k8s_namespace_handler(k8s_state_t& state
 #if defined(HAS_CAPTURE) && !defined(_WIN32)
-		,ptr_t dependency_handler
-		,collector_ptr_t collector = nullptr
-		,std::string url = ""
-		,const std::string& http_version = "1.1"
-		,ssl_ptr_t ssl = 0
-		,bt_ptr_t bt = 0
-		,bool connect = true
-		,bool blocking_socket = false
+			  ,
+			  ptr_t dependency_handler,
+			  collector_ptr_t collector = nullptr,
+			  std::string url = "",
+			  const std::string& http_version = "1.1",
+			  ssl_ptr_t ssl = 0, bt_ptr_t bt = 0,
+			  bool connect = true, bool blocking_socket = false
 #endif // HAS_CAPTURE
-		);
+    );
 
-	~k8s_namespace_handler();
+    ~k8s_namespace_handler();
 
-private:
-	static std::string EVENT_FILTER;
-	static std::string STATE_FILTER;
+    private:
+    static std::string EVENT_FILTER;
+    static std::string STATE_FILTER;
 
-	bool handle_component(const Json::Value& json, const msg_data* data = 0);
+    bool handle_component(const Json::Value& json, const msg_data* data = 0);
 };
 
 #endif // MINIMAL_BUILD

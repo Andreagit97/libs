@@ -29,33 +29,32 @@ class sinsp;
 
 class k8s_pod_handler : public k8s_handler
 {
-public:
-	k8s_pod_handler(k8s_state_t& state
+    public:
+    k8s_pod_handler(k8s_state_t& state
 #if defined(HAS_CAPTURE) && !defined(_WIN32)
-		,ptr_t dependency_handler
-		,collector_ptr_t collector = nullptr
-		,std::string url = ""
-		,const std::string& http_version = "1.1"
-		,ssl_ptr_t ssl = 0
-		,bt_ptr_t bt = 0
-		,bool connect = true
-		,bool blocking_socket = false
-		,std::string node_selector = ""
+		    ,
+		    ptr_t dependency_handler,
+		    collector_ptr_t collector = nullptr, std::string url = "",
+		    const std::string& http_version = "1.1", ssl_ptr_t ssl = 0,
+		    bt_ptr_t bt = 0, bool connect = true,
+		    bool blocking_socket = false, std::string node_selector = ""
 #endif // HAS_CAPTURE
-		);
+    );
 
-	~k8s_pod_handler();
+    ~k8s_pod_handler();
 
-	static std::vector<std::string> extract_pod_container_ids(const Json::Value& item);
-	static k8s_container::list extract_pod_containers(const Json::Value& item);
-	static void extract_pod_data(const Json::Value& item, k8s_pod_t& pod);
-	static size_t extract_pod_restart_count(const Json::Value& item);
+    static std::vector<std::string>
+    extract_pod_container_ids(const Json::Value& item);
+    static k8s_container::list extract_pod_containers(const Json::Value& item);
+    static void extract_pod_data(const Json::Value& item, k8s_pod_t& pod);
+    static size_t extract_pod_restart_count(const Json::Value& item);
 
-private:
-	static std::string EVENT_FILTER;
-	static std::string STATE_FILTER;
+    private:
+    static std::string EVENT_FILTER;
+    static std::string STATE_FILTER;
 
-	virtual bool handle_component(const Json::Value& json, const msg_data* data = 0);
+    virtual bool handle_component(const Json::Value& json,
+				  const msg_data* data = 0);
 };
 
 #endif // MINIMAL_BUILD

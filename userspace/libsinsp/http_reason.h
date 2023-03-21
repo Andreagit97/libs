@@ -22,9 +22,9 @@ limitations under the License.
 
 class http_reason
 {
-public:
-	static std::string get(int status);
+    public:
+    static std::string get(int status);
 
-private:
-	static const std::map<int, std::string> m_http_reason;
+    private:
+    static const std::map<int, std::string> m_http_reason;
 };

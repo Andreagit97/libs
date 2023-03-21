@@ -26,113 +26,121 @@ limitations under the License.
 #include <sinsp.h>
 #include "fields_info.h"
 
-static void list_fields_markdown(std::list<gen_event_filter_factory::filter_fieldclass_info> &fld_classes)
+static void
+list_fields_markdown(std::list<gen_event_filter_factory::filter_fieldclass_info>
+			     &fld_classes)
 {
-	for(auto &fld_class : fld_classes)
+    for(auto &fld_class : fld_classes)
+    {
+	printf("\n## Field Class: %s\n\n", fld_class.name.c_str());
+	printf("%s\n\n", fld_class.desc.c_str());
+	printf("Name | Type | Description\n");
+	printf(":----|:-----|:-----------\n");
+
+	for(auto &fld_info : fld_class.fields)
 	{
-		printf("\n## Field Class: %s\n\n", fld_class.name.c_str());
-		printf("%s\n\n", fld_class.desc.c_str());
-		printf("Name | Type | Description\n");
-		printf(":----|:-----|:-----------\n");
+	    // Skip fields with the EPF_TABLE_ONLY flag.
+	    if(fld_info.is_skippable())
+	    {
+		continue;
+	    }
 
-		for(auto &fld_info : fld_class.fields)
-		{
-			// Skip fields with the EPF_TABLE_ONLY flag.
-			if(fld_info.is_skippable())
-			{
-				continue;
-			}
-
-			printf("`%s` | %s | %s\n", fld_info.name.c_str(), fld_info.data_type.c_str(), fld_info.desc.c_str());
-		}
+	    printf("`%s` | %s | %s\n", fld_info.name.c_str(),
+		   fld_info.data_type.c_str(), fld_info.desc.c_str());
 	}
+    }
 }
 
 void list_fields(bool verbose, bool markdown)
 {
-	vector<const filter_check_info*> fc_plugins;
-	std::list<gen_event_filter_factory::filter_fieldclass_info> fld_classes;
+    vector<const filter_check_info *> fc_plugins;
+    std::list<gen_event_filter_factory::filter_fieldclass_info> fld_classes;
 
-	sinsp::get_filtercheck_fields_info(fc_plugins);
+    sinsp::get_filtercheck_fields_info(fc_plugins);
 
-	fld_classes = sinsp_filter_factory::check_infos_to_fieldclass_infos(fc_plugins);
+    fld_classes =
+	    sinsp_filter_factory::check_infos_to_fieldclass_infos(fc_plugins);
+
+    if(markdown)
+    {
+	list_fields_markdown(fld_classes);
+    }
+    else
+    {
+	for(auto &fld_class : fld_classes)
+	{
+	    printf("%s\n", fld_class.as_string(verbose).c_str());
+	}
+    }
+}
+
+void list_events(sinsp *inspector, bool markdown)
+{
+    uint32_t j, k;
+    string tstr;
+
+    sinsp_evttables *einfo = inspector->get_event_info_tables();
+    const struct ppm_event_info *etable = einfo->m_event_info;
+
+    if(markdown)
+    {
+	printf("Falco | Dir | Event\n");
+	printf(":-----|:----|:-----\n");
+    }
+
+    for(j = 0; j < PPM_EVENT_MAX; j++)
+    {
+	const struct ppm_event_info ei = etable[j];
+	char dir = (PPME_IS_ENTER(j)) ? '>' : '<';
+
+	if((ei.flags & EF_UNUSED) || (ei.flags & EF_OLD_VERSION) ||
+	   (ei.category & EC_INTERNAL))
+	{
+	    continue;
+	}
 
 	if(markdown)
 	{
-		list_fields_markdown(fld_classes);
+	    if(sinsp::simple_consumer_consider_evtnum(j))
+	    {
+		printf("Yes");
+	    }
+	    else
+	    {
+		printf("No");
+	    }
+
+	    printf(" | %c | **%s**(", dir, ei.name);
+
+	    for(k = 0; k < ei.nparams; k++)
+	    {
+		if(k != 0)
+		{
+		    printf(", ");
+		}
+
+		printf("%s %s", param_type_to_string(ei.params[k].type),
+		       ei.params[k].name);
+	    }
+
+	    printf(")\n");
 	}
 	else
 	{
-		for(auto &fld_class : fld_classes)
+	    printf("%c %s(", dir, ei.name);
+
+	    for(k = 0; k < ei.nparams; k++)
+	    {
+		if(k != 0)
 		{
-			printf("%s\n", fld_class.as_string(verbose).c_str());
-		}
-	}
-}
-
-void list_events(sinsp* inspector, bool markdown)
-{
-	uint32_t j, k;
-	string tstr;
-
-	sinsp_evttables* einfo = inspector->get_event_info_tables();
-	const struct ppm_event_info* etable = einfo->m_event_info;
-
-	if(markdown)
-	{
-		printf("Falco | Dir | Event\n");
-		printf(":-----|:----|:-----\n");
-	}
-
-	for(j = 0; j < PPM_EVENT_MAX; j++)
-	{
-		const struct ppm_event_info ei = etable[j];
-		char dir = (PPME_IS_ENTER(j))? '>' : '<';
-
-		if((ei.flags & EF_UNUSED) || (ei.flags & EF_OLD_VERSION) || (ei.category & EC_INTERNAL))
-		{
-			continue;
+		    printf(", ");
 		}
 
-		if(markdown)
-		{
-			if(sinsp::simple_consumer_consider_evtnum(j))
-			{
-				printf("Yes");
-			} else {
-				printf("No");
-			}
+		printf("%s %s", param_type_to_string(ei.params[k].type),
+		       ei.params[k].name);
+	    }
 
-			printf(" | %c | **%s**(", dir, ei.name);
-
-			for(k = 0; k < ei.nparams; k++)
-			{
-				if(k != 0)
-				{
-					printf(", ");
-				}
-
-				printf("%s %s", param_type_to_string(ei.params[k].type),
-					ei.params[k].name);
-			}
-
-			printf(")\n");
-		} else
-		{
-			printf("%c %s(", dir, ei.name);
-
-			for(k = 0; k < ei.nparams; k++)
-			{
-				if(k != 0)
-				{
-					printf(", ");
-				}
-
-				printf("%s %s", param_type_to_string(ei.params[k].type),
-					ei.params[k].name);
-			}
-
-			printf(")\n");
-		}
+	    printf(")\n");
 	}
+    }
 }

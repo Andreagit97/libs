@@ -30,13 +30,15 @@ limitations under the License.
 #include "../../driver/ppm_events_public.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-/*!
-  \brief Arguments for scap_open
-*/
-typedef enum {
+    /*!
+      \brief Arguments for scap_open
+    */
+    typedef enum
+    {
 	/*!
 	 * Default value that mostly exists so that sinsp can have a valid value
 	 * before it is initialized.
@@ -56,44 +58,63 @@ typedef enum {
 	 */
 	SCAP_MODE_NODRIVER,
 	/*!
-	 * Do not read system call data. Events come from the configured input plugin.
+	 * Do not read system call data. Events come from the configured input
+	 * plugin.
 	 */
 	SCAP_MODE_PLUGIN,
-} scap_mode_t;
+    } scap_mode_t;
 
-/*!
-  \brief Argument for scap_open
-  Set any PPM_SC syscall idx to true to enable its tracing at driver level,
-  otherwise syscalls are not traced (so called "uninteresting syscalls").
-*/
-typedef struct {
+    /*!
+      \brief Argument for scap_open
+      Set any PPM_SC syscall idx to true to enable its tracing at driver level,
+      otherwise syscalls are not traced (so called "uninteresting syscalls").
+    */
+    typedef struct
+    {
 	bool ppm_sc[PPM_SC_MAX];
-} interesting_ppm_sc_set;
+    } interesting_ppm_sc_set;
 
-typedef struct scap_open_args
-{
+    typedef struct scap_open_args
+    {
 	scap_mode_t mode;
-	int fd; // If non-zero, will be used instead of fname.
-	const char* fname; ///< The name of the file to open. NULL for live captures.
-	proc_entry_callback proc_callback; ///< Callback to be invoked for each thread/fd that is extracted from /proc, or NULL if no callback is needed.
-	void* proc_callback_context; ///< Opaque pointer that will be included in the calls to proc_callback. Ignored if proc_callback is NULL.
-	bool import_users; ///< true if the user list should be created when opening the capture.
-	uint64_t start_offset; ///< Used to start reading a capture file from an arbitrary offset. This is leveraged when opening merged files.
-	const char *bpf_probe; ///< The name of the BPF probe to open. If NULL, the kernel driver will be used.
-	const char *suppressed_comms[SCAP_MAX_SUPPRESSED_COMMS]; ///< A list of processes (comm) for which no
+	int fd;		   // If non-zero, will be used instead of fname.
+	const char* fname; ///< The name of the file to open. NULL for live
+			   ///< captures.
+	proc_entry_callback
+		proc_callback; ///< Callback to be invoked for each thread/fd
+			       ///< that is extracted from /proc, or NULL if no
+			       ///< callback is needed.
+	void* proc_callback_context; ///< Opaque pointer that will be included
+				     ///< in the calls to proc_callback. Ignored
+				     ///< if proc_callback is NULL.
+	bool import_users;     ///< true if the user list should be created when
+			       ///< opening the capture.
+	uint64_t start_offset; ///< Used to start reading a capture file from an
+			       ///< arbitrary offset. This is leveraged when
+			       ///< opening merged files.
+	const char* bpf_probe; ///< The name of the BPF probe to open. If NULL,
+			       ///< the kernel driver will be used.
+	const char* suppressed_comms
+		[SCAP_MAX_SUPPRESSED_COMMS]; ///< A list of processes (comm) for
+					     ///< which no
 	// events should be returned, with a trailing NULL value.
 	// You can provide additional comm
 	// values via scap_suppress_events_comm().
-	bool udig; ///< If true, UDIG will be used for event capture.
+	bool udig;   ///< If true, UDIG will be used for event capture.
 	bool gvisor; //< If true, gVisor will be used for event capture
-	const char *gvisor_root_path; ///< When using gvisor, the root path used by runsc commands
-	const char *gvisor_config_path; ///< When using gvisor, the path to the configuration file
+	const char* gvisor_root_path; ///< When using gvisor, the root path used
+				      ///< by runsc commands
+	const char* gvisor_config_path; ///< When using gvisor, the path to the
+					///< configuration file
 
 	interesting_ppm_sc_set ppm_sc_of_interest;
 
-	scap_source_plugin* input_plugin; ///< use this to configure a source plugin that will produce the events for this capture
-	char* input_plugin_params; ///< optional parameters string for the source plugin pointed by src_plugin
-}scap_open_args;
+	scap_source_plugin*
+		input_plugin; ///< use this to configure a source plugin that
+			      ///< will produce the events for this capture
+	char* input_plugin_params; ///< optional parameters string for the
+				   ///< source plugin pointed by src_plugin
+    } scap_open_args;
 
 #ifdef __cplusplus
 }

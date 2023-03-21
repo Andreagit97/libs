@@ -28,14 +28,18 @@ class sinsp_threadinfo;
 #include "container_info.h"
 #include <cri.h>
 
-namespace runtime {
-namespace v1alpha2 {
+namespace runtime
+{
+namespace v1alpha2
+{
 class ContainerStatusResponse;
 }
-}
+} // namespace runtime
 
-namespace libsinsp {
-namespace container_engine {
+namespace libsinsp
+{
+namespace container_engine
+{
 
 /**
  * Asynchronous metadata lookup for CRI containers
@@ -47,50 +51,54 @@ namespace container_engine {
  * for a short while, so we should delay the query a bit.
  */
 class cri_async_source : public libsinsp::async_key_value_source<
-        libsinsp::cgroup_limits::cgroup_limits_key,
-        sinsp_container_info>
+				 libsinsp::cgroup_limits::cgroup_limits_key,
+				 sinsp_container_info>
 {
-public:
-	explicit cri_async_source(container_cache_interface *cache, ::libsinsp::cri::cri_interface *cri, uint64_t ttl_ms) :
-		async_key_value_source(NO_WAIT_LOOKUP, ttl_ms),
-		m_cache(cache),
-		m_cri(cri)
-	{
-	}
+    public:
+    explicit cri_async_source(container_cache_interface* cache,
+			      ::libsinsp::cri::cri_interface* cri,
+			      uint64_t ttl_ms):
+	    async_key_value_source(NO_WAIT_LOOKUP, ttl_ms),
+	    m_cache(cache), m_cri(cri)
+    {
+    }
 
-	void quiesce() {
-		async_key_value_source::stop();
-	}
+    void quiesce() { async_key_value_source::stop(); }
 
-	bool lookup_sync(const libsinsp::cgroup_limits::cgroup_limits_key& key,
-		    sinsp_container_info& value);
+    bool lookup_sync(const libsinsp::cgroup_limits::cgroup_limits_key& key,
+		     sinsp_container_info& value);
 
-	bool parse_cri(sinsp_container_info& container, const libsinsp::cgroup_limits::cgroup_limits_key& key);
-private:
-	bool parse_containerd(const runtime::v1alpha2::ContainerStatusResponse& status, sinsp_container_info& container);
-	void run_impl() override;
+    bool parse_cri(sinsp_container_info& container,
+		   const libsinsp::cgroup_limits::cgroup_limits_key& key);
 
-	container_cache_interface *m_cache;
-	::libsinsp::cri::cri_interface *m_cri;
+    private:
+    bool
+    parse_containerd(const runtime::v1alpha2::ContainerStatusResponse& status,
+		     sinsp_container_info& container);
+    void run_impl() override;
+
+    container_cache_interface* m_cache;
+    ::libsinsp::cri::cri_interface* m_cri;
 };
 
 class cri : public container_engine_base
 {
-public:
-	cri(container_cache_interface &cache);
-	bool resolve(sinsp_threadinfo *tinfo, bool query_os_for_missing_info) override;
-	void update_with_size(const std::string& container_id) override;
-	void cleanup() override;
-	static void set_cri_socket_path(const std::string& path);
-	static void add_cri_socket_path(const std::string& path);
-	static void set_cri_timeout(int64_t timeout_ms);
-	static void set_extra_queries(bool extra_queries);
-	static void set_async(bool async_limits);
-	static void set_cri_delay(uint64_t delay_ms);
+    public:
+    cri(container_cache_interface& cache);
+    bool resolve(sinsp_threadinfo* tinfo,
+		 bool query_os_for_missing_info) override;
+    void update_with_size(const std::string& container_id) override;
+    void cleanup() override;
+    static void set_cri_socket_path(const std::string& path);
+    static void add_cri_socket_path(const std::string& path);
+    static void set_cri_timeout(int64_t timeout_ms);
+    static void set_extra_queries(bool extra_queries);
+    static void set_async(bool async_limits);
+    static void set_cri_delay(uint64_t delay_ms);
 
-private:
-	std::unique_ptr<cri_async_source> m_async_source;
-	std::unique_ptr<::libsinsp::cri::cri_interface> m_cri;
+    private:
+    std::unique_ptr<cri_async_source> m_async_source;
+    std::unique_ptr<::libsinsp::cri::cri_interface> m_cri;
 };
-}
-}
+} // namespace container_engine
+} // namespace libsinsp

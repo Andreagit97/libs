@@ -19,6 +19,5 @@ limitations under the License.
 
 const char *scap_get_bpf_probe_from_env()
 {
-	return getenv(SCAP_BPF_PROBE_ENV_VAR_NAME);
+    return getenv(SCAP_BPF_PROBE_ENV_VAR_NAME);
 }
-

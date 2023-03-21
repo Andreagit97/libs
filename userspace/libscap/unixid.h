@@ -28,20 +28,21 @@ limitations under the License.
  */
 static inline int thread_seteuid(uid_t uid)
 {
-	int result;
+    int result;
 
-	if (uid == (uid_t) ~0) {
-		errno = EINVAL;
-		return -1;
-	}
+    if(uid == (uid_t)~0)
+    {
+	errno = EINVAL;
+	return -1;
+    }
 
 #ifdef __NR_setresuid32
-	result = syscall(SYS_setresuid32, -1, uid, -1);
+    result = syscall(SYS_setresuid32, -1, uid, -1);
 #else
-	result = syscall(SYS_setresuid, -1, uid, -1);
+    result = syscall(SYS_setresuid, -1, uid, -1);
 #endif
 
-	return result;
+    return result;
 }
 
 /*!
@@ -52,18 +53,19 @@ static inline int thread_seteuid(uid_t uid)
  */
 static inline int thread_setegid(gid_t gid)
 {
-	int result;
+    int result;
 
-	if (gid == (gid_t) ~0) {
-		errno = EINVAL;
-		return -1;
-	}
+    if(gid == (gid_t)~0)
+    {
+	errno = EINVAL;
+	return -1;
+    }
 
 #ifdef __NR_setresgid32
-	result = syscall(SYS_setresgid32, -1, gid, -1);
+    result = syscall(SYS_setresgid32, -1, gid, -1);
 #else
-	result = syscall(SYS_setresgid, -1, gid, -1);
+    result = syscall(SYS_setresgid, -1, gid, -1);
 #endif
 
-	return result;
+    return result;
 }

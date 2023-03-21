@@ -20,43 +20,39 @@ limitations under the License.
 
 using namespace libsinsp::container_engine;
 
-docker_connection::docker_connection():
-	m_api_version("/v1.30")
+docker_connection::docker_connection(): m_api_version("/v1.30") {}
+
+docker_connection::~docker_connection() {}
+
+docker_connection::docker_response
+docker_connection::get_docker(const docker_lookup_request& request,
+			      const std::string& req_url, std::string& json)
 {
+    std::string req = "GET " + m_api_version + req_url +
+		      " HTTP/1.1\r\nHost: docker\r\n\r\n";
+
+    const char* response = NULL;
+    bool qdres = wh_query_docker(m_inspector->get_wmi_handle(),
+				 (char*)req.c_str(), &response);
+    if(qdres == false)
+    {
+	ASSERT(false);
+	return docker_response::RESP_ERROR;
+    }
+
+    json = response;
+    if(strncmp(json.c_str(), "HTTP/1.0 200 OK", sizeof("HTTP/1.0 200 OK") - 1))
+    {
+	return docker_response::RESP_BAD_REQUEST;
+    }
+
+    size_t pos = json.find("{");
+    if(pos == string::npos)
+    {
+	ASSERT(false);
+	return docker_response::RESP_ERROR;
+    }
+    json = json.substr(pos);
+
+    return docker_response::RESP_OK;
 }
-
-docker_connection::~docker_connection()
-{
-}
-
-docker_connection::docker_response docker_connection::get_docker(const docker_lookup_request& request, const std::string& req_url, std::string &json)
-{
-	std::string req = "GET " + m_api_version + req_url + " HTTP/1.1\r\nHost: docker\r\n\r\n";
-
-	const char* response = NULL;
-	bool qdres = wh_query_docker(m_inspector->get_wmi_handle(),
-				     (char*)req.c_str(),
-				     &response);
-	if(qdres == false)
-	{
-		ASSERT(false);
-		return docker_response::RESP_ERROR;
-	}
-
-	json = response;
-	if(strncmp(json.c_str(), "HTTP/1.0 200 OK", sizeof("HTTP/1.0 200 OK") -1))
-	{
-		return docker_response::RESP_BAD_REQUEST;
-	}
-
-	size_t pos = json.find("{");
-	if(pos == string::npos)
-	{
-		ASSERT(false);
-		return docker_response::RESP_ERROR;
-	}
-	json = json.substr(pos);
-
-	return docker_response::RESP_OK;
-}
-

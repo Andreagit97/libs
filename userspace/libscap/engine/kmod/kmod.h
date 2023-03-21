@@ -23,6 +23,6 @@ struct scap;
 
 struct kmod_engine
 {
-	struct scap_device_set m_dev_set;
-	char* m_lasterr;
+    struct scap_device_set m_dev_set;
+    char* m_lasterr;
 };

@@ -29,38 +29,46 @@ namespace container_engine
  */
 class container_cache_interface
 {
-public:
-	virtual ~container_cache_interface() = default;
+    public:
+    virtual ~container_cache_interface() = default;
 
-	virtual void notify_new_container(const sinsp_container_info& container_info, sinsp_threadinfo *tinfo = nullptr) = 0;
+    virtual void
+    notify_new_container(const sinsp_container_info& container_info,
+			 sinsp_threadinfo* tinfo = nullptr) = 0;
 
-	virtual bool should_lookup(const std::string& container_id, sinsp_container_type ctype) = 0;
+    virtual bool should_lookup(const std::string& container_id,
+			       sinsp_container_type ctype) = 0;
 
-	virtual void set_lookup_status(const std::string& container_id, sinsp_container_type ctype, sinsp_container_lookup_state state) = 0;
+    virtual void set_lookup_status(const std::string& container_id,
+				   sinsp_container_type ctype,
+				   sinsp_container_lookup_state state) = 0;
 
-	/**
-	 * Get a container from the cache.
-	 */
-	virtual sinsp_container_info::ptr_t get_container(const std::string& id) const = 0;
+    /**
+     * Get a container from the cache.
+     */
+    virtual sinsp_container_info::ptr_t
+    get_container(const std::string& id) const = 0;
 
-	/**
-	 * Add a new container to the cache.
-	 */
-	virtual void add_container(const sinsp_container_info::ptr_t& container_info, sinsp_threadinfo *thread) = 0;
+    /**
+     * Add a new container to the cache.
+     */
+    virtual void
+    add_container(const sinsp_container_info::ptr_t& container_info,
+		  sinsp_threadinfo* thread) = 0;
 
-	/**
-	 * Update a container by replacing its entry with a new one
-	 */
-	virtual void replace_container(const sinsp_container_info::ptr_t& container_info) = 0;
+    /**
+     * Update a container by replacing its entry with a new one
+     */
+    virtual void
+    replace_container(const sinsp_container_info::ptr_t& container_info) = 0;
 
-	/**
-	 * Return whether the container exists in the cache.
-	 */
-	virtual bool container_exists(const std::string& container_id) const = 0;
+    /**
+     * Return whether the container exists in the cache.
+     */
+    virtual bool container_exists(const std::string& container_id) const = 0;
 
-
-	virtual bool async_allowed() const = 0;
+    virtual bool async_allowed() const = 0;
 };
 
-}
-}
+} // namespace container_engine
+} // namespace libsinsp
