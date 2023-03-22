@@ -232,6 +232,7 @@ int32_t scap_modern_bpf__init(scap_t* handle, scap_open_args* oargs)
 	{
 		return SCAP_FAILURE;
 	}
+	printf("************ boot_time: %lu\n\n", boot_time);
 	pman_set_boot_time(boot_time);
 
 	engine.m_handle->m_api_version = pman_get_probe_api_ver();
