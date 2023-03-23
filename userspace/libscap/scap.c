@@ -1234,14 +1234,14 @@ int32_t scap_get_boot_time(char* last_err, uint64_t *boot_time)
 	struct stat targetstat = {0};
 
 	/* More reliable way to get boot time */
-	snprintf(proc_dir, sizeof(proc_dir), "%s/proc/1/", scap_get_host_root());
-	printf("************ proc_dir: %s\n", proc_dir);
-	if (stat(proc_dir, &targetstat) == 0)
-	{
-		/* This approach is constant between agent re-boots */
-		*boot_time = targetstat.st_ctim.tv_sec * (uint64_t) SECOND_TO_NS + targetstat.st_ctim.tv_nsec;
-		return SCAP_SUCCESS;
-	}
+	// snprintf(proc_dir, sizeof(proc_dir), "%s/proc/1/", scap_get_host_root());
+	// printf("************ proc_dir: %s\n", proc_dir);
+	// if (stat(proc_dir, &targetstat) == 0)
+	// {
+	// 	/* This approach is constant between agent re-boots */
+	// 	*boot_time = targetstat.st_ctim.tv_sec * (uint64_t) SECOND_TO_NS + targetstat.st_ctim.tv_nsec;
+	// 	return SCAP_SUCCESS;
+	// }
 
 	/*
 	 * Fall-back method
