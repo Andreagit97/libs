@@ -362,6 +362,13 @@ extern "C"
 	void pman_set_drop_failed(bool drop_failed);
 
 	/**
+	 * @brief Ask driver to increase `snaplen` on writes to `/dev/null`.
+	 *
+	 * @param tracers_enabled whether to enable the tracers capture mode.
+	 */
+	void pman_set_tracers_enabled(bool tracers_enabled);
+
+	/**
 	 * @brief Get API version to check it a runtime.
 	 *
 	 * @return API version

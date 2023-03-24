@@ -44,6 +44,30 @@ int BPF_PROG(write_e,
 
 /*=============================== EXIT EVENT ===========================*/
 
+/* This helper is used only with the write exit event
+ * It increases `snaplen` on writes to `/dev/null`
+ */
+static inline void write_tracers_capture(struct pt_regs *regs, u16* snaplen)
+{
+	if(!maps__get_tracers_enabled())
+	{
+		return;
+	}
+
+	s32 fd = (s32)extract__syscall_argument(regs, 0);
+	struct file *f = extract__file_struct_from_fd(fd);
+	if(!f)
+	{
+		return;
+	}
+
+	dev_t i_rdev = BPF_CORE_READ(f, f_inode, i_rdev);
+	if(i_rdev == PPM_NULL_RDEV)
+	{
+		*snaplen = RW_SNAPLEN_EVENT;
+	}
+}
+
 SEC("tp_btf/sys_exit")
 int BPF_PROG(write_x,
 	     struct pt_regs *regs,
@@ -65,8 +89,9 @@ int BPF_PROG(write_x,
 	/* If the syscall doesn't fail we use the return value as `size`
 	 * otherwise we need to rely on the syscall parameter provided by the user.
 	 */
-	unsigned long bytes_to_read = ret > 0 ? ret : extract__syscall_argument(regs, 2);
-	unsigned long snaplen = maps__get_snaplen();
+	u16 bytes_to_read = ret > 0 ? ret : extract__syscall_argument(regs, 2);
+	u16 snaplen = maps__get_snaplen();
+	write_tracers_capture(regs, &snaplen);
 	if(bytes_to_read > snaplen)
 	{
 		bytes_to_read = snaplen;

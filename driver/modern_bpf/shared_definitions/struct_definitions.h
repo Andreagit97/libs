@@ -28,6 +28,7 @@ struct capture_settings
 	bool dropping_mode;	 /* this flag actives the sampling logic */
 	uint32_t sampling_ratio; /* this config tells tracepoints when they have to drop events  */
 	bool drop_failed;     /* whether to drop failed syscalls (exit events) */
+	bool tracers_enabled; /* increases `snaplen` on writes to `/dev/null` */
 };
 
 /**
