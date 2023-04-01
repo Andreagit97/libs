@@ -39,7 +39,6 @@ limitations under the License.
 #define BUFFER_OPTION "--buffer_dim"
 #define SIMPLE_SET_OPTION "--simple_set"
 #define CPUS_FOR_EACH_BUFFER_MODE "--cpus_for_buf"
-#define ALL_AVAILABLE_CPUS_MODE "--available_cpus"
 #define DROP_FAILED "--drop-failed"
 
 /* PRINT */
@@ -537,7 +536,6 @@ void print_help()
 	printf("'%s <dim>': dimension in bytes of a single per CPU buffer.\n", BUFFER_OPTION);
 	printf("[MODERN PROBE ONLY, EXPERIMENTAL]\n");
 	printf("'%s <cpus_for_each_buffer>': allocate a ring buffer for every `cpus_for_each_buffer` CPUs.\n", CPUS_FOR_EACH_BUFFER_MODE);
-	printf("'%s': allocate ring buffers for all available CPUs. Default: allocate ring buffers for online CPUs only.\n", ALL_AVAILABLE_CPUS_MODE);
 	printf("'%s': instrument drivers to drop failed syscalls (exit) events.\n", DROP_FAILED);
 	printf("\n------> PRINT OPTIONS\n");
 	printf("'%s': print all supported syscalls with different sources and configurations.\n", PRINT_SYSCALLS_OPTION);
@@ -645,7 +643,6 @@ void parse_CLI_options(int argc, char** argv)
 			oargs.mode = SCAP_MODE_LIVE;
 			modern_bpf_params.buffer_bytes_dim = buffer_bytes_dim;
 			modern_bpf_params.cpus_for_each_buffer = DEFAULT_CPU_FOR_EACH_BUFFER;
-			modern_bpf_params.allocate_online_only = true;
 			oargs.engine_params = &modern_bpf_params;
 		}
 		if(!strcmp(argv[i], SCAP_FILE_OPTION))
@@ -719,12 +716,6 @@ void parse_CLI_options(int argc, char** argv)
 			}
 			modern_bpf_params.cpus_for_each_buffer = atoi(argv[++i]);
 		}
-		/* This should be used only with the modern probe */
-		if(!strcmp(argv[i], ALL_AVAILABLE_CPUS_MODE))
-		{
-			modern_bpf_params.allocate_online_only = false;
-		}
-
 		if(!strcmp(argv[i], DROP_FAILED))
 		{
 			drop_failed = true;
