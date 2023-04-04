@@ -56,6 +56,13 @@ typedef enum ss_plugin_schema_type
 	SS_PLUGIN_SCHEMA_JSON = 1,
 } ss_plugin_schema_type;
 
+// Plugin logging severities
+typedef enum ss_plugin_log_severity
+{
+	DEBUG = 8,
+	INFO = 9,
+} ss_plugin_log_severity;
+
 // This struct represents an event returned by the plugin, and is used
 // below in next_batch().
 // - evtnum: incremented for each event returned. Might not be contiguous.
@@ -159,6 +166,13 @@ typedef void ss_plugin_t;
 // and it treats is as opaque.
 //
 typedef void ss_instance_t;
+
+typedef void (*ss_plugin_log_func)(void* owner, ss_plugin_log_severity sev, const char* msg);
+
+typedef struct ss_plugin_init_input
+{
+	ss_plugin_rc (*init_logger) (ss_plugin_t* s, void* owner, ss_plugin_log_func log);
+} ss_plugin_init_input;
 
 #ifdef __cplusplus
 }
