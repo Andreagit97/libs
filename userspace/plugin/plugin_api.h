@@ -118,7 +118,7 @@ typedef struct
 	// If a non-NULL ss_plugin_t* state is returned, then subsequent invocations
 	// of init() must not return the same ss_plugin_t* value again, if not after
 	// it has been disposed with destroy() first.
-	ss_plugin_t *(*init)(const char *config, ss_plugin_rc *rc);
+	ss_plugin_t *(*init)(const char *config, ss_plugin_rc *rc, const ss_plugin_init_input* input);
 
 	//
 	// Destroy the plugin and, if plugin state was allocated, free it.

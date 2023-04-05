@@ -51,6 +51,49 @@ static std::string str_from_alloc_charbuf(const char* charbuf)
 	return str;
 }
 
+static sinsp_logger::severity plugin_sev_to_scap_sev(ss_plugin_log_severity sev)
+{
+	switch(sev)
+	{
+	case SS_PLUGIN_SEV_FATAL:
+		return sinsp_logger::severity::SEV_FATAL;
+
+	case SS_PLUGIN_SEV_CRITICAL:
+		return sinsp_logger::severity::SEV_CRITICAL;
+
+	case SS_PLUGIN_SEV_ERROR:
+		return sinsp_logger::severity::SEV_ERROR;
+
+	case SS_PLUGIN_SEV_WARNING:
+		return sinsp_logger::severity::SEV_WARNING;
+
+	case SS_PLUGIN_SEV_NOTICE:
+		return sinsp_logger::severity::SEV_NOTICE;
+
+	case SS_PLUGIN_SEV_INFO:
+		return sinsp_logger::severity::SEV_INFO;
+
+	case SS_PLUGIN_SEV_DEBUG:
+		return sinsp_logger::severity::SEV_DEBUG;
+
+	case SS_PLUGIN_SEV_TRACE:
+		return sinsp_logger::severity::SEV_TRACE;
+
+	default:
+		ASSERT(false);
+		//TODO: Not sure what to return here maybe an exception ?
+		return sinsp_logger::severity::SEV_FATAL;
+	}
+
+	ASSERT(false);
+	return sinsp_logger::severity::SEV_FATAL;
+}
+
+static void logging_callback(void* owner, ss_plugin_log_severity sev, const char* msg)
+{
+	((sinsp_logger*)owner)->log(msg, plugin_sev_to_scap_sev(sev));
+}
+
 std::shared_ptr<sinsp_plugin> sinsp_plugin::create(
 	const std::string &filepath,
 	std::string &errstr)
@@ -107,8 +150,13 @@ bool sinsp_plugin::init(const std::string &config, std::string &errstr)
 	ss_plugin_rc rc;
 	std::string conf = config;
 	validate_init_config(conf);
-
-	ss_plugin_t *state = m_handle->api.init(conf.c_str(), &rc);
+	ss_plugin_init_input init_params = {};
+	/// TODO: just to test it
+	g_logger.add_stdout_log();
+	init_params.log = logging_callback;
+	init_params.min_sev = ss_plugin_log_severity::SS_PLUGIN_SEV_ERROR;
+	init_params.owner = &g_logger;
+	ss_plugin_t *state = m_handle->api.init(conf.c_str(), &rc, &init_params);
 	if (state != NULL)
 	{
 		// Plugins can return a state even if the result code is
