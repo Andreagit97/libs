@@ -2712,14 +2712,7 @@ FILLER(proc_startupdate_3, true)
 		CHECK_RES(res);
 
 		/* Parameter 21: pid_namespace init task start_time monotonic time in ns (type: PT_UINT64) */
-		// only perform lookup when clone/vfork/fork returns 0 (child process / childtid)
-		u64 pidns_init_start_time = 0;
-		if(retval == 0 && pidns)
-		{
-			struct task_struct *child_reaper = (struct task_struct *)_READ(pidns->child_reaper);
-			pidns_init_start_time = _READ(child_reaper->start_time);
-		}
-		res = bpf_val_to_ring_type(data, pidns_init_start_time, PT_UINT64);
+		res = bpf_val_to_ring_type(data, 0, PT_UINT64);
 		CHECK_RES(res);
 
 	} else if (data->state->tail_ctx.evt_type == PPME_SYSCALL_EXECVE_19_X ||
@@ -2865,15 +2858,6 @@ FILLER(execve_family_flags, true)
 			flags |= PPM_EXE_WRITABLE;
 		}
 
-		/*
-		 * exe_upper_layer
-		 */
-		exe_upper_layer = get_exe_upper_layer(inode);
-		if (exe_upper_layer)
-		{
-			flags |= PPM_EXE_UPPER_LAYER;
-		}
-
 		// write all additional flags for execve family here...
 	}
 
@@ -2897,25 +2881,21 @@ FILLER(execve_family_flags, true)
 	CHECK_RES(res);
 
 	/* Parameter 24: exe_file ino (type: PT_UINT64) */
-	unsigned long ino = _READ(inode->i_ino);
-	res = bpf_val_to_ring_type(data, ino, PT_UINT64);
+	res = bpf_val_to_ring_type(data, 0, PT_UINT64);
 	CHECK_RES(res);
 
 	struct timespec64 time = {0};
 
 	/* Parameter 25: exe_file ctime (last status change time, epoch value in nanoseconds) (type: PT_ABSTIME) */
-	time = _READ(inode->i_ctime);
-	res = bpf_val_to_ring_type(data, bpf_epoch_ns_from_time(time), PT_ABSTIME);
+	res = bpf_val_to_ring_type(data, 0, PT_ABSTIME);
 	CHECK_RES(res);
 
 	/* Parameter 26: exe_file mtime (last modification time, epoch value in nanoseconds) (type: PT_ABSTIME) */
-	time = _READ(inode->i_mtime);
-	res = bpf_val_to_ring_type(data, bpf_epoch_ns_from_time(time), PT_ABSTIME);
+	res = bpf_val_to_ring_type(data, 0, PT_ABSTIME);
 	CHECK_RES(res);
 
 	/* Parameter 27: uid */
-	euid = _READ(cred->euid);
-	return bpf_val_to_ring_type(data, euid.val, PT_UINT32);
+	return bpf_val_to_ring_type(data, 0, PT_UINT32);
 }
 
 FILLER(sys_accept4_e, true)
@@ -3824,16 +3804,14 @@ FILLER(sys_epoll_create1_e, true)
 	/*
 	 * flags
 	 */
-	flags = bpf_syscall_get_argument(data, 0);
-	return bpf_val_to_ring(data, epoll_create1_flags_to_scap(flags));
+	return bpf_val_to_ring(data, 0);
 }
 
 FILLER(sys_epoll_create1_x, true)
 {
 	unsigned long retval;
 
-	retval = bpf_syscall_get_retval(data->ctx);
-	return bpf_val_to_ring(data, retval);
+	return bpf_val_to_ring(data, 0);
 }
 
 FILLER(sys_sendfile_e, true)
