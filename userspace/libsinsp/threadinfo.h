@@ -119,6 +119,15 @@ public:
 		return m_parent_loop_detected;
 	}
 
+	/*
+	  \brief returns true if there is a loop detected in the main thread parent state.
+	  Needs traverse_main_parent_state() to have been called first.
+	*/
+	inline bool main_parent_loop_detected() const
+	{
+		return m_main_parent_loop_detected;
+	}
+
 	/*!
 	  \brief Get the main thread of the process containing this thread.
 	*/
@@ -237,6 +246,12 @@ public:
 	//
 	typedef std::function<bool (sinsp_threadinfo *)> visitor_func_t;
 	void traverse_parent_state(visitor_func_t &visitor);
+
+	//
+	// Like `traverse_parent_state` but considering only main threads
+	// and not subthreads.
+	//
+	void traverse_main_parent_state(visitor_func_t &visitor);
 
 	// Note that the provided tid, a thread in this main thread's
 	// pid, has been used in an exec enter event. In the
@@ -489,6 +504,7 @@ VISIBILITY_PRIVATE
 	uint16_t m_lastevent_cpuid;
 	sinsp_evt::category m_lastevent_category;
 	bool m_parent_loop_detected;
+	bool m_main_parent_loop_detected;
 	blprogram* m_blprogram;
 
 	friend class sinsp;

@@ -85,6 +85,7 @@ void sinsp_threadinfo::init()
 	m_program_hash_scripts = 0;
 	m_lastevent_data = NULL;
 	m_parent_loop_detected = false;
+	m_main_parent_loop_detected = false;
 	m_tty = 0;
 	m_category = CAT_NONE;
 	m_blprogram = NULL;
@@ -1072,6 +1073,55 @@ void sinsp_threadinfo::traverse_parent_state(visitor_func_t &visitor)
 						     " ptid=" + std::to_string(slow->m_ptid),
 						     sinsp_logger::SEV_WARNING);
 					m_parent_loop_detected = true;
+				}
+				return;
+			}
+		}
+	}
+}
+
+void sinsp_threadinfo::traverse_main_parent_state(visitor_func_t &visitor)
+{
+	// Use two pointers starting at this, traversing the parent
+	// state, at different rates. If they ever equal each other
+	// before slow is NULL there's a loop.
+
+	sinsp_threadinfo *slow=this->get_main_thread(), *fast=slow;
+
+	// Move fast to its parent
+	fast = (fast ? fast->get_main_thread() : fast);
+
+	// The slow pointer must be valid and not have a tid of -1.
+	while(slow && slow->m_tid != -1)
+	{
+		if(!visitor(slow))
+		{
+			break;
+		}
+
+		// Advance slow one step and advance fast two steps
+		slow = slow->get_main_thread();
+
+		// advance fast 2 steps, checking to see if we meet
+		// slow after each step.
+		for (uint32_t i = 0; i < 2; i++) {
+			fast = (fast ? fast->get_main_thread() : fast);
+
+			// If not at the end but fast == slow or if
+			// slow points to itself, there's a loop in
+			// the thread state.
+			if(slow && (slow == fast ||
+				    slow->m_tid == slow->m_ptid))
+			{
+				// Note we only log a loop once for a given main thread, to avoid flooding logs.
+				if(!m_main_parent_loop_detected)
+				{
+					g_logger.log(std::string("Loop in main parent thread state detected for pid ") +
+						     std::to_string(m_pid) +
+						     ". stopped at tid= " + std::to_string(slow->m_tid) +
+						     " ptid=" + std::to_string(slow->m_ptid),
+						     sinsp_logger::SEV_WARNING);
+					m_main_parent_loop_detected = true;
 				}
 				return;
 			}
