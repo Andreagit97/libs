@@ -23,6 +23,13 @@ int BPF_PROG(sys_exit,
 	if(syscall_id == __NR_socketcall)
 	{
 		syscall_id = convert_network_syscalls(regs);
+		/* We are not able to convert the socketcall into a network syscall.
+		 * This should never happen unless the user provides some random values.
+		 */
+		if(syscall_id == 0)
+		{
+			return 0;
+		}
 	}
 #endif
 
