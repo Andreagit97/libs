@@ -55,6 +55,13 @@ BPF_PROBE("raw_syscalls/", sys_enter, sys_enter_args)
 	if(id == __NR_socketcall)
 	{
 		id = convert_network_syscalls(ctx);
+		/* We are not able to convert the socketcall into a network syscall.
+		 * This should never happen unless the user provides some random values.
+		 */
+		if(id == 0)
+		{
+			return 0;
+		}
 	}
 #endif
 
@@ -112,6 +119,13 @@ BPF_PROBE("raw_syscalls/", sys_exit, sys_exit_args)
 	if(id == __NR_socketcall)
 	{
 		id = convert_network_syscalls(ctx);
+		/* We are not able to convert the socketcall into a network syscall.
+		 * This should never happen unless the user provides some random values.
+		 */
+		if(id == 0)
+		{
+			return 0;
+		}
 	}
 #endif
 
