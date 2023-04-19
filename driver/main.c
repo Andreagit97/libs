@@ -2258,6 +2258,13 @@ TRACEPOINT_PROBE(syscall_enter_probe, struct pt_regs *regs, long id)
 	if (id == socketcall_syscall)
 	{
 		id = convert_network_syscalls(regs);
+		/* We are not able to convert the socketcall into a network syscall.
+		 * This should never happen unless the user provides some random values.
+		 */
+		if(id == 0)
+		{
+			return;
+		}
 		event_data.is_socketcall = true;
 	}
 #endif
@@ -2366,8 +2373,14 @@ TRACEPOINT_PROBE(syscall_exit_probe, struct pt_regs *regs, long ret)
 #ifdef _HAS_SOCKETCALL
 	if (id == socketcall_syscall)
 	{
-		/// TODO: we cannot return 0 we need to handle this case in all drivers.
 		id = convert_network_syscalls(regs);
+		/* We are not able to convert the socketcall into a network syscall.
+		 * This should never happen unless the user provides some random values.
+		 */
+		if(id == 0)
+		{
+			return;
+		}
 		event_data.is_socketcall = true;
 	}
 #endif
