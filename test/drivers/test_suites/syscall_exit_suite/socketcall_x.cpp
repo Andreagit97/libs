@@ -3273,4 +3273,28 @@ TEST(SyscallExit, socketcall_getsocknameX)
 }
 #endif
 
+TEST(SyscallExit, socketcall_wrong_code)
+{
+	auto evt_test = get_syscall_event_test();
+
+	evt_test->enable_capture();
+
+	/*=============================== TRIGGER SYSCALL ===========================*/
+
+	unsigned long args[3] = {0};
+	args[0] = 47;
+	args[1] = 0;
+	args[2] = 0;
+	int wrong_code = 1230;
+
+	assert_syscall_state(SYSCALL_FAILURE, "socketcall bind", syscall(__NR_socketcall, wrong_code, args));
+
+	/*=============================== TRIGGER SYSCALL ===========================*/
+
+	evt_test->disable_capture();
+
+	/* if we send a socketcall with a wrong code we should immediately drop the event */
+	evt_test->assert_event_absence();
+}
+
 #endif /* __NR_socketcall */
