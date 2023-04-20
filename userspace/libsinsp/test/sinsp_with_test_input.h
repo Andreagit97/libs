@@ -26,6 +26,8 @@ limitations under the License.
 #include "strlcpy.h"
 #include "test_utils.h"
 
+#define DEFAULT_VALUE 0
+
 class sinsp_with_test_input : public ::testing::Test {
 protected:
 	void SetUp() override
@@ -76,6 +78,29 @@ protected:
 
 		return nullptr;
 	}
+
+	/*=============================== CLONE GENERATION ===========================*/
+
+	sinsp_evt* generate_clone_x_event(int64_t retval, int64_t tid, int64_t pid, int64_t ppid, uint32_t flags = 0, int64_t vtid = DEFAULT_VALUE, int64_t vpid = DEFAULT_VALUE, std::string name = "bash")
+	{
+		if(vtid == DEFAULT_VALUE)
+		{
+			vtid = tid;
+		}
+		
+		if(vpid == DEFAULT_VALUE)
+		{
+			vpid = pid;
+		}
+
+		/* Scaffolding needed to call the PPME_SYSCALL_CLONE_20_X */
+		uint64_t not_relevant_64 = 0;
+		uint32_t not_relevant_32 = 0;
+		scap_const_sized_buffer empty_bytebuf = {.buf = nullptr, .size = 0};
+		return add_event_advance_ts(increasing_ts(), tid, PPME_SYSCALL_CLONE_20_X, 20, retval, name.c_str(), empty_bytebuf, tid, pid, ppid, "", not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_32, not_relevant_32, not_relevant_32, name.c_str(), empty_bytebuf, flags, not_relevant_32, not_relevant_32, vtid, vpid);
+	}
+
+	/*=============================== CLONE GENERATION ===========================*/
 
 	// adds an event and advances the inspector to the new timestamp
 	sinsp_evt* add_event_advance_ts(uint64_t ts, uint64_t tid, ppm_event_code event_type, uint32_t n, ...)

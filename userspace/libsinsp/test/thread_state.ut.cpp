@@ -20,6 +20,10 @@ limitations under the License.
 #include "sinsp_with_test_input.h"
 #include "test_utils.h"
 
+#define INIT_TID 1
+#define INIT_PID INIT_TID
+#define INIT_PARENT 0
+
 #define ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(tid, pid, ppid, vtid, vpid)          \
 	{                                                                         \
 		tinfo = m_inspector.get_thread_ref(tid, false, true).get();       \
@@ -37,17 +41,13 @@ limitations under the License.
 		ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(tid, pid, ppid, tid, pid) \
 	}
 
-TEST_F(sinsp_with_test_input, check_init_thread)
+TEST_F(sinsp_with_test_input, THRD_STATE_check_init_thread)
 {
 	/* Right now we have only the init process here */
 	add_default_init_thread();
 	open_inspector();
-	sinsp_evt* evt = NULL;
-
 	uint64_t init_tid = 1;
-	evt = add_event_advance_ts(increasing_ts(), init_tid, PPME_SYSCALL_CLONE_20_E, 0);
-
-	sinsp_threadinfo* tinfo = evt->get_thread_info(false);
+	sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(init_tid, false, true).get();
 	ASSERT_TRUE(tinfo);
 	ASSERT_TRUE(tinfo->is_main_thread());
 	ASSERT_EQ(tinfo->get_main_thread(), tinfo);
@@ -59,95 +59,111 @@ TEST_F(sinsp_with_test_input, check_init_thread)
 
 /*=============================== CLONE PARENT EXIT EVENT ===========================*/
 
-/* Parse a simple PPME_SYSCALL_CLONE_20_X event */
-TEST_F(sinsp_with_test_input, parse_clone_exit_parent)
-{
-	add_default_init_thread();
-	open_inspector();
-	uint64_t init_tid = 1;
-	uint64_t parent_ppid = 0;
-
-	/* Scaffolding needed to call the PPME_SYSCALL_CLONE_20_X */
-	uint64_t child_tid = 20;
-	uint64_t not_relevant_64 = 0;
-	uint32_t not_relevant_32 = 0;
-	scap_const_sized_buffer empty_bytebuf = {.buf = nullptr, .size = 0};
-
-	/* Here we simulate a new process spawned by the init one.
-	 * The parent is the init process so `tid` == `pid` and `tid` == `vtid`.
-	 * Here the father event comes before the child.
-	 */
-	add_event_advance_ts(increasing_ts(), init_tid, PPME_SYSCALL_CLONE_20_X, 20, child_tid, "bash", empty_bytebuf, init_tid, init_tid, parent_ppid, "", not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_32, not_relevant_32, not_relevant_32, "bash", empty_bytebuf, PPM_CL_CLONE_FILES, not_relevant_32, not_relevant_32, init_tid, init_tid);
-
-	/* The father exit event has already created the tinfo for the child */
-	sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(child_tid, false, true).get();
-	ASSERT_TRUE(tinfo);
-	ASSERT_EQ(tinfo->m_tid, child_tid);
-	ASSERT_EQ(tinfo->m_pid, child_tid); /* this seems correct since we have a new process*/
-	ASSERT_EQ(tinfo->m_ptid, init_tid); /// [TODO]: this could be a wrong assumption if the clone is performed by a thread
-
-	/* If we are in a container the father never parses its `PPME_SYSCALL_CLONE_20_X` event, but here we are not in a container */
-	ASSERT_EQ(tinfo->m_vtid, child_tid);
-	ASSERT_EQ(tinfo->m_vpid, child_tid);
-}
-
 /* Parse a failed PPME_SYSCALL_CLONE_20_X event */
-TEST_F(sinsp_with_test_input, parse_clone_exit_parent_failed)
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_failed)
 {
 	add_default_init_thread();
 	open_inspector();
-	uint64_t init_tid = 1;
-	uint64_t parent_ppid = 0;
 
-	/* Scaffolding needed to call the PPME_SYSCALL_CLONE_20_X */
-	int64_t child_tid = -2;
-	uint64_t not_relevant_64 = 0;
-	uint32_t not_relevant_32 = 0;
-	scap_const_sized_buffer empty_bytebuf = {.buf = nullptr, .size = 0};
+	int64_t child_tid = -3;
 
-	/* Here we simulate a new process spawned by the init one.
-	 * The parent is the init process so `tid` == `pid` and `tid` == `vtid`.
-	 * Here the father event comes before the child.
-	 */
-	add_event_advance_ts(increasing_ts(), init_tid, PPME_SYSCALL_CLONE_20_X, 20, child_tid, "bash", empty_bytebuf, init_tid, init_tid, parent_ppid, "", not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_32, not_relevant_32, not_relevant_32, "bash", empty_bytebuf, PPM_CL_CLONE_FILES, not_relevant_32, not_relevant_32, init_tid, init_tid);
+	/* Here we generate a parent clone exit event failed */
+	generate_clone_x_event(child_tid, INIT_TID, INIT_PID, INIT_PARENT);
 
-	/* The system call failed we don't populate the thread_info for the child  */
+	/* We should have a NULL pointer here  */
 	sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(child_tid, false, true).get();
 	ASSERT_TRUE(tinfo == nullptr);
 }
 
 /* Parse a PPME_SYSCALL_CLONE_20_X event with the parent into a container */
-TEST_F(sinsp_with_test_input, parse_clone_exit_parent_in_container)
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_in_container)
 {
 	add_default_init_thread();
 	open_inspector();
-	/* we spawn a clone event from a thread that doesn't exist in our table just to test the behavior in containers */
-	uint64_t mock_tid = 18;
-	uint64_t mock_vtid = 34;
-	uint64_t parent_ppid = 1;
 
-	/* Scaffolding needed to call the PPME_SYSCALL_CLONE_20_X */
-	int64_t child_tid = 36;
-	uint64_t not_relevant_64 = 0;
-	uint32_t not_relevant_32 = 0;
-	scap_const_sized_buffer empty_bytebuf = {.buf = nullptr, .size = 0};
+	/* We simulate a parent clone exit event that wants to generate a child into a container */
+	int64_t child_tid = 24;
 
-	/* Here we simulate a new process spawned by the init one.
-	 * The parent is the init process so `tid` == `pid` and `tid` == `vtid`.
-	 * Here the father event comes before the child.
-	 */
-	add_event_advance_ts(increasing_ts(), mock_tid, PPME_SYSCALL_CLONE_20_X, 20, child_tid, "bash", empty_bytebuf, mock_tid, mock_tid, parent_ppid, "", not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_32, not_relevant_32, not_relevant_32, "bash", empty_bytebuf, PPM_CL_CLONE_FILES, not_relevant_32, not_relevant_32, mock_vtid, mock_vtid);
+	/* Parent clone exit event */
+	generate_clone_x_event(child_tid, INIT_TID, INIT_PID, INIT_PARENT, PPM_CL_CLONE_NEWPID | PPM_CL_CHILD_IN_PIDNS);
 
-	/* The father process is in a container we don't populate the thread_info for the child  */
+	/* The child process is in a container so the parent doesn't populate the thread_info for the child  */
 	sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(child_tid, false, true).get();
 	ASSERT_TRUE(tinfo == nullptr);
 }
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_remove_mock_child)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* we spawn a mock clone child event but we remove the `PPM_CL_CLONE_INVERTED` flag
+	 * in this way the parent clone event should remove it
+	 */
+	int64_t child_tid = 24;
+	int64_t child_pid = 24;
+	int64_t child_parent = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, child_tid, child_pid, child_parent, DEFAULT_VALUE, DEFAULT_VALUE, DEFAULT_VALUE, "old_bash");
+
+	sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(child_tid, false, true).get();
+	ASSERT_TRUE(tinfo);
+	ASSERT_EQ(tinfo->m_comm, "old_bash");
+
+	/* Remove the `PPM_CL_CLONE_INVERTED` flag */
+	tinfo->m_flags = tinfo->m_flags & ~PPM_CL_CLONE_INVERTED;
+
+	/* Parent clone exit event */
+	/* The parent considers the existing child entry stale and removes it. It populates a new threadinfo */
+	generate_clone_x_event(child_tid, INIT_TID, INIT_PID, INIT_PARENT, DEFAULT_VALUE, DEFAULT_VALUE, DEFAULT_VALUE, "new_bash");
+
+	tinfo = m_inspector.get_thread_ref(child_tid, false, true).get();
+	ASSERT_TRUE(tinfo);
+	/* We should find the new name now since this should be a fresh threadinfo */
+	ASSERT_EQ(tinfo->m_comm, "new_bash");
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_keep_mock_child)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* we spawn a mock clone child event this should be preserved by the parent
+	 * since we don't remove the `PPM_CL_CLONE_INVERTED` flag this time.
+	 */
+	int64_t child_tid = 24;
+	int64_t child_pid = 24;
+	int64_t child_parent = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, child_tid, child_pid, child_parent, DEFAULT_VALUE, DEFAULT_VALUE, DEFAULT_VALUE, "old_bash");
+
+	sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(child_tid, false, true).get();
+	ASSERT_TRUE(tinfo);
+	ASSERT_EQ(tinfo->m_comm, "old_bash");
+
+	/* Parent clone exit event */
+	/* The parent considers the existing child entry stale and removes it. It populates a new threadinfo */
+	generate_clone_x_event(child_tid, INIT_TID, INIT_PID, INIT_PARENT, DEFAULT_VALUE, DEFAULT_VALUE, DEFAULT_VALUE, "new_bash");
+
+	tinfo = m_inspector.get_thread_ref(child_tid, false, true).get();
+	ASSERT_TRUE(tinfo);
+	/* We should find the new name now since this should be a fresh threadinfo */
+	ASSERT_EQ(tinfo->m_comm, "old_bash");
+}
+
+/* write a test for PPM_CL_CLONE_PARENT */
+
+/* write a test for PPM_CL_CLONE_THREAD */
+
+/* write a test for simple process */
 
 /*=============================== CLONE FATHER EXIT EVENT ===========================*/
 
 /*=============================== TRAVERSE THREAD INFO ===========================*/
 
-TEST_F(sinsp_with_test_input, traverse_thread_info)
+TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info)
 {
 	add_default_init_thread();
 	open_inspector();
@@ -179,7 +195,7 @@ TEST_F(sinsp_with_test_input, traverse_thread_info)
 	/*=============================== p1_t1 ===========================*/
 
 	uint64_t p1_t1_tid = 2;
-	uint64_t p1_t1_pid = 2;
+	uint64_t p1_t1_pid = p1_t1_tid;
 	uint64_t p1_t1_parent = init_pid;
 
 	/* Parent exit event */
@@ -201,7 +217,7 @@ TEST_F(sinsp_with_test_input, traverse_thread_info)
 	/*=============================== p1_t2 ===========================*/
 
 	uint64_t p1_t2_tid = 6;
-	uint64_t p1_t2_pid = 2;
+	uint64_t p1_t2_pid = p1_t1_pid;
 	uint64_t p1_t2_parent = init_pid;
 
 	/* Parent exit event */
