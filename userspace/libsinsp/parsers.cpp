@@ -1612,6 +1612,8 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 	 * an entry in the thread table for this process. If there is one, make sure
 	 * it was created recently. Otherwise, assume it's an old thread for which
 	 * we lost the exit event and remove it from the table.
+	 * Please note that the thread info is associated with the event 
+	 * in `sinsp_parser::reset` method.
 	 */
 	if(evt->m_tinfo != nullptr && evt->m_tinfo->m_clone_ts != 0)
 	{
