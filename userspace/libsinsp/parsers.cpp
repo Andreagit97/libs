@@ -1357,10 +1357,9 @@ void sinsp_parser::parse_clone_exit_parent(sinsp_evt *evt, int64_t child_tid)
 		tinfo->m_pid = tinfo->m_tid;
 
 		/* PTID */
-		/* The issue here is that `sched_proc_fork` doesn't send this flag (ARM64/s390x)
-		 * So the parent won't be correct here. BY the way with `sched_proc_fork`
-		 * the clone child event should always preceed the parent one.
-		 * todo(@Andreagit97): find a workaround to send `PPM_CL_CLONE_PARENT` from the kernel.
+		/* Please note `sched_proc_fork` won't send the `PPM_CL_CLONE_PARENT` flag,
+		 * but this tracepoint generates only the child event, here we are in parent one
+		 * so we shouldn't have any issue.
 		 */
 		if(tinfo->m_flags & PPM_CL_CLONE_PARENT)
 		{
