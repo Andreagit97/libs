@@ -230,6 +230,59 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_thread_fl
 	ASSERT_THREAD_INFO_PIDS(second_thread_tid, second_thread_pid, second_thread_parent)
 }
 
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_simulate_old_scap_file)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* Init create a child process p1 */
+	int64_t p1_t1_tid = 24;
+	int64_t p1_t1_pid = 24;
+	int64_t p1_t1_parent = INIT_PID;
+
+	/* Parent clone exit event */
+	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PARENT);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+
+	/* process p1 creates a second thread */
+	int64_t p1_t2_tid = 30;
+	int64_t p1_t2_pid = 24;
+	int64_t p1_t2_parent = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
+
+	/* Parent clone exit event */
+	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_parent, PPM_CL_CLONE_THREAD);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+
+	/* The second thread of p1 creates a new process p2 */
+	/* Here we are receiving the clone exit event of the parent so the old scap-file won't have wrong info.
+	 * Only if the new process (that is the child of a thread) will do another clone() we will notice the wrong info.
+	 */
+	int64_t p2_t1_tid = 80;
+	int64_t p2_t1_pid = 80;
+	int64_t p2_t1_parent = p1_t2_pid;
+
+	/* Parent clone exit event */
+	generate_clone_x_event(p2_t1_tid, p1_t2_tid, p1_t2_pid, p1_t2_parent);
+	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
+
+	/* process p2 creates a new process p3 */
+	int64_t p3_t1_tid = 90;
+	int64_t p3_t1_pid = 90;
+	int64_t p3_t1_parent = p2_t1_pid;
+
+	/* Parent clone exit event */
+	/* Please note here that the parent of p2 will be wrong in the scap-file!
+	 * It should be `p2_t1_parent` and so `p1_t2_pid` but indeed it will be the tid of `p1_t2` and so `p1_t2_tid`
+	 * BTW thanks to our recovery logic we should be able to correctly populate the new process thread info (p3 thread info) 
+	 */
+	generate_clone_x_event(p3_t1_tid, p2_t1_tid, p2_t1_pid, p1_t2_tid);
+	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_parent)
+	sinsp_threadinfo* ptinfo = m_inspector.get_thread_ref(p2_t1_tid, false, true).get();
+	ASSERT_TRUE(ptinfo);
+	/* The clone parent event carries wrong info so we don't update the parent info */
+	ASSERT_EQ(ptinfo->m_ptid, p2_t1_parent);
+}
+
 /* Here the parent exit event always comes first  */
 TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 {
@@ -416,7 +469,6 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 /*=============================== CLONE CHILD EXIT EVENT ===========================*/
 
-/* Parse a PPME_SYSCALL_CLONE_20_X event with the parent into a container */
 TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_in_container)
 {
 	add_default_init_thread();
@@ -583,6 +635,93 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 	/* Child clone exit event */
 	generate_clone_x_event(0, second_thread_tid, second_thread_pid, second_thread_parent, PPM_CL_CLONE_THREAD);
 	ASSERT_THREAD_INFO_PIDS(second_thread_tid, second_thread_pid, second_thread_parent)
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simulate_old_scap_file)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* We create a first child */
+	int64_t first_child_tid = 24;
+	int64_t first_child_pid = 24;
+	int64_t first_child_parent = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, first_child_tid, first_child_pid, first_child_parent);
+	ASSERT_THREAD_INFO_PIDS(first_child_tid, first_child_pid, first_child_parent)
+
+	/* The first child creates a thread */
+	int64_t second_thread_tid = 30;
+	int64_t second_thread_pid = 24;
+	int64_t second_thread_parent = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, second_thread_tid, second_thread_pid, second_thread_parent, PPM_CL_CLONE_THREAD);
+	ASSERT_THREAD_INFO_PIDS(second_thread_tid, second_thread_pid, second_thread_parent)
+
+	/* The second thread creates a child */
+	int64_t second_child_tid = 80;
+	int64_t second_child_pid = 80;
+	/* old scap files return `real_parent->pid` so the parent will be the second thread and not the leader thread.
+	 * BTW, our recovery logic should patch the parent value to `first_child_pid`.
+	 */
+	int64_t second_child_parent = second_thread_tid; // our recovery logic will set `first_child_pid` here
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, second_child_tid, second_child_pid, second_child_parent);
+	ASSERT_THREAD_INFO_PIDS(second_child_tid, second_child_pid, first_child_pid)
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simulate_old_scap_file_missing_info)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* We create a first child */
+	int64_t first_child_tid = 24;
+	int64_t first_child_pid = 24;
+	int64_t first_child_parent = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, first_child_tid, first_child_pid, first_child_parent);
+	ASSERT_THREAD_INFO_PIDS(first_child_tid, first_child_pid, first_child_parent)
+
+	/* Now let's imagine that the first child creates a thread
+	 * like in the previous test, but we miss it.
+	 *
+	 * 	 int64_t second_thread_tid = 30;
+	 *   int64_t second_thread_pid = 24;
+	 *   int64_t second_thread_parent = INIT_PID;
+	 *   generate_clone_x_event(0, second_thread_tid, second_thread_pid, second_thread_parent, PPM_CL_CLONE_THREAD);
+	 *
+	 * When this thread will create a new process we won't be able
+	 * to patch the `ptid` since we miss the caller thread info!
+	 */
+
+	/* The second thread creates a child */
+	int64_t second_child_tid = 80;
+	int64_t second_child_pid = 80;
+	int64_t second_child_parent = 30; // Our recovery logic will leave `second_thread_tid`, because we miss caller info
+	const char* second_child_mock_name = "mock_name";
+	/* Child clone exit event */
+	generate_clone_x_event(0, second_child_tid, second_child_pid, second_child_parent, 0, second_child_tid, second_child_pid, second_child_mock_name);
+	ASSERT_THREAD_INFO_PIDS(second_child_tid, second_child_pid, second_child_parent)
+
+	/* During the parsing logic of the child we create also a mock parent since
+	 * it was not present. Let's assert some of its values...
+	 */
+	sinsp_threadinfo* ptinfo = m_inspector.get_thread_ref(second_child_parent, false, true).get();
+	ASSERT_TRUE(ptinfo);
+	ASSERT_EQ(ptinfo->m_user.uid, 0xffffffff);
+	ASSERT_EQ(ptinfo->m_user.uid, 0xffffffff);
+	ASSERT_EQ(ptinfo->m_loginuser.uid, 0xffffffff);
+	ASSERT_EQ(ptinfo->m_nchilds, 0);
+	ASSERT_EQ(ptinfo->m_exe, second_child_mock_name);
+	ASSERT_EQ(ptinfo->m_comm, second_child_mock_name);
+	ASSERT_EQ(ptinfo->m_tid, second_child_parent);
+	ASSERT_EQ(ptinfo->m_pid, second_child_parent); /// todo: this is wrong we created a new main thread but this is not a main thread!
+	GTEST_SKIP() << "The parent thread info matches the expected one, but some parent data are not correct!";
 }
 
 /*=============================== CLONE CHILD EXIT EVENT ===========================*/
