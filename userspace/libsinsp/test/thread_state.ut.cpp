@@ -709,11 +709,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simulate_old_sca
 	 */
 	int64_t p2_t1_parent = p1_t2_tid;
 
-	/* We also set the name just to check some info of the parent */
-	const char* p2_mock_name = "mock_name";
-
 	/* Child clone exit event */
-	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_parent, DEFAULT_VALUE, DEFAULT_VALUE, DEFAULT_VALUE, p2_mock_name);
+	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_parent);
 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
 
 	/* During the parsing logic of the child we create also a mock parent (p2_t1_parent) since
@@ -725,8 +722,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simulate_old_sca
 	ASSERT_EQ(p1_t2_tinfo->m_user.uid, 0xffffffff);
 	ASSERT_EQ(p1_t2_tinfo->m_loginuser.uid, 0xffffffff);
 	ASSERT_EQ(p1_t2_tinfo->m_nchilds, 0);
-	ASSERT_EQ(p1_t2_tinfo->m_exe, p2_mock_name);
-	ASSERT_EQ(p1_t2_tinfo->m_comm, p2_mock_name);
+	ASSERT_EQ(p1_t2_tinfo->m_exe, "<NA>");
+	ASSERT_EQ(p1_t2_tinfo->m_comm, "<NA>");
 	ASSERT_EQ(p1_t2_tinfo->m_tid, p2_t1_parent);
 	ASSERT_EQ(p1_t2_tinfo->m_pid, p2_t1_parent); /// todo: this is wrong we created a new main thread but this is not a main thread!
 	GTEST_SKIP() << "The parent thread info matches the expected one, but some parent data are not correct!";
