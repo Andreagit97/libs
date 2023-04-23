@@ -730,3 +730,60 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simulate_old_sca
 }
 
 /*=============================== CLONE CHILD EXIT EVENT ===========================*/
+
+/*=============================== EXECVE EVENTS ===========================*/
+
+TEST_F(sinsp_with_test_input, THRD_STATE_remove_thread_after_execve)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* Init creates a new process p1 */
+	int64_t p1_t1_tid = 24;
+	int64_t p1_t1_pid = 24;
+	int64_t p1_t1_parent = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+
+	/* process p1 creates a new thread (p1_t2) */
+	int64_t p1_t2_tid = 30;
+	int64_t p1_t2_pid = p1_t1_pid;
+	int64_t p1_t2_parent = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_parent);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+
+	/* p1_t2 creates a new thread (p1_t3) */
+	int64_t p1_t3_tid = 36;
+	int64_t p1_t3_pid = p1_t1_pid;
+	int64_t p1_t3_parent = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, p1_t3_tid, p1_t3_pid, p1_t3_parent);
+	ASSERT_THREAD_INFO_PIDS(p1_t3_tid, p1_t3_pid, p1_t3_parent)
+
+	/* p1_t2 calls an execve */
+	generate_execve_enter_and_exit_event(0, p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_parent);
+
+	/* Here we still have the thread info of `p1_t2_tid` */
+	sinsp_threadinfo* p1_t2_tinfo = m_inspector.get_thread_ref(p1_t2_tid, false, true).get();
+	ASSERT_TRUE(p1_t2_tinfo);
+
+	/* At the next event we should remove the thread info of `p1_t2_tid`.
+	 * `PPME_SYSCALL_UNLINK_2_E` is just a random event in this case.
+	 */
+	add_event_advance_ts(increasing_ts(), p1_t1_tid, PPME_SYSCALL_UNLINK_2_E, 0);
+
+	p1_t2_tinfo = m_inspector.get_thread_ref(p1_t2_tid, false, true).get();
+	ASSERT_FALSE(p1_t2_tinfo);
+
+	/* Please note that we still have the thread info of `p1_t3` when we should remove it */
+	sinsp_threadinfo* p1_t3_tinfo = m_inspector.get_thread_ref(p1_t3_tid, false, true).get();
+	ASSERT_TRUE(p1_t3_tinfo);
+	GTEST_SKIP() << "The expected behavior is correct but we need to remove all threads! Moreover, if the main thread performs the execve does someone remove all other threads?";
+}
+
+/*=============================== EXECVE EVENTS ===========================*/
