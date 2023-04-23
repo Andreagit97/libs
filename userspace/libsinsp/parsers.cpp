@@ -1699,7 +1699,7 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 
 		/* We are in a scap-file we cannot parse `/proc`! We put `query_os_if_not_found` to `false`
 		 * in this way if we don't have a thread in the table we return NULL and not a fake thread info.
-		 * Please note the check `ptinfo->m_user.uid != 0xffffffff`, we need to ensure that the parent is not
+		 * Please note the check `!INVALID_THREAD_INFO(possible_parent)`, we need to ensure that the parent is not
 		 * a fake entry otherwise there is the risk to use the wrong info!
 		 */
 		sinsp_threadinfo* possible_parent = m_inspector->get_thread_ref(tinfo->m_ptid, false, true).get();
@@ -2946,6 +2946,32 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 		parinfo = evt->get_param(5);
 		ASSERT(parinfo->m_len == sizeof(uint64_t));
 		evt->m_tinfo->m_ptid = *(uint64_t *)parinfo->m_val;
+
+		if(m_inspector->is_offline())
+		{
+			/*  Before this commit, scap-files sent to userspace 
+			* `ptid = real_parent->pid` instead of
+			* `ptid = real_parent->tgid`
+			* 
+			* We don't need a patch in the following cases:
+			* - The scap-file is recent enough to send the `real_parent->tgid`.
+			* - The parent is already a leader thread.
+			* - We don't have the thread info of the parent (in this case we have no enough
+			*   info to apply the patch).
+			*/
+
+			/* We are in a scap-file we cannot parse `/proc`! We put `query_os_if_not_found` to `false`
+			* in this way if we don't have a thread in the table we return NULL and not a fake thread info.
+			* Please note the check `!INVALID_THREAD_INFO(possible_parent)`, we need to ensure that the parent is not
+			* a fake entry otherwise there is the risk to use the wrong info!
+			*/
+			sinsp_threadinfo* possible_parent = m_inspector->get_thread_ref(evt->m_tinfo->m_ptid, false, true).get();
+			if(possible_parent != nullptr && !INVALID_THREAD_INFO(possible_parent) && !possible_parent->is_main_thread())
+			{	
+				/* We need to apply the patch */
+				evt->m_tinfo->m_ptid = possible_parent->m_pid;
+			}
+		}
 	}
 
 	// Get the fdlimit
