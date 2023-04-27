@@ -1405,14 +1405,11 @@ void sinsp_thread_manager::increment_mainthread_childcount(sinsp_threadinfo* thr
 		//
 		ASSERT(threadinfo->m_pid != threadinfo->m_tid);
 
-		sinsp_threadinfo* main_thread = m_inspector->get_thread_ref(threadinfo->m_pid, true, true).get();
+		/* Here we should create new threads since we are in a rebalancing phase, for this reason, `query_os_if_not_found` should be `false` */
+		sinsp_threadinfo* main_thread = m_inspector->get_thread_ref(threadinfo->m_pid, false, true).get();
 		if(main_thread)
 		{
 			++main_thread->m_nchilds;
-		}
-		else
-		{
-			ASSERT(false);
 		}
 	}
 }
@@ -1473,10 +1470,11 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 	}
 	else if((nchilds = tinfo->m_nchilds) == 0 || force)
 	{
-		//
-		// Decrement the refcount of the main thread/program because
-		// this reference is gone
-		//
+		/* Remove this thread from the count of its main thread 
+		 * Each main thread keeps a counter for all its threads...
+		 * If we already received a proc_exit on the main thread
+		 * it is marked with `PPM_CL_CLOSED`
+		 */
 		if(tinfo->m_flags & PPM_CL_CLONE_THREAD)
 		{
 			ASSERT(tinfo->m_pid != tinfo->m_tid);
@@ -1512,6 +1510,7 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 		//
 		if((tinfo->m_pid == tinfo->m_tid) || tinfo->m_flags & PPM_CL_IS_MAIN_THREAD)
 		{
+			/// todo(@Andreagit97) not clear why we never remove this thread if its pointer to the fdtable is null (?)
 			sinsp_fdtable* fd_table_ptr = tinfo->get_fd_table();
 			if(fd_table_ptr == NULL)
 			{
@@ -1554,6 +1553,9 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 
 		m_threadtable.erase(tid);
 
+		/* If for some reason we are forcing the termination of this thread and there are some children still there
+		 * we need a sort of reparenting logic.
+		 */
 		//
 		// If the thread has a nonzero refcount, it means that we are forcing the removal
 		// of a main process or program that some child refer to.
@@ -1601,8 +1603,10 @@ void sinsp_thread_manager::reset_child_dependencies()
 	m_last_tinfo.reset();
 	m_last_tid = 0;
 
+	/* We clear all possible children */
 	m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
 		tinfo.m_nchilds = 0;
+		/* every thread as a pointer to its main_thread, here we erase it! */
 		clear_thread_pointers(tinfo);
 		return true;
 	});

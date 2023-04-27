@@ -1271,6 +1271,9 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		ASSERT(false);
 	}
 	ASSERT(parinfo->m_len == sizeof(uint32_t));
+	/* we should never assign these flags to the caller otherwise if the child is a thread
+	 * also the caller will be marked as a thread with the `PPM_CL_CLONE_THREAD` flag.
+	 */
 	uint32_t flags = *(uint32_t *)parinfo->m_val;
 
 	/* If the child is running into a container, wait until we see it,
@@ -1787,6 +1790,7 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 	*/
 	if(INVALID_THREAD_INFO(lookup_tinfo))
 	{
+		/// todo(@Andreagit97) not sure we want to force here, if this thread has some childs probably it is not so invalid!
 		m_inspector->remove_thread(lookup_tid, true);
 		tid_collision = lookup_tid;
 		lookup_tinfo = m_inspector->get_thread_ref(lookup_tid, true, true).get();
@@ -1808,6 +1812,41 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 			valid_lookup_thread = false;
 		}
 	}
+
+	/* We need to do this here, in this way we can use this info to populate the lookup thread
+	 * if it is invalid.
+	 */
+
+	/* exe */
+	parinfo = evt->get_param(1);
+	tinfo->m_exe = (char*)parinfo->m_val;
+
+	/* comm */
+	switch(etype)
+	{
+	case PPME_SYSCALL_CLONE_11_X:
+	case PPME_SYSCALL_CLONE_16_X:
+	case PPME_SYSCALL_FORK_X:
+	case PPME_SYSCALL_VFORK_X:
+		tinfo->m_comm = tinfo->m_exe;
+		break;
+	case PPME_SYSCALL_CLONE_17_X:
+	case PPME_SYSCALL_CLONE_20_X:
+	case PPME_SYSCALL_FORK_17_X:
+	case PPME_SYSCALL_FORK_20_X:
+	case PPME_SYSCALL_VFORK_17_X:
+	case PPME_SYSCALL_VFORK_20_X:
+	case PPME_SYSCALL_CLONE3_X:
+		parinfo = evt->get_param(13);
+		tinfo->m_comm = parinfo->m_val;
+		break;
+	default:
+		ASSERT(false);
+	}
+
+	/* args */
+	parinfo = evt->get_param(2);
+	tinfo->set_args(parinfo->m_val, parinfo->m_len);
 
 	if(valid_lookup_thread)
 	{
@@ -1883,42 +1922,18 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 			tinfo->m_cwd = lookup_tinfo->get_cwd();
 		}
 	}
+	// else
+	// {
+	// 	/* Please note that here we shouldn't enrich the lookup thread state
+	// 	 * if it is invalid since we have no info about it! `comm`, `exe`, ... could be different!
+	// 	 * BTW if we don't update at least comm this thread will be invalid
+	// 	 * every time we will get it, so we will remove it and recreate it every time, genereting some issues in the reparenting
+	// 	 */
+	// 	lookup_tinfo->m_comm = tinfo->m_comm;
+	// }
 
-	/* Please note that here we cannot enrich the lookup thread state
-	 * if it is invalid since we have no info about it! `comm`, `exe`, ...
-	 * could be completely different.
-	 */
 
-	/* exe */
-	parinfo = evt->get_param(1);
-	tinfo->m_exe = (char*)parinfo->m_val;
 
-	/* comm */
-	switch(etype)
-	{
-	case PPME_SYSCALL_CLONE_11_X:
-	case PPME_SYSCALL_CLONE_16_X:
-	case PPME_SYSCALL_FORK_X:
-	case PPME_SYSCALL_VFORK_X:
-		tinfo->m_comm = tinfo->m_exe;
-		break;
-	case PPME_SYSCALL_CLONE_17_X:
-	case PPME_SYSCALL_CLONE_20_X:
-	case PPME_SYSCALL_FORK_17_X:
-	case PPME_SYSCALL_FORK_20_X:
-	case PPME_SYSCALL_VFORK_17_X:
-	case PPME_SYSCALL_VFORK_20_X:
-	case PPME_SYSCALL_CLONE3_X:
-		parinfo = evt->get_param(13);
-		tinfo->m_comm = parinfo->m_val;
-		break;
-	default:
-		ASSERT(false);
-	}
-
-	/* args */
-	parinfo = evt->get_param(2);
-	tinfo->set_args(parinfo->m_val, parinfo->m_len);
 
 	/* fdlimit */
 	parinfo = evt->get_param(7);
@@ -2089,7 +2104,6 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 
 	/* Add the new thread to the table */
 	bool thread_added = m_inspector->add_thread(tinfo);
-
 	/* Refresh user / loginuser / group */
 	if(tinfo->m_container_id.empty() == false)
 	{

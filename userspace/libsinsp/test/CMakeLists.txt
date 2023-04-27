@@ -53,6 +53,8 @@ set(LIBSINSP_UNIT_TESTS_SOURCES
 	"${PUBLIC_SINSP_API_SUITE}"
 )
 
+add_definitions(-DVISIBILITY_PRIVATE=public:)
+
 if(NOT MINIMAL_BUILD)
 	list(APPEND LIBSINSP_UNIT_TESTS_SOURCES procfs_utils.ut.cpp)
 endif()

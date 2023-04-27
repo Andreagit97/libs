@@ -787,3 +787,101 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_thread_after_execve)
 }
 
 /*=============================== EXECVE EVENTS ===========================*/
+
+/*=============================== NEW THREAD LOGIC ===========================*/
+
+/* There is a bug in this test! 
+ * we count some threads more than one time!
+ */
+TEST_F(sinsp_with_test_input, THRD_STATE_check_number_of_children)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* - init
+	 *  - p1_t1 (we will create this, thanks to `get_thread_ref()` in `parse_clone_exit_child`)
+	 *  - p1_t2
+	 *  - p1_t3  
+	 * 
+	 * We want to check if `p1_t1` will have the right number of children.
+	 */
+
+	int64_t p1_t1_tid = 24;
+	int64_t p1_t1_pid = 24;
+
+	/* create thread `p1_t2` for process `p1_t1` */
+	int64_t p1_t2_tid = 25;
+	int64_t p1_t2_pid = p1_t1_pid;
+	int64_t p1_t2_parent = INIT_TID;
+
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_parent, PPM_CL_CLONE_THREAD);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+
+	/* Now we should have created also `p1_t1` as an invalid tinfo */
+	sinsp_threadinfo* p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
+	ASSERT_TRUE(p1_t1_tinfo);
+	/* in `add_thread()` we call `increment_mainthread_childcount` so we should be able to correctly
+	 * assign this thread to the new created process.
+	 */
+	ASSERT_EQ(p1_t1_tinfo->m_nchilds, 1);
+
+	/* Please note that `p1_t1` is still an invalid thread so we will destroy it again at the next clone child event */
+	/// todo(@Andreagit97) not sure this is exactly what we want but populating it with child comm could be a wrong assumption.
+
+	/* create thread `p1_t3` for process `p1_t1` */
+	int64_t p1_t3_tid = 26;
+	int64_t p1_t3_pid = p1_t1_pid;
+	int64_t p1_t3_parent = INIT_TID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, p1_t3_tid, p1_t3_pid, p1_t3_parent, PPM_CL_CLONE_THREAD);
+	ASSERT_THREAD_INFO_PIDS(p1_t3_tid, p1_t3_pid, p1_t3_parent)
+
+	p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
+	ASSERT_TRUE(p1_t1_tinfo);
+	ASSERT_EQ(p1_t1_tinfo->m_nchilds, 2);
+}
+
+/*=============================== NEW THREAD LOGIC ===========================*/
+
+/*=============================== REMOVE THREAD LOGIC ===========================*/
+
+TEST_F(sinsp_with_test_input, THRD_STATE_remove_non_existing_thread)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	int64_t unknown_tid = 24;
+	
+	/* we should do nothing, here we are only checking that nothing will crash */
+	m_inspector.remove_thread(unknown_tid, false);
+	m_inspector.remove_thread(unknown_tid, true);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_remove_a_thread_leader_without_children)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* Init creates a new process p1 */
+	int64_t p1_t1_tid = 24;
+	int64_t p1_t1_pid = 24;
+	int64_t p1_t1_parent = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+
+	/* We should be able to remove the thread since it doesn't have children */
+	m_inspector.remove_thread(p1_t1_tid, false);
+	sinsp_threadinfo* p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
+	ASSERT_FALSE(p1_t1_tinfo);
+}
+
+
+
+/* creare un proccesso vuoto con il finto scan di proc e prima creare alcuni suoi thread e vedere il numero che si setta di child figli */
+
+/*=============================== REMOVE THREAD LOGIC ===========================*/
