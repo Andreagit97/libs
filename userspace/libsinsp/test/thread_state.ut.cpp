@@ -107,10 +107,10 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_remove_mock_chi
 	 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent, DEFAULT_VALUE, DEFAULT_VALUE, DEFAULT_VALUE, "old_bash");
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid, DEFAULT_VALUE, DEFAULT_VALUE, DEFAULT_VALUE, "old_bash");
 
 	sinsp_threadinfo* p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
 	ASSERT_TRUE(p1_t1_tinfo);
@@ -139,10 +139,10 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_keep_mock_child
 	 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent, DEFAULT_VALUE, DEFAULT_VALUE, DEFAULT_VALUE, "old_bash");
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid, DEFAULT_VALUE, DEFAULT_VALUE, DEFAULT_VALUE, "old_bash");
 
 	sinsp_threadinfo* p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
 	ASSERT_TRUE(p1_t1_tinfo);
@@ -164,20 +164,20 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_simple)
 	/* Init creates a new process p1 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Parent clone exit event */
 	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 	/* The process p1 creates a second process p2 */
 	int64_t p2_t1_tid = 30;
 	int64_t p2_t1_pid = 30;
-	int64_t p2_t1_parent = p1_t1_pid;
+	int64_t p2_t1_ptid = p1_t1_pid;
 
 	/* Parent clone exit event */
-	generate_clone_x_event(p2_t1_tid, p1_t1_tid, p1_t1_pid, p1_t1_parent);
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
+	generate_clone_x_event(p2_t1_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 }
 
 TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_parent_flag)
@@ -188,20 +188,20 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_parent_fl
 	/* Init creates a new process p1 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Parent clone exit event */
 	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 	/* The process p1 creates a second process p2 with the `CLONE_PARENT` flag */
 	int64_t p2_t1_tid = 30;
 	int64_t p2_t1_pid = 30;
-	int64_t p2_t1_parent = INIT_PID; /* with the `CLONE_PARENT` flag the parent is the parent of the calling process */
+	int64_t p2_t1_ptid = INIT_PID; /* with the `CLONE_PARENT` flag the parent is the parent of the calling process */
 
 	/* Parent clone exit event */
-	generate_clone_x_event(p2_t1_tid, p1_t1_tid, p1_t1_pid, p1_t1_parent, PPM_CL_CLONE_PARENT);
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
+	generate_clone_x_event(p2_t1_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CLONE_PARENT);
+	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 }
 
 TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_thread_flag)
@@ -213,20 +213,20 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_thread_fl
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
 	/// todo(@Andreagit97): rename all `_parent` in ptid;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Parent clone exit event */
 	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 	/* The process p1 creates a second thread p1_t2 */
 	int64_t p1_t2_tid = 30;
 	int64_t p1_t2_pid = 24;
-	int64_t p1_t2_parent = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
+	int64_t p1_t2_ptid = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
 
 	/* Parent clone exit event */
-	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_parent, PPM_CL_CLONE_THREAD);
-	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CLONE_THREAD);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
 }
 
 // TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_simulate_old_scap_file)
@@ -237,20 +237,20 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_thread_fl
 // 	/* Init create a child process p1 */
 // 	int64_t p1_t1_tid = 24;
 // 	int64_t p1_t1_pid = 24;
-// 	int64_t p1_t1_parent = INIT_PID;
+// 	int64_t p1_t1_ptid = INIT_PID;
 
 // 	/* Parent clone exit event */
 // 	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 // 	/* process p1 creates a second thread */
 // 	int64_t p1_t2_tid = 30;
 // 	int64_t p1_t2_pid = 24;
-// 	int64_t p1_t2_parent = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
+// 	int64_t p1_t2_ptid = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
 
 // 	/* Parent clone exit event */
-// 	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_parent, PPM_CL_CLONE_THREAD);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+// 	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CLONE_THREAD);
+// 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
 
 // 	/* The second thread of p1 creates a new process p2 */
 // 	/* Here we are receiving the clone exit event of the parent so the old scap-file won't have wrong info.
@@ -258,16 +258,16 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_thread_fl
 // 	 */
 // 	int64_t p2_t1_tid = 80;
 // 	int64_t p2_t1_pid = 80;
-// 	int64_t p2_t1_parent = p1_t2_pid;
+// 	int64_t p2_t1_ptid = p1_t2_pid;
 
 // 	/* Parent clone exit event */
-// 	generate_clone_x_event(p2_t1_tid, p1_t2_tid, p1_t2_pid, p1_t2_parent);
-// 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
+// 	generate_clone_x_event(p2_t1_tid, p1_t2_tid, p1_t2_pid, p1_t2_ptid);
+// 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 
 // 	/* process p2 creates a new process p3 */
 // 	int64_t p3_t1_tid = 90;
 // 	int64_t p3_t1_pid = 90;
-// 	int64_t p3_t1_parent = p2_t1_pid;
+// 	int64_t p3_t1_ptid = p2_t1_pid;
 
 // 	/* Parent clone exit event */
 // 	/* Please note here that the parent of p2 will be wrong in the scap-file!
@@ -275,11 +275,11 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_thread_fl
 // 	 * BTW thanks to our recovery logic we should be able to correctly populate the new process thread info (p3 thread info)
 // 	 */
 // 	generate_clone_x_event(p3_t1_tid, p2_t1_tid, p2_t1_pid, p1_t2_tid);
-// 	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_parent)
+// 	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_ptid)
 // 	sinsp_threadinfo* ptinfo = m_inspector.get_thread_ref(p2_t1_tid, false, true).get();
 // 	ASSERT_TRUE(ptinfo);
 // 	/* The clone parent event carries wrong info so we don't update the parent info */
-// 	ASSERT_EQ(ptinfo->m_ptid, p2_t1_parent);
+// 	ASSERT_EQ(ptinfo->m_ptid, p2_t1_ptid);
 // }
 
 /* Here the parent exit event always comes first  */
@@ -289,7 +289,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 	 *	- (init) tid 1 pid 1 ptid 0
 	 *  - (p_1 - t1) tid 2 pid 2 ptid 1
 	 *  - (p_1 - t2) tid 3 pid 2 ptid 1
-	 * 	  - (p_2 - t1) tid 25 pid 25 ptid 1 (CLONE_PARENT)
+	 * 	  - (p_2 - t1) tid 25 pid 25 ptid 1 (CLONE_ptid)
 	 * 		- (p_3 - t1) tid 72 pid 72 ptid 25
 	 * 			- (p_4 - t1) tid 76 pid 76 ptid 72 (container: vtid 1 vpid 1)
 	 * 	  - (p_2 - t2) tid 23 pid 25 ptid 1
@@ -304,19 +304,19 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	int64_t p1_t1_tid = 2;
 	int64_t p1_t1_pid = p1_t1_tid;
-	int64_t p1_t1_parent = INIT_TID;
+	int64_t p1_t1_ptid = INIT_TID;
 
 	/* Parent exit event */
 	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
 
 	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 	/* Child exit event */
-	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent);
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
 
 	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 	/*=============================== p1_t1 ===========================*/
 
@@ -326,19 +326,19 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	int64_t p1_t2_tid = 6;
 	int64_t p1_t2_pid = p1_t1_pid;
-	int64_t p1_t2_parent = INIT_TID;
+	int64_t p1_t2_ptid = INIT_TID;
 
 	/* Parent exit event */
-	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_parent, PPM_CL_CLONE_THREAD);
+	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CLONE_THREAD);
 
 	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
 
 	/* Child exit event */
-	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_parent, PPM_CL_CLONE_THREAD);
+	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD);
 
 	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
 
 	/*=============================== p1_t2 ===========================*/
 
@@ -348,19 +348,19 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	int64_t p2_t1_tid = 25;
 	int64_t p2_t1_pid = 25;
-	int64_t p2_t1_parent = INIT_TID;
+	int64_t p2_t1_ptid = INIT_TID;
 
 	/* Parent exit event */
-	generate_clone_x_event(p2_t1_tid, p1_t2_tid, p1_t2_pid, p1_t2_parent, PPM_CL_CLONE_PARENT);
+	generate_clone_x_event(p2_t1_tid, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_PARENT);
 
 	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
+	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 
 	/* Child exit event */
-	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_parent, PPM_CL_CLONE_PARENT);
+	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_ptid, PPM_CL_CLONE_PARENT);
 
 	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
+	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 
 	/*=============================== p2_t1 ===========================*/
 
@@ -370,19 +370,19 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	int64_t p2_t2_tid = 23;
 	int64_t p2_t2_pid = p2_t1_pid;
-	int64_t p2_t2_parent = INIT_TID; /* p2_t2 will have the same parent of p2_t1 */
+	int64_t p2_t2_ptid = INIT_TID; /* p2_t2 will have the same parent of p2_t1 */
 
 	/* Parent exit event */
-	generate_clone_x_event(p2_t2_tid, p2_t1_tid, p2_t1_pid, p2_t1_parent, PPM_CL_CLONE_THREAD);
+	generate_clone_x_event(p2_t2_tid, p2_t1_tid, p2_t1_pid, p2_t1_ptid, PPM_CL_CLONE_THREAD);
 
 	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p2_t2_tid, p2_t2_pid, p2_t2_parent)
+	ASSERT_THREAD_INFO_PIDS(p2_t2_tid, p2_t2_pid, p2_t2_ptid)
 
 	/* Child exit event */
-	generate_clone_x_event(0, p2_t2_tid, p2_t2_pid, p2_t2_parent, PPM_CL_CLONE_THREAD);
+	generate_clone_x_event(0, p2_t2_tid, p2_t2_pid, p2_t2_ptid, PPM_CL_CLONE_THREAD);
 
 	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS(p2_t2_tid, p2_t2_pid, p2_t2_parent)
+	ASSERT_THREAD_INFO_PIDS(p2_t2_tid, p2_t2_pid, p2_t2_ptid)
 
 	/*=============================== p2_t2 ===========================*/
 
@@ -392,19 +392,19 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	int64_t p3_t1_tid = 72;
 	int64_t p3_t1_pid = p3_t1_tid;
-	int64_t p3_t1_parent = p2_t1_tid;
+	int64_t p3_t1_ptid = p2_t1_tid;
 
 	/* Parent exit event */
-	generate_clone_x_event(p3_t1_tid, p2_t1_tid, p2_t1_pid, p2_t1_parent);
+	generate_clone_x_event(p3_t1_tid, p2_t1_tid, p2_t1_pid, p2_t1_ptid);
 
 	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_parent)
+	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_ptid)
 
 	/* Child exit event */
-	generate_clone_x_event(0, p3_t1_tid, p3_t1_pid, p3_t1_parent);
+	generate_clone_x_event(0, p3_t1_tid, p3_t1_pid, p3_t1_ptid);
 
 	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_parent)
+	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_ptid)
 
 	/*=============================== p3_t1 ===========================*/
 
@@ -414,12 +414,12 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	int64_t p4_t1_tid = 76;
 	int64_t p4_t1_pid = p4_t1_tid;
-	int64_t p4_t1_parent = p3_t1_tid;
+	int64_t p4_t1_ptid = p3_t1_tid;
 	int64_t p4_t1_vtid = 1; /* This process will be the `init` one in the new namespace */
 	int64_t p4_t1_vpid = p4_t1_vtid;
 
 	/* Parent exit event */
-	generate_clone_x_event(p4_t1_tid, p3_t1_tid, p3_t1_pid, p3_t1_parent, PPM_CL_CHILD_IN_PIDNS | PPM_CL_CLONE_NEWPID);
+	generate_clone_x_event(p4_t1_tid, p3_t1_tid, p3_t1_pid, p3_t1_ptid, PPM_CL_CHILD_IN_PIDNS | PPM_CL_CLONE_NEWPID);
 
 	/* Check fields after parent parsing
 	 * Note: here we cannot assert anything because the child will be in a container
@@ -428,10 +428,10 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	/* Child exit event */
 	/* On arm64 the flag `PPM_CL_CLONE_NEWPID` is not sent by the child, so we simulate the worst case */
-	generate_clone_x_event(0, p4_t1_tid, p4_t1_pid, p4_t1_parent, PPM_CL_CHILD_IN_PIDNS, p4_t1_vtid, p4_t1_vpid);
+	generate_clone_x_event(0, p4_t1_tid, p4_t1_pid, p4_t1_ptid, PPM_CL_CHILD_IN_PIDNS, p4_t1_vtid, p4_t1_vpid);
 
 	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t1_tid, p4_t1_pid, p4_t1_parent, p4_t1_vtid, p4_t1_vpid)
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t1_tid, p4_t1_pid, p4_t1_ptid, p4_t1_vtid, p4_t1_vpid)
 
 	/*=============================== p4_t1 ===========================*/
 
@@ -441,7 +441,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 	/* Here we prepare tid of the parents, please note that all the parents will always be process so
 	 * `tid == pid`.
 	 */
-	std::vector<int64_t> expected_p4_traverse_parents = {p4_t1_parent, p3_t1_parent, p2_t1_parent};
+	std::vector<int64_t> expected_p4_traverse_parents = {p4_t1_ptid, p3_t1_ptid, p2_t1_ptid};
 
 	sinsp_threadinfo::visitor_func_t p4_visitor = [&p4_traverse_parents](sinsp_threadinfo* pt)
 	{
@@ -476,15 +476,15 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_in_container)
 	/* We simulate a child clone exit event that wants to generate a child into a container */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 	int64_t p1_t1_vtid = 80;
 	int64_t p1_t1_vpid = 80;
 
 	/* Child clone exit event */
 	/* if we use `sched_proc_fork` tracepoint `PPM_CL_CLONE_NEWPID` won't be sent so we don't use it here, we use just `PPM_CL_CHILD_IN_PIDNS` */
-	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent, PPM_CL_CHILD_IN_PIDNS, p1_t1_vtid, p1_t1_vpid);
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CHILD_IN_PIDNS, p1_t1_vtid, p1_t1_vpid);
 
-	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p1_t1_tid, p1_t1_pid, p1_t1_parent, p1_t1_vtid, p1_t1_vpid)
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p1_t1_tid, p1_t1_pid, p1_t1_ptid, p1_t1_vtid, p1_t1_vpid)
 }
 
 TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_already_there)
@@ -495,14 +495,14 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_already_there)
 	/* Init creates a new process p1 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Parent clone exit event */
 	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
 
 	/* Now we try to create a child with a different pid but same tid with a clone exit child event */
 	int64_t new_pid = 35;
-	sinsp_evt* evt = generate_clone_x_event(0, p1_t1_tid, new_pid, p1_t1_parent);
+	sinsp_evt* evt = generate_clone_x_event(0, p1_t1_tid, new_pid, p1_t1_ptid);
 
 	/* The child parser should find a valid `evt->m_tinfo` set by the previous
 	 * parent clone event, so this new child event should be ignored and so
@@ -521,7 +521,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_replace_stale_ch
 	/* Create a mock child with a clone exit parent event */
 	int64_t p1_t1_tid = 24;
 	// int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Parent clone exit event */
 	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
@@ -536,7 +536,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_replace_stale_ch
 
 	/* Now we try to create a child with a different pid but same tid with a clone exit child event */
 	int64_t new_pid = 35;
-	sinsp_evt* evt = generate_clone_x_event(0, p1_t1_tid, new_pid, p1_t1_parent);
+	sinsp_evt* evt = generate_clone_x_event(0, p1_t1_tid, new_pid, p1_t1_ptid);
 
 	/* The child parser should find a "stale" `evt->m_tinfo` set by the previous
 	 * parent clone event and should replace it with new thread info.
@@ -554,11 +554,11 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simple)
 	/* Init creates a new process p1 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Child clone exit event */
-	evt = generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent);
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+	evt = generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 	/* Check if the thread-info in the thread table is correctly assigned to our event */
 	sinsp_threadinfo* p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
@@ -569,11 +569,11 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simple)
 	/* process p1 creates a new process p2 */
 	int64_t p2_t1_tid = 30;
 	int64_t p2_t1_pid = 30;
-	int64_t p2_t1_parent = p1_t1_pid;
+	int64_t p2_t1_ptid = p1_t1_pid;
 
 	/* Child clone exit event */
-	evt = generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_parent);
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
+	evt = generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 
 	/* Check if the thread-info in the thread table is correctly assigned to our event */
 	sinsp_threadinfo* p2_t1_tinfo = m_inspector.get_thread_ref(p2_t1_tid, false, true).get();
@@ -590,16 +590,16 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_parent_fla
 	/* Init creates a new process p1 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent);
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 	/* process p1 creates a new process p2 with the `CLONE_PARENT` flag */
 	int64_t p2_t1_tid = 30;
 	int64_t p2_t1_pid = 30;
-	int64_t p2_t1_parent = INIT_PID; /* with the `CLONE_PARENT` flag the parent is the parent of the calling process */
+	int64_t p2_t1_ptid = INIT_PID; /* with the `CLONE_PARENT` flag the parent is the parent of the calling process */
 
 	/* Child clone exit event */
 	/* Please note that in the clone child exit event, it could happen that
@@ -608,8 +608,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_parent_fla
 	 * shouldn't need this flag to detect the real parent, so we omit it here
 	 * and see what happens.
 	 */
-	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_parent); // PPM_CL_CLONE_PARENT
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
+	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_ptid); // PPM_CL_CLONE_PARENT
+	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 }
 
 TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_flag)
@@ -620,20 +620,20 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 	/* Init creates a new process p1 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent);
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 	/* process p1 creates a new thread (p1_t2_tid) */
 	int64_t p1_t2_tid = 30;
 	int64_t p1_t2_pid = 24;
-	int64_t p1_t2_parent = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
+	int64_t p1_t2_ptid = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
 
 	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_parent, PPM_CL_CLONE_THREAD);
-	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
 }
 
 // TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simulate_old_scap_file)
@@ -644,25 +644,25 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 // 	/* Init creates a new process p1 */
 // 	int64_t p1_t1_tid = 24;
 // 	int64_t p1_t1_pid = 24;
-// 	int64_t p1_t1_parent = INIT_PID;
+// 	int64_t p1_t1_ptid = INIT_PID;
 
 // 	/* Child clone exit event */
-// 	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+// 	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 // 	/* process p1 creates a new thread (p1_t2_tid) */
 // 	int64_t p1_t2_tid = 30;
 // 	int64_t p1_t2_pid = 24;
-// 	int64_t p1_t2_parent = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
+// 	int64_t p1_t2_ptid = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
 
 // 	/* Child clone exit event */
-// 	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_parent, PPM_CL_CLONE_THREAD);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+// 	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD);
+// 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
 
 // 	/* p1_t2 creates a new process p2 */
 // 	int64_t p2_t1_tid = 80;
 // 	int64_t p2_t1_pid = 80;
-// 	int64_t p2_t1_parent = p1_t1_pid;
+// 	int64_t p2_t1_ptid = p1_t1_pid;
 
 // 	/* Child clone exit event */
 // 	/* old scap files return `real_parent->pid` so the parent will be the second thread and not the leader thread.
@@ -670,7 +670,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 // 	 */
 // 	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p1_t2_tid);
 // 	/* Here we should see the patched thread info */
-// 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
+// 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 // }
 
 // TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simulate_old_scap_file_missing_info)
@@ -681,16 +681,16 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 // 	/* Init creates a new process p1 */
 // 	int64_t p1_t1_tid = 24;
 // 	int64_t p1_t1_pid = 24;
-// 	int64_t p1_t1_parent = INIT_PID;
+// 	int64_t p1_t1_ptid = INIT_PID;
 
 // 	/* Child clone exit event */
-// 	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+// 	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 // 	/* Now let's imagine that the process p1 creates a new thread (p1_t2)
 // 	 * like in the previous test, but we miss it.
 // 	 *
-// 	 *   generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_parent, PPM_CL_CLONE_THREAD);
+// 	 *   generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD);
 // 	 *
 // 	 * When this thread (p1_t2) will create a new process we won't be able
 // 	 * to patch the `ptid` since we miss the caller thread info!
@@ -698,7 +698,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 
 // 	int64_t p1_t2_tid = 30;
 // 	UNUSED int64_t p1_t2_pid = 24;
-// 	UNUSED int64_t p1_t2_parent = INIT_PID;
+// 	UNUSED int64_t p1_t2_ptid = INIT_PID;
 
 // 	/* Missing clone! */
 
@@ -708,16 +708,16 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 // 	/* The real parent should be `p1_t2_pid` but in old scap files we used `p1_t2_tid`
 // 	 * Here we simulate the scap_file behavior.
 // 	 */
-// 	int64_t p2_t1_parent = p1_t2_tid;
+// 	int64_t p2_t1_ptid = p1_t2_tid;
 
 // 	/* Child clone exit event */
-// 	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_parent);
-// 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_parent)
+// 	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_ptid);
+// 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 
-// 	/* During the parsing logic of the child we create also a mock parent (p2_t1_parent) since
+// 	/* During the parsing logic of the child we create also a mock parent (p2_t1_ptid) since
 // 	 * it was not present. Let's assert some of its values...
 // 	 */
-// 	sinsp_threadinfo* p1_t2_tinfo = m_inspector.get_thread_ref(p2_t1_parent, false, true).get();
+// 	sinsp_threadinfo* p1_t2_tinfo = m_inspector.get_thread_ref(p2_t1_ptid, false, true).get();
 // 	ASSERT_TRUE(p1_t2_tinfo);
 // 	ASSERT_EQ(p1_t2_tinfo->m_user.uid, 0xffffffff);
 // 	ASSERT_EQ(p1_t2_tinfo->m_user.uid, 0xffffffff);
@@ -725,8 +725,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 // 	ASSERT_EQ(p1_t2_tinfo->m_nchilds, 0);
 // 	ASSERT_EQ(p1_t2_tinfo->m_exe, "<NA>");
 // 	ASSERT_EQ(p1_t2_tinfo->m_comm, "<NA>");
-// 	ASSERT_EQ(p1_t2_tinfo->m_tid, p2_t1_parent);
-// 	ASSERT_EQ(p1_t2_tinfo->m_pid, p2_t1_parent); /// todo: this is wrong we created a new main thread but this is not a main thread!
+// 	ASSERT_EQ(p1_t2_tinfo->m_tid, p2_t1_ptid);
+// 	ASSERT_EQ(p1_t2_tinfo->m_pid, p2_t1_ptid); /// todo: this is wrong we created a new main thread but this is not a main thread!
 // 	GTEST_SKIP() << "The parent thread info matches the expected one, but some parent data are not correct!";
 // }
 
@@ -742,32 +742,32 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_thread_after_execve)
 	/* Init creates a new process p1 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent);
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 	/* process p1 creates a new thread (p1_t2) */
 	int64_t p1_t2_tid = 30;
 	int64_t p1_t2_pid = p1_t1_pid;
-	int64_t p1_t2_parent = INIT_PID;
+	int64_t p1_t2_ptid = INIT_PID;
 
 	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_parent);
-	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
 
 	/* p1_t2 creates a new thread (p1_t3) */
 	int64_t p1_t3_tid = 36;
 	int64_t p1_t3_pid = p1_t1_pid;
-	int64_t p1_t3_parent = INIT_PID;
+	int64_t p1_t3_ptid = INIT_PID;
 
 	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t3_tid, p1_t3_pid, p1_t3_parent);
-	ASSERT_THREAD_INFO_PIDS(p1_t3_tid, p1_t3_pid, p1_t3_parent)
+	generate_clone_x_event(0, p1_t3_tid, p1_t3_pid, p1_t3_ptid);
+	ASSERT_THREAD_INFO_PIDS(p1_t3_tid, p1_t3_pid, p1_t3_ptid)
 
 	/* p1_t2 calls an execve */
-	generate_execve_enter_and_exit_event(0, p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_parent);
+	generate_execve_enter_and_exit_event(0, p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
 
 	/* Here we still have the thread info of `p1_t2_tid` */
 	sinsp_threadinfo* p1_t2_tinfo = m_inspector.get_thread_ref(p1_t2_tid, false, true).get();
@@ -813,12 +813,12 @@ TEST_F(sinsp_with_test_input, THRD_STATE_check_number_of_children)
 	/* create thread `p1_t2` for process `p1_t1` */
 	int64_t p1_t2_tid = 25;
 	int64_t p1_t2_pid = p1_t1_pid;
-	int64_t p1_t2_parent = INIT_TID;
+	int64_t p1_t2_ptid = INIT_TID;
 
 	FAIL() << " We have to be able here the missing thread-leader";
 	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_parent, PPM_CL_CLONE_THREAD);
-	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_parent)
+	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
 
 	// /* Now we should have created also `p1_t1` as an invalid tinfo */
 	// sinsp_threadinfo* p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
@@ -834,11 +834,11 @@ TEST_F(sinsp_with_test_input, THRD_STATE_check_number_of_children)
 	// /* create thread `p1_t3` for process `p1_t1` */
 	// int64_t p1_t3_tid = 26;
 	// int64_t p1_t3_pid = p1_t1_pid;
-	// int64_t p1_t3_parent = INIT_TID;
+	// int64_t p1_t3_ptid = INIT_TID;
 
 	// /* Child clone exit event */
-	// generate_clone_x_event(0, p1_t3_tid, p1_t3_pid, p1_t3_parent, PPM_CL_CLONE_THREAD);
-	// ASSERT_THREAD_INFO_PIDS(p1_t3_tid, p1_t3_pid, p1_t3_parent)
+	// generate_clone_x_event(0, p1_t3_tid, p1_t3_pid, p1_t3_ptid, PPM_CL_CLONE_THREAD);
+	// ASSERT_THREAD_INFO_PIDS(p1_t3_tid, p1_t3_pid, p1_t3_ptid)
 
 	// p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
 	// ASSERT_TRUE(p1_t1_tinfo);
@@ -869,11 +869,11 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_a_thread_leader_without_children
 	/* Init creates a new process p1 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_parent = INIT_PID;
+	int64_t p1_t1_ptid = INIT_PID;
 
 	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_parent);
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_parent)
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
 	/* We should be able to remove the thread since it doesn't have children */
 	m_inspector.remove_thread(p1_t1_tid, false);
