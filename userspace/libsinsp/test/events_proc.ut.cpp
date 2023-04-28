@@ -351,6 +351,7 @@ TEST_F(sinsp_with_test_input, spawn_process)
 	ASSERT_EQ(get_field_as_string(evt, "proc.exepath"), "/bin/test-exe");
 	ASSERT_EQ(get_field_as_string(evt, "proc.aexepath[0]"), "/bin/test-exe");
 
+	FAIL() << " This test seems to assert a wrong proc.pname!";
 	// check that parent/ancestor info are taken from the parent process
 	ASSERT_EQ(get_field_as_string(evt, "proc.pname"), "init");
 
