@@ -39,6 +39,7 @@ struct iovec {
 class sinsp_delays_info;
 class sinsp_tracerparser;
 class blprogram;
+class thread_group_info;
 
 typedef struct erase_fd_params
 {
@@ -325,6 +326,8 @@ public:
 	size_t m_program_hash; ///< Unique hash of the current program
 	size_t m_program_hash_scripts;  ///< Unique hash of the current program, including arguments for scripting programs (like python or ruby)
 	int32_t m_tty; ///< Number of controlling terminal
+	std::shared_ptr<thread_group_info> m_tginfo;
+	std::list<std::weak_ptr<sinsp_threadinfo>> m_childs;
 
 
 	// In some cases, a threadinfo has a category that identifies
@@ -714,3 +717,25 @@ private:
 	friend class sinsp_threadinfo;
 	friend class sinsp_baseliner;
 };
+
+/* New struct that keep information regarding the thread group */
+typedef struct thread_group_info
+{
+    // thread_group_info():
+	// 	pid(-1),
+	// 	alive_count(0),
+	// 	reaper(false){ };
+	thread_group_info(int64_t group_pid, uint64_t count, bool reaper, std::weak_ptr<sinsp_threadinfo> current_thread):
+		pid(group_pid),
+		alive_count(count),
+		reaper(reaper){
+			threads.push_front(current_thread);
+		 };	
+
+  ///todo(@Andreagit97): implements setter/getters
+
+  int64_t pid; /* unsigned if we want to use `-1` as an invalid value */
+  uint64_t alive_count;
+  std::list<std::weak_ptr<sinsp_threadinfo>> threads;
+  bool reaper;
+}thread_group_info;
