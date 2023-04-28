@@ -511,6 +511,7 @@ VISIBILITY_PRIVATE
 class threadinfo_map_t
 {
 public:
+	typedef std::function<bool(const std::shared_ptr<sinsp_threadinfo>&)> shared_ptr_visitor_t;
 	typedef std::function<bool(const sinsp_threadinfo&)> const_visitor_t;
 	typedef std::function<bool(sinsp_threadinfo&)> visitor_t;
 	typedef std::shared_ptr<sinsp_threadinfo> ptr_t;
@@ -548,6 +549,18 @@ public:
 	inline void clear()
 	{
 		m_threads.clear();
+	}
+
+	bool loop_shared_pointer(shared_ptr_visitor_t callback)
+	{
+		for (auto& it : m_threads)
+		{
+			if (!callback(it.second))
+			{
+				return false;
+			}
+		}
+		return true;
 	}
 
 	bool const_loop(const_visitor_t callback) const
@@ -628,6 +641,8 @@ public:
 	void reset_child_dependencies();
 	void create_child_dependencies();
 	void recreate_child_dependencies();
+	void create_thread_groups_after_proc_scan();
+	void assign_children_to_parent_after_proc_scan();
 
 	/*!
       \brief Look up a thread given its tid and return its information,
@@ -686,6 +701,8 @@ public:
 	void set_m_max_n_proc_lookups(int32_t val) { m_max_n_proc_lookups = val; }
 	void set_m_max_n_proc_socket_lookups(int32_t val) { m_max_n_proc_socket_lookups = val; }
 private:
+	void create_thread_groups(const std::shared_ptr<sinsp_threadinfo>& tinfo);
+	void assign_children_to_parent(const std::shared_ptr<sinsp_threadinfo>& tinfo);
 	void increment_mainthread_childcount(sinsp_threadinfo* threadinfo);
 	inline void clear_thread_pointers(sinsp_threadinfo& threadinfo);
 	void free_dump_fdinfos(std::vector<scap_fdinfo*>* fdinfos_to_free);
