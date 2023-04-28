@@ -1538,7 +1538,7 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		child_tinfo->m_tginfo = std::make_shared<thread_group_info>(child_tinfo->m_pid, 1, false, child_tinfo_tmp);
 
 		/* This could become shared...*/
-		child_parent_tinfo->m_childs.push_front(child_tinfo_tmp);
+		child_parent_tinfo->m_children.push_front(child_tinfo_tmp);
 	}
 	else /* Simple thread case */
 	{
@@ -1562,7 +1562,7 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		ASSERT(child_parent_tinfo);
 
 		/* This could become shared...*/
-		child_parent_tinfo->m_childs.push_front(child_tinfo_tmp);
+		child_parent_tinfo->m_children.push_front(child_tinfo_tmp);
 	}
 
 	/* We set them here because now we have the right info.
@@ -2095,7 +2095,7 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 		tinfo->m_tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, 1, false, child_tinfo);
 
 		/* lookup_tinfo is the parent in case of main process */
-		lookup_tinfo->m_childs.push_front(child_tinfo);
+		lookup_tinfo->m_children.push_front(child_tinfo);
 	}
 	else /* Simple thread case */
 	{
@@ -2114,7 +2114,7 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 			/* If nullprt it means we have no more space in the table so not sure what to do here...*/
 				/// todo(@Andreagit97) probably we need to assing the child to `init` process...
 		}
-		parent_tinfo->m_childs.push_front(child_tinfo);
+		parent_tinfo->m_children.push_front(child_tinfo);
 	}
 
 	/*=============================== CREATE THREAD RELATIONSHIPS ===========================*/
