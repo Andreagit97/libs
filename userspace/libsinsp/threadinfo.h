@@ -39,7 +39,6 @@ struct iovec {
 class sinsp_delays_info;
 class sinsp_tracerparser;
 class blprogram;
-class thread_group_info;
 
 typedef struct erase_fd_params
 {
@@ -49,6 +48,31 @@ typedef struct erase_fd_params
 	sinsp_fdinfo_t* m_fdinfo;
 	uint64_t m_ts;
 }erase_fd_params;
+
+class sinsp_threadinfo;
+
+/* New struct that keep information regarding the thread group */
+typedef struct thread_group_info
+{
+    // thread_group_info():
+	// 	pid(-1),
+	// 	alive_count(0),
+	// 	reaper(false){ };
+	thread_group_info(int64_t group_pid, uint64_t count, bool reaper, std::weak_ptr<sinsp_threadinfo> current_thread):
+		pid(group_pid),
+		alive_count(count),
+		reaper(reaper){
+			threads.push_front(current_thread);
+		 };	
+
+  ///todo(@Andreagit97): implements setter/getters
+
+  int64_t pid; /* unsigned if we want to use `-1` as an invalid value */
+  uint64_t alive_count;
+  std::list<std::weak_ptr<sinsp_threadinfo>> threads;
+  bool reaper;
+}thread_group_info;
+
 
 /** @defgroup state State management
  *  @{
@@ -125,39 +149,26 @@ public:
 	*/
 	inline sinsp_threadinfo* get_main_thread() const
 	{
-		auto main_thread = m_main_thread.lock();
-		if(!main_thread)
+		/* Here we could use the first element of our list */
+		/* This is possible when we have invalid threads
+		 */
+		if(m_tginfo == nullptr)
 		{
-			//
-			// Is this a child thread?
-			//
-			if((m_pid == m_tid) || m_flags & PPM_CL_IS_MAIN_THREAD)
-			{
-				//
-				// No, this is either a single thread process or the root thread of a
-				// multithread process.
-				// Note: we don't set m_main_thread because there are cases in which this is
-				//       invoked for a threadinfo that is in the stack. Caching the this pointer
-				//       would cause future mess.
-				//
-				return const_cast<sinsp_threadinfo*>(this);
-			}
-			else
-			{
-				//
-				// Yes, this is a child thread. Find the process root thread.
-				//
-				auto ptinfo = lookup_thread();
-				if (!ptinfo)
-				{
-					return NULL;
-				}
-				m_main_thread = ptinfo;
-				return &*ptinfo;
-			}
+			return nullptr;
 		}
 
-		return &*main_thread;
+		/* If the tginfo is not nullptr we have for sure at least one 
+		 * thread. We use weak pointers so if the first thread is expired
+		 * or is not the main thread, we still don't have the main thread
+		 * for this group.
+		 */
+		auto possible_main = m_tginfo->threads.front().lock();
+		if(possible_main == nullptr || !possible_main->is_main_thread())
+		{
+			return nullptr;
+		}
+
+		return possible_main.get();
 	}
 
 	/*!
@@ -484,7 +495,6 @@ VISIBILITY_PRIVATE
 	//
 	sinsp_fdtable m_fdtable; // The fd table of this thread
 	std::string m_cwd; // current working directory
-	mutable std::weak_ptr<sinsp_threadinfo> m_main_thread;
 	uint8_t* m_lastevent_data; // Used by some event parsers to store the last enter event
 	std::vector<void*> m_private_state;
 
@@ -516,9 +526,9 @@ public:
 	typedef std::function<bool(sinsp_threadinfo&)> visitor_t;
 	typedef std::shared_ptr<sinsp_threadinfo> ptr_t;
 
-	inline void put(sinsp_threadinfo* tinfo)
+	inline void put(ptr_t tinfo)
 	{
-		m_threads[tinfo->m_tid] = ptr_t(tinfo);
+		m_threads[tinfo->m_tid] = tinfo;
 	}
 
 	inline sinsp_threadinfo* get(uint64_t tid)
@@ -639,7 +649,6 @@ public:
 	inline bool remove_inactive_threads();
 	void fix_sockets_coming_from_proc();
 	void reset_child_dependencies();
-	void create_child_dependencies();
 	void recreate_child_dependencies();
 	void create_thread_dependencies_after_proc_scan();
 	/*!
@@ -714,7 +723,6 @@ public:
 	}
 private:
 	void create_thread_dependencies(const std::shared_ptr<sinsp_threadinfo>& tinfo);
-	void increment_mainthread_childcount(sinsp_threadinfo* threadinfo);
 	inline void clear_thread_pointers(sinsp_threadinfo& threadinfo);
 	void free_dump_fdinfos(std::vector<scap_fdinfo*>* fdinfos_to_free);
 	void thread_to_scap(sinsp_threadinfo& tinfo, scap_threadinfo* sctinfo);
@@ -747,25 +755,3 @@ private:
 	friend class sinsp_threadinfo;
 	friend class sinsp_baseliner;
 };
-
-/* New struct that keep information regarding the thread group */
-typedef struct thread_group_info
-{
-    // thread_group_info():
-	// 	pid(-1),
-	// 	alive_count(0),
-	// 	reaper(false){ };
-	thread_group_info(int64_t group_pid, uint64_t count, bool reaper, std::weak_ptr<sinsp_threadinfo> current_thread):
-		pid(group_pid),
-		alive_count(count),
-		reaper(reaper){
-			threads.push_front(current_thread);
-		 };	
-
-  ///todo(@Andreagit97): implements setter/getters
-
-  int64_t pid; /* unsigned if we want to use `-1` as an invalid value */
-  uint64_t alive_count;
-  std::list<std::weak_ptr<sinsp_threadinfo>> threads;
-  bool reaper;
-}thread_group_info;

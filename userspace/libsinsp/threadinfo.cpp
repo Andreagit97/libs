@@ -77,7 +77,6 @@ void sinsp_threadinfo::init()
 	m_vtid = -1;
 	m_vpid = -1;
 	m_pidns_init_start_ts = 0;
-	m_main_thread.reset();
 	m_lastevent_fd = 0;
 	m_last_latency_entertime = 0;
 	m_latency = 0;
@@ -1381,6 +1380,7 @@ sinsp_thread_manager::sinsp_thread_manager(sinsp* inspector)
 void sinsp_thread_manager::clear()
 {
 	m_threadtable.clear();
+	m_thread_groups.clear();
 	m_last_tid = 0;
 	m_last_tinfo.reset();
 	m_last_flush_time_ns = 0;
@@ -1404,16 +1404,20 @@ void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sins
 		throw sinsp_exception("There is a NULL pointer in the thread table, this should never happen");
 	}
 
-	/* Init doesn't have a parent, we need to explicitly ignore it, otherwise, we will
-	 * assign itself as its parent.
-	 * We need to understand if we want to create a thread group info for init or not...
-	 */
-	if(tinfo->m_tid==1)
+	/* For invalid threads we attach them to init */
+	if(tinfo->m_pid == -1 || tinfo->m_ptid == -1)
 	{
+		auto parent_thread = m_inspector->get_thread_ref(1, false);
+		if(parent_thread == nullptr)
+		{
+			throw sinsp_exception("There is no init process (tid 1) under `/proc`. We cannot build a process tree");
+		}
+		tinfo->m_ptid = 1;
+		parent_thread->m_children.push_front(tinfo);
 		return;
 	}
 
-	/* Create the thread group info for the thread */
+	/* Create the thread group info for the thread. */
 	auto tginfo = m_inspector->m_thread_manager->get_thread_group_info(tinfo->m_pid);
 	if(tginfo == nullptr)
 	{
@@ -1422,10 +1426,26 @@ void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sins
 	}
 	else
 	{
-		tginfo->threads.push_front(tinfo);
+		/* The main thread should always be the first element of the list, if present.
+		 * In this way we can efficiently obtain the main thread.
+		 */
+		if(tinfo->is_main_thread())
+		{
+			tginfo->threads.push_front(tinfo);
+		}
+		else
+		{
+			tginfo->threads.push_back(tinfo);
+		}
 		tginfo->alive_count++;
 	}
 	tinfo->m_tginfo = tginfo;
+
+	/* init has no parent */
+	if(tinfo->m_tid == 1)
+	{
+		return;
+	}
 
 	/* Assign the child to the parent:
 	 * Remember that in `/proc` scan the `ptid` is `ppid`.
@@ -1436,12 +1456,11 @@ void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sins
 	auto parent_thread = m_inspector->get_thread_ref(tinfo->m_ptid, false);
 	if(parent_thread == nullptr)
 	{
-		/* We try to scan proc again if necessary, searching explicitly for
-		 * the init process. If init is not there we can do nothing.
+		/* If init is not there we can do nothing.
 		 * If for some reason the process with tid `1` is not the reaper, we need to
 		 * implement some custom way to find the init reaper.
 		 */
-		parent_thread = m_inspector->get_thread_ref(1, true, true);
+		parent_thread = m_inspector->get_thread_ref(1, false);
 		if(parent_thread == nullptr)
 		{
 			throw sinsp_exception("There is no init process (tid 1) under `/proc`. We cannot build a process tree");
@@ -1452,25 +1471,11 @@ void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sins
 	parent_thread->m_children.push_front(tinfo);
 }
 
-void sinsp_thread_manager::increment_mainthread_childcount(sinsp_threadinfo* threadinfo)
-{
-	if(threadinfo->m_flags & PPM_CL_CLONE_THREAD)
-	{
-		//
-		// Increment the refcount of the main thread so it won't
-		// be deleted (if it calls pthread_exit()) until we are done
-		//
-		ASSERT(threadinfo->m_pid != threadinfo->m_tid);
-
-		/* Here we should create new threads since we are in a rebalancing phase, for this reason, `query_os_if_not_found` should be `false` */
-		sinsp_threadinfo* main_thread = m_inspector->get_thread_ref(threadinfo->m_pid, false, true).get();
-		if(main_thread)
-		{
-			++main_thread->m_nchilds;
-		}
-	}
-}
-
+/* Can be called when:
+ * 1. We crafted a new event to create in clone parsers. (`from_scap_proctable==false`)
+ * 2. We are doing a proc scan with a callback or without. (`from_scap_proctable==true`)
+ * 3. We are trying to obtain thread info from /proc through `get_thread_ref`
+ */
 bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_scap_proctable)
 {
 #ifdef GATHER_INTERNAL_STATS
@@ -1479,6 +1484,7 @@ bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_sc
 
 	m_last_tinfo.reset();
 
+	/* We have no more space */
 	if(m_threadtable.size() >= m_max_thread_table_size
 #if defined(HAS_CAPTURE)
 	   && threadinfo->m_pid != m_inspector->m_self_pid
@@ -1495,14 +1501,16 @@ bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_sc
 		return false;
 	}
 
+	auto tinfo_shared_ptr = std::shared_ptr<sinsp_threadinfo>(threadinfo);
+
 	if(!from_scap_proctable)
 	{
-		increment_mainthread_childcount(threadinfo);
+		create_thread_dependencies(tinfo_shared_ptr);
 	}
 
-	threadinfo->compute_program_hash();
-	threadinfo->allocate_private_state();
-	m_threadtable.put(threadinfo);
+	tinfo_shared_ptr->compute_program_hash();
+	tinfo_shared_ptr->allocate_private_state();
+	m_threadtable.put(tinfo_shared_ptr);
 
 	return true;
 }
@@ -1636,24 +1644,12 @@ void sinsp_thread_manager::fix_sockets_coming_from_proc()
 
 void sinsp_thread_manager::clear_thread_pointers(sinsp_threadinfo& tinfo)
 {
-	tinfo.m_main_thread.reset();
-
 	sinsp_fdtable* fdt = tinfo.get_fd_table();
 	if(fdt != NULL)
 	{
 		fdt->reset_cache();
 	}
 }
-
-/*
-void sinsp_thread_manager::clear_thread_pointers(threadinfo_map_iterator_t it)
-{
-	it->second.m_main_program_thread = NULL;
-	it->second.m_main_thread = NULL;
-	it->second.m_progid = -1LL;
-	it->second.m_fdtable.reset_cache();
-}
-*/
 
 void sinsp_thread_manager::reset_child_dependencies()
 {
@@ -1677,18 +1673,10 @@ void sinsp_thread_manager::create_thread_dependencies_after_proc_scan()
 	});
 }
 
-void sinsp_thread_manager::create_child_dependencies()
-{
-	m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
-		increment_mainthread_childcount(&tinfo);
-		return true;
-	});
-}
-
+// todo(@Andreagit97) check if we can remove it!
 void sinsp_thread_manager::recreate_child_dependencies()
 {
 	reset_child_dependencies();
-	create_child_dependencies();
 }
 
 void sinsp_thread_manager::update_statistics()
@@ -1969,7 +1957,7 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::get_thread_ref(int64_t tid, bool q
             // Add a fake entry to avoid a continuous lookup
             //
             newti->m_tid = tid;
-            newti->m_pid = tid;
+            newti->m_pid = -1;
             newti->m_ptid = -1;
             newti->m_comm = "<NA>";
             newti->m_exe = "<NA>";
@@ -2001,6 +1989,7 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::get_thread_ref(int64_t tid, bool q
     return sinsp_proc;
 }
 
+/* `lookup_only==true` means that we don't fill the `m_last_tinfo` field */
 threadinfo_map_t::ptr_t sinsp_thread_manager::find_thread(int64_t tid, bool lookup_only)
 {
 	threadinfo_map_t::ptr_t thr;
@@ -2010,7 +1999,8 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::find_thread(int64_t tid, bool look
 	if(tid == m_last_tid)
 	{
 		thr = m_last_tinfo.lock();
-		if (thr)                                                                                     {
+		if (thr)
+		{
 #ifdef GATHER_INTERNAL_STATS
 			m_cached_lookups->increment();
 #endif
@@ -2018,7 +2008,8 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::find_thread(int64_t tid, bool look
 			// for something that may not need to be precise
 			thr->m_lastaccess_ts = m_inspector->get_lastevent_ts();
 			return thr;
-		}                                                                                        }
+		}
+	}
 
 	//
 	// Caching failed, do a real lookup

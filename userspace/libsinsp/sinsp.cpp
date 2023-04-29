@@ -387,12 +387,6 @@ void sinsp::init()
 	m_thread_manager->create_thread_dependencies_after_proc_scan();
 
 	//
-	// Scan the list to create the proper parent/child dependencies
-	//
-	///todo(@Andreagit97): probably we need to remove this one
-	m_thread_manager->create_child_dependencies();
-
-	//
 	// Scan the list to fix the direction of the sockets
 	//
 	m_thread_manager->fix_sockets_coming_from_proc();
