@@ -641,11 +641,7 @@ public:
 	void reset_child_dependencies();
 	void create_child_dependencies();
 	void recreate_child_dependencies();
-	// void create_thread_dependencies_scan();
-
-	void create_thread_groups_after_proc_scan();
-	void assign_children_to_parent_after_proc_scan();
-
+	void create_thread_dependencies_after_proc_scan();
 	/*!
       \brief Look up a thread given its tid and return its information,
        and optionally go dig into proc if the thread is not in the thread table.
@@ -717,8 +713,7 @@ public:
 		m_thread_groups.insert({pid, tginfo});
 	}
 private:
-	void create_thread_groups(const std::shared_ptr<sinsp_threadinfo>& tinfo);
-	void assign_children_to_parent(const std::shared_ptr<sinsp_threadinfo>& tinfo);
+	void create_thread_dependencies(const std::shared_ptr<sinsp_threadinfo>& tinfo);
 	void increment_mainthread_childcount(sinsp_threadinfo* threadinfo);
 	inline void clear_thread_pointers(sinsp_threadinfo& threadinfo);
 	void free_dump_fdinfos(std::vector<scap_fdinfo*>* fdinfos_to_free);

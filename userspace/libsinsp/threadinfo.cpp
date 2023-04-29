@@ -1396,7 +1396,7 @@ void sinsp_thread_manager::clear()
 }
 
 /* This is called on the table after the `/proc` scan */
-void sinsp_thread_manager::assign_children_to_parent(const std::shared_ptr<sinsp_threadinfo>& tinfo)
+void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sinsp_threadinfo>& tinfo)
 {
 	/* This should never happen */
 	if(tinfo == nullptr)
@@ -1406,13 +1406,29 @@ void sinsp_thread_manager::assign_children_to_parent(const std::shared_ptr<sinsp
 
 	/* Init doesn't have a parent, we need to explicitly ignore it, otherwise, we will
 	 * assign itself as its parent.
+	 * We need to understand if we want to create a thread group info for init or not...
 	 */
 	if(tinfo->m_tid==1)
 	{
 		return;
 	}
 
-	/* Remember that in `/proc` scan the `ptid` is `ppid`.
+	/* Create the thread group info for the thread */
+	auto tginfo = m_inspector->m_thread_manager->get_thread_group_info(tinfo->m_pid);
+	if(tginfo == nullptr)
+	{
+		tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, 1, false, tinfo);
+		m_inspector->m_thread_manager->set_thread_group_info(tinfo->m_pid, tginfo);
+	}
+	else
+	{
+		tginfo->threads.push_front(tinfo);
+		tginfo->alive_count++;
+	}
+	tinfo->m_tginfo = tginfo;
+
+	/* Assign the child to the parent:
+	 * Remember that in `/proc` scan the `ptid` is `ppid`.
 	 * Here we just scanned proc so `query_os_if_not_found` should be false.
 	 * If we don't find the parent in the table we can do nothing, so we consider
 	 * INIT as the new parent.
@@ -1434,57 +1450,6 @@ void sinsp_thread_manager::assign_children_to_parent(const std::shared_ptr<sinsp
 		tinfo->m_ptid = 1;
 	}
 	parent_thread->m_children.push_front(tinfo);
-}
-
-/* This is called on the table after the `/proc` scan */
-void sinsp_thread_manager::create_thread_groups(const std::shared_ptr<sinsp_threadinfo>& tinfo)
-{
-	/* This should never happen */
-	if(tinfo == nullptr)
-	{
-		throw sinsp_exception("There is a NULL pointer in the thread table, this should never happen");
-	}
-
-	///todo(@Andreagit97): understand if we want to create a thread group info for init.
-
-	/* All threads of the same thread group will be under the same parent
-	 * so we use parents to recover all threads that belong to a specific
-	 * thread group.
-	 * 
-	 * Please note that not all threads in the table should have children!
-	 * but they all should have a parent, apart from init (do we want to handle it(?))
-	 */
-	if(tinfo->m_children.empty())
-	{
-		return;
-	}
-
-	/* The key is the pid while the value is the shared pointer to the thread group info */
-	std::unordered_map<int64_t, std::shared_ptr<thread_group_info>> thread_group_info_map;
-
-	for(const auto& child: tinfo->m_children)
-	{
-		if(auto child_ptr = child.lock())
-		{
-			auto tginfo = thread_group_info_map.find(child_ptr->m_pid);
-			/* We don't have the thread group info for this group, we need
-			 * to create it and assign it to the current thread. If we don't
-			 * find the entry in the map it means that is the first time we meet
-			 * this thread group.
-			 */
-			if(tginfo == thread_group_info_map.end())
-			{
-				child_ptr->m_tginfo = std::make_shared<thread_group_info>(child_ptr->m_pid, 1, false, child);
-				thread_group_info_map.insert({child_ptr->m_pid, child_ptr->m_tginfo});
-			}
-			else
-			{
-				child_ptr->m_tginfo = tginfo->second;
-				child_ptr->m_tginfo->alive_count++;
-				child_ptr->m_tginfo->threads.push_front(child);
-			}
-		}
-	}
 }
 
 void sinsp_thread_manager::increment_mainthread_childcount(sinsp_threadinfo* threadinfo)
@@ -1704,23 +1669,10 @@ void sinsp_thread_manager::reset_child_dependencies()
 	});
 }
 
-/* Here we are almost sure that many children will have their parents
- * but we could have some exceptions, for example, some parents could die
- * during the proc scan.
- */
-void sinsp_thread_manager::assign_children_to_parent_after_proc_scan()
-{
-	/* Here we loop over the whole table and we assign children to parents. */
-	m_threadtable.loop_shared_pointer([&](const std::shared_ptr<sinsp_threadinfo>& tinfo) {
-		assign_children_to_parent(tinfo);
-		return true;
-	});
-}
-
-void sinsp_thread_manager::create_thread_groups_after_proc_scan()
+void sinsp_thread_manager::create_thread_dependencies_after_proc_scan()
 {
 	m_threadtable.loop_shared_pointer([&](const std::shared_ptr<sinsp_threadinfo>& tinfo) {
-		create_thread_groups(tinfo);
+		create_thread_dependencies(tinfo);
 		return true;
 	});
 }

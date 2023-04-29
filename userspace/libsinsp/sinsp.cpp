@@ -384,10 +384,7 @@ void sinsp::init()
 	import_user_list();
 
 	/* Create parent/child dependencies */
-	m_thread_manager->assign_children_to_parent_after_proc_scan();
-
-	/* Create thread group info */
-	m_thread_manager->create_thread_groups_after_proc_scan();
+	m_thread_manager->create_thread_dependencies_after_proc_scan();
 
 	//
 	// Scan the list to create the proper parent/child dependencies
