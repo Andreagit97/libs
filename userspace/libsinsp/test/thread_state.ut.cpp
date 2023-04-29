@@ -726,7 +726,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 	int64_t p1_t2_ptid = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of
 					  the calling process */
 
-	/* Child clone exit event */
+	// /* Child clone exit event */
 	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD);
 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
 
@@ -991,3 +991,67 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_a_thread_leader_without_children
  * numero che si setta di child figli */
 
 /*=============================== REMOVE THREAD LOGIC ===========================*/
+
+/*=============================== MISSING INFO ===========================*/
+
+/* We can reproduce the same test with just one event missing between child and parent */
+/* We can reproduce the same test with the clone Parent flag */
+
+TEST_F(sinsp_with_test_input, THRD_STATE_missing_both_clone_events_create_leader_thread)
+{
+	// add_default_init_thread();
+	// open_inspector();
+
+	// /* Init creates a new process p1 but we miss both clone events so we know nothing about it */
+	// int64_t p1_t1_tid = 24;
+	// int64_t p1_t1_pid = 24;
+	// int64_t p1_t1_ptid = INIT_TID;
+
+	// /* The process p1 creates a second process p2 */
+	// int64_t p2_t1_tid = 30;
+	// int64_t p2_t1_pid = 30;
+	// int64_t p2_t1_ptid = p1_t1_tid;
+
+	// /* Parent clone exit event */
+	// generate_clone_x_event(p2_t1_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	// ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
+	// ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 1, p2_t1_tid)
+	// ASSERT_THREAD_CHILDREN(p1_t1_tid, 1, p2_t1_tid)
+
+	// /* We should be also able to set p1_t1 as a child of init */
+	// ASSERT_THREAD_CHILDREN(INIT_TID, 1, p1_t1_tid)
+
+	// /* We should be also able to set the thread group info and the child of p1_t1 */
+	// ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 1, false, 1, p1_t1_tid)
+	// ASSERT_THREAD_CHILDREN(p1_t1_tid, 1, p2_t1_tid)
+}
+
+// TEST_F(sinsp_with_test_input, THRD_STATE_missing_both_clone_events_create_thread)
+// {
+// 	add_default_init_thread();
+// 	open_inspector();
+
+// 	/* Init creates a new process p1 but we miss both clone events so we know nothing about it */
+// 	UNUSED int64_t p1_t1_tid = 24;
+// 	UNUSED int64_t p1_t1_pid = 24;
+// 	UNUSED int64_t p1_t1_ptid = INIT_TID;
+
+// 	/* Parent clone exit event */
+// 	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
+// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
+// 	ASSERT_THREAD_CHILDREN(INIT_TID, 1, p1_t1_tid)
+
+// 	/* The process p1 creates a second thread p1_t2 */
+// 	int64_t p1_t2_tid = 30;
+// 	int64_t p1_t2_pid = 24;
+// 	/* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
+// 	int64_t p1_t2_ptid = INIT_TID;
+
+// 	/* Parent clone exit event */
+// 	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CLONE_THREAD);
+// 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
+// 	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, p1_t1_tid, p1_t2_tid)
+// 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, p1_t1_tid, p1_t2_tid)
+// }
+
+/*=============================== MISSING INFO ===========================*/

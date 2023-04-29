@@ -641,6 +641,8 @@ public:
 	void reset_child_dependencies();
 	void create_child_dependencies();
 	void recreate_child_dependencies();
+	// void create_thread_dependencies_scan();
+
 	void create_thread_groups_after_proc_scan();
 	void assign_children_to_parent_after_proc_scan();
 
@@ -700,6 +702,20 @@ public:
 
 	void set_m_max_n_proc_lookups(int32_t val) { m_max_n_proc_lookups = val; }
 	void set_m_max_n_proc_socket_lookups(int32_t val) { m_max_n_proc_socket_lookups = val; }
+	std::shared_ptr<thread_group_info> get_thread_group_info(int64_t pid)
+	{ 
+		auto tgroup = m_thread_groups.find(pid);
+		if(tgroup != m_thread_groups.end())
+		{
+			return tgroup->second;
+		}
+		return nullptr;
+	}
+	/* what to do if there is already a pid in the table */
+	void set_thread_group_info(int64_t pid, const std::shared_ptr<thread_group_info>& tginfo)
+	{ 
+		m_thread_groups.insert({pid, tginfo});
+	}
 private:
 	void create_thread_groups(const std::shared_ptr<sinsp_threadinfo>& tinfo);
 	void assign_children_to_parent(const std::shared_ptr<sinsp_threadinfo>& tinfo);
@@ -709,6 +725,8 @@ private:
 	void thread_to_scap(sinsp_threadinfo& tinfo, scap_threadinfo* sctinfo);
 
 	sinsp* m_inspector;
+	/* the key is the pid of the group, and the value is a shared pointer to the thread_group_info */
+	std::unordered_map<int64_t, std::shared_ptr<thread_group_info>> m_thread_groups;
 	threadinfo_map_t m_threadtable;
 	int64_t m_last_tid;
 	std::weak_ptr<sinsp_threadinfo> m_last_tinfo;

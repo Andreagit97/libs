@@ -1097,6 +1097,7 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 	{
 		printf("invalid caller thread-info\n");
 		valid_caller = false;
+		/* here we need to reconstruct the whole upper tree */
 	}
 	
 	/// todo(@Andreagit97): check if after the parser we have the thread info associated to the parent event with a test!
@@ -1151,7 +1152,7 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		ASSERT(false);
 	}
 
-	/* also exe and args should go here, but it seems to trigger wrong behavior */
+	/* also exe and args should go here, but it seems to trigger wrong behaviors with proc.pname and other fields */
 
 	if(!valid_caller)
 	{
@@ -1214,7 +1215,9 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		else
 		{
 			///todo(@Andreagit97): possible issue
-			/* This could happen if we forget a `sched_proc_exit`, what to do here? */
+			/* This could happen if we forget a `sched_proc_exit`, what to do here?
+			 * we need to remove this thread and if it has child we probably need to give them to init process.
+			 */
 			m_inspector->remove_thread(child_tid, true);
 			tid_collision = child_tid;
 		}
@@ -1527,18 +1530,10 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		{
 			/* The child parent is the calling process */
 			child_tinfo->m_ptid = caller_tinfo->m_tid;
-			/* The caller is always there we have checked it previosuly */
+			/* The caller is always there we have previously checked it */
 			child_parent_tinfo = caller_tinfo;
 		}
 
-		/// todo(@Andreagit97) this is just a temp workaround until we have a shared pointer
-		std::weak_ptr<sinsp_threadinfo> child_tinfo_tmp = m_inspector->get_thread_ref(child_tinfo->m_tid, false, true);
-
-		/// todo(@Andreagit97) not sure count should be `1` here
-		child_tinfo->m_tginfo = std::make_shared<thread_group_info>(child_tinfo->m_pid, 1, false, child_tinfo_tmp);
-
-		/* This could become shared...*/
-		child_parent_tinfo->m_children.push_front(child_tinfo_tmp);
 	}
 	else /* Simple thread case */
 	{
@@ -1549,21 +1544,27 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		/* The parent is the parent of the calling process */
 		child_tinfo->m_ptid = caller_tinfo->m_ptid;
 
-		/// todo(@Andreagit97) this is just a temp workaround until we have a shared pointer
-		std::weak_ptr<sinsp_threadinfo> child_tinfo_tmp = m_inspector->get_thread_ref(child_tinfo->m_tid, false, true);
-	
-		/* add myself to the thread_group_info struct */
-		child_tinfo->m_tginfo = caller_tinfo->m_tginfo;
-		child_tinfo->m_tginfo->threads.push_front(child_tinfo_tmp);
-		child_tinfo->m_tginfo->alive_count++;
-
 		/* Here the parent should be always in our table otherwise we have bug in how we add new threads from `/proc` */
 		child_parent_tinfo = m_inspector->get_thread_ref(child_tinfo->m_ptid, false, true).get();
 		ASSERT(child_parent_tinfo);
-
-		/* This could become shared...*/
-		child_parent_tinfo->m_children.push_front(child_tinfo_tmp);
 	}
+
+	/// todo(@Andreagit97) This is just a temp workaround until we have a shared pointer
+	std::weak_ptr<sinsp_threadinfo> child_tinfo_tmp = m_inspector->get_thread_ref(child_tinfo->m_tid, false, true);
+	auto tginfo = m_inspector->m_thread_manager->get_thread_group_info(child_tinfo->m_pid);
+	if(tginfo == nullptr)
+	{
+		tginfo = std::make_shared<thread_group_info>(child_tinfo->m_pid, 1, false, child_tinfo_tmp);
+		m_inspector->m_thread_manager->set_thread_group_info(child_tinfo->m_pid, tginfo);
+	}
+	else
+	{
+		tginfo->threads.push_front(child_tinfo_tmp);
+		tginfo->alive_count++;
+	}
+	child_tinfo->m_tginfo = tginfo;
+
+	child_parent_tinfo->m_children.push_front(child_tinfo_tmp);
 
 	/* We set them here because now we have the right info.
 	 * We are not in a container otherwise we should never reach this point,
@@ -2039,7 +2040,8 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 		if(tinfo->m_flags & PPM_CL_CHILD_IN_PIDNS || tinfo->m_tid != tinfo->m_vtid)
 		{
 			tinfo->m_pidns_init_start_ts = *(uint64_t *)parinfo->m_val + m_inspector->m_machine_info->boot_ts_epoch;
-		} else
+		}
+		else
 		{
 			tinfo->m_pidns_init_start_ts = m_inspector->m_machine_info->boot_ts_epoch;
 		}
@@ -2049,6 +2051,9 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 	bool thread_added = m_inspector->add_thread(tinfo);
 
 	/*=============================== CREATE THREAD RELATIONSHIPS ===========================*/
+
+	/* We need to add the child to the parent */
+	sinsp_threadinfo* child_parent_tinfo = nullptr;
 
 	/* We are a new thread leader */
 	if(is_thread_leader)
@@ -2088,34 +2093,35 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 			tinfo->m_cwd = lookup_tinfo->get_cwd();
 		}
 
-		/// todo(@Andreagit97) double check we need this, we cannot probably use the simple pointer returned from build_thread info.
-		std::weak_ptr<sinsp_threadinfo> child_tinfo = m_inspector->get_thread_ref(tinfo->m_tid, false, true);
-
-		/// todo(@Andreagit97) not sure count should be `1` here
-		tinfo->m_tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, 1, false, child_tinfo);
-
-		/* lookup_tinfo is the parent in case of main process */
-		lookup_tinfo->m_children.push_front(child_tinfo);
+		child_parent_tinfo = lookup_tinfo;
 	}
 	else /* Simple thread case */
 	{
-		/// todo(@Andreagit97) this is just a temp workaround until we have a shared pointer
-		std::weak_ptr<sinsp_threadinfo> child_tinfo = m_inspector->get_thread_ref(tinfo->m_tid, false, true);
-	
-		/* add myself to the thread_group_info struct */
-		/// todo(@Andreagit97): the lookup thread info should always have the tginfo!! as a sort of reparenting
-		tinfo->m_tginfo = lookup_tinfo->m_tginfo;
-		tinfo->m_tginfo->threads.push_front(child_tinfo);
-		tinfo->m_tginfo->alive_count++;
-
-		sinsp_threadinfo* parent_tinfo = m_inspector->get_thread_ref(tinfo->m_ptid, true, true).get();
-		if(parent_tinfo == nullptr)
+		child_parent_tinfo = m_inspector->get_thread_ref(tinfo->m_ptid, true, true).get();
+		if(child_parent_tinfo == nullptr)
 		{
+			printf("null parent\n");
 			/* If nullprt it means we have no more space in the table so not sure what to do here...*/
 				/// todo(@Andreagit97) probably we need to assing the child to `init` process...
 		}
-		parent_tinfo->m_children.push_front(child_tinfo);
 	}
+
+	/// todo(@Andreagit97) this is just a temp workaround until we have a shared pointer
+	std::weak_ptr<sinsp_threadinfo> child_tinfo_tmp = m_inspector->get_thread_ref(tinfo->m_tid, false, true);
+	auto tginfo = m_inspector->m_thread_manager->get_thread_group_info(tinfo->m_pid);
+	if(tginfo == nullptr)
+	{
+		tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, 1, false, child_tinfo_tmp);
+		m_inspector->m_thread_manager->set_thread_group_info(tinfo->m_pid, tginfo);
+	}
+	else
+	{
+		tginfo->threads.push_front(child_tinfo_tmp);
+		tginfo->alive_count++;
+	}
+	tinfo->m_tginfo = tginfo;
+
+	child_parent_tinfo->m_children.push_front(child_tinfo_tmp);
 
 	/*=============================== CREATE THREAD RELATIONSHIPS ===========================*/
 
