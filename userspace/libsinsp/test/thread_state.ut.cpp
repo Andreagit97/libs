@@ -122,7 +122,12 @@ TEST_F(sinsp_with_test_input, THRD_STATE_check_init_thread)
 	ASSERT_EQ(tinfo->m_tid, INIT_TID);
 	ASSERT_EQ(tinfo->m_pid, INIT_PID);
 	ASSERT_EQ(tinfo->m_ptid, INIT_PTID);
-	/* we need to check the thread group info for init! */
+	
+	/* assert thread group info */
+	ASSERT_TRUE(tinfo->m_tginfo);
+	ASSERT_EQ(tinfo->m_tginfo->alive_count, 1);
+	ASSERT_EQ(tinfo->m_tginfo->reaper, true);
+	ASSERT_EQ(tinfo->m_tginfo->threads.front().lock().get(), tinfo);
 }
 
 /*=============================== CLONE PARENT EXIT EVENT ===========================*/

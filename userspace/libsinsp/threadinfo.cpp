@@ -1449,11 +1449,18 @@ void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sins
 		return;
 	}
 
+	bool reaper = false;
+	/* reaper should be true if we are an init process for the init namespace or for an inner namespace */
+	if(tinfo->m_pid == 1 || tinfo->m_vpid == 1)
+	{
+		reaper = true;
+	}
+
 	/* Create the thread group info for the thread. */
 	auto tginfo = m_inspector->m_thread_manager->get_thread_group_info(tinfo->m_pid);
 	if(tginfo == nullptr)
 	{
-		tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, 1, false, tinfo);
+		tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, 1, reaper, tinfo);
 		m_inspector->m_thread_manager->set_thread_group_info(tinfo->m_pid, tginfo);
 	}
 	else
