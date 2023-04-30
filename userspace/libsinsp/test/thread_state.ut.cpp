@@ -93,10 +93,21 @@ limitations under the License.
 				not_expired_count++;                                                                   \
 			}                                                                                              \
 		}                                                                                                      \
-		ASSERT_EQ(not_expired, not_expired_count);                                                             \
+		ASSERT_EQ(not_expired_count, not_expired);                                                             \
 	}
 
-#define ASSERT_MISSING_THREAD_INFO(tid_to_check) ASSERT_FALSE(m_inspector.get_thread_ref(tid_to_check, false));
+/* if `missing==true` we shouldn't find the thread info */
+#define ASSERT_MISSING_THREAD_INFO(tid_to_check, missing)                                                              \
+	{                                                                                                              \
+		if(missing)                                                                                            \
+		{                                                                                                      \
+			ASSERT_FALSE(m_inspector.get_thread_ref(tid_to_check, false));                                 \
+		}                                                                                                      \
+		else                                                                                                   \
+		{                                                                                                      \
+			ASSERT_TRUE(m_inspector.get_thread_ref(tid_to_check, false));                                  \
+		}                                                                                                      \
+	}
 
 TEST_F(sinsp_with_test_input, THRD_STATE_check_init_thread)
 {
@@ -111,6 +122,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_check_init_thread)
 	ASSERT_EQ(tinfo->m_tid, INIT_TID);
 	ASSERT_EQ(tinfo->m_pid, INIT_PID);
 	ASSERT_EQ(tinfo->m_ptid, INIT_PTID);
+	/* we need to check the thread group info for init! */
 }
 
 /*=============================== CLONE PARENT EXIT EVENT ===========================*/
@@ -258,7 +270,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_simple)
 	 * if we remove p1_t1, we should see:
 	 * - thread group info is deleted from the thread_manager.
 	 * - ptid of `p2_t1` is updated to `INIT_TID`
-	 * - init has 1 child that is `p2_t1`
+	 * - init has 2 children but the only one not expired is `p2_t1`
 	 * - there is no more a thread info for `p1_t1`
 	 */
 	remove_thread(p1_t1_tid);
@@ -266,7 +278,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_simple)
 	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p1_t1_pid));
 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, INIT_TID)
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p2_t1_tid)
-	ASSERT_MISSING_THREAD_INFO(p1_t1_tid)
+	ASSERT_MISSING_THREAD_INFO(p1_t1_tid, true)
 }
 
 TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_parent_flag)
@@ -297,9 +309,25 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_parent_fl
 
 	/* Assert that init has 2 children */
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p2_t1_tid)
+
+	/* Now the schema is:
+	 * - init
+	 *  - p1_t1
+	 *   - p2_t1 (where the parent is init)
+	 *
+	 * if we remove p2_t1, we should see:
+	 * - thread group info is deleted from the thread_manager.
+	 * - init has 2 children but the only one not expired is `p1_t1`
+	 * - there is no more thread info for `p2_t1`
+	 */
+	remove_thread(p2_t1_tid);
+
+	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p2_t1_pid));
+	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p1_t1_tid)
+	ASSERT_MISSING_THREAD_INFO(p2_t1_tid, true)
 }
 
-TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_thread_flag)
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_remove_main_thread_first)
 {
 	add_default_init_thread();
 	open_inspector();
@@ -325,6 +353,106 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_thread_fl
 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
 	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, p1_t1_tid, p1_t2_tid)
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p1_t2_tid)
+
+	/* Now the schema is:
+	 * - init
+	 *  - p1_t1
+	 *  - p1_t2
+	 *
+	 * if we remove p1_t1, we should see:
+	 * - thread group info is not deleted from the thread_manager and the alive count is 1
+	 * - init has 2 children
+	 * - there is still thread info for `p1_t1`
+	 */
+	remove_thread(p1_t1_tid);
+
+	auto tginfo = m_inspector.m_thread_manager->get_thread_group_info(p1_t1_tid).get();
+	ASSERT_TRUE(tginfo);
+	ASSERT_EQ(tginfo->alive_count, 1);
+	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p1_t2_tid)
+
+	/* We should have the thread info but the thread should be marked as CLOSED */
+	auto p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false).get();
+	ASSERT_TRUE(p1_t1_tinfo);
+	ASSERT_TRUE(p1_t1_tinfo->m_flags & PPM_CL_CLOSED);
+	/* We double-check the thread group info with the one in the thread table */
+	ASSERT_TRUE(p1_t1_tinfo->m_tginfo);
+	ASSERT_EQ(p1_t1_tinfo->m_tginfo->alive_count, 1);
+
+	/* Now we remove also p1_t2, we should see
+	 * - thread group info is deleted from the thread_manager
+	 * - init has 2 children, but both are expired
+	 * - there are no more thread info for `p1_t1` and `p1_t2`
+	 */
+	remove_thread(p1_t2_tid);
+
+	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p1_t1_tid));
+	ASSERT_MISSING_THREAD_INFO(p1_t1_tid, true)
+	ASSERT_MISSING_THREAD_INFO(p1_t2_tid, true)
+	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 0)
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_remove_second_thread_first)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* Init creates a new process p1 */
+	int64_t p1_t1_tid = 24;
+	int64_t p1_t1_pid = 24;
+	int64_t p1_t1_ptid = INIT_TID;
+
+	/* Parent clone exit event */
+	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
+	ASSERT_THREAD_CHILDREN(INIT_TID, 1, 1, p1_t1_tid)
+
+	/* The process p1 creates a second thread p1_t2 */
+	int64_t p1_t2_tid = 30;
+	int64_t p1_t2_pid = 24;
+	/* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
+	int64_t p1_t2_ptid = INIT_TID;
+
+	/* Parent clone exit event */
+	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CLONE_THREAD);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
+	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, p1_t1_tid, p1_t2_tid)
+	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p1_t2_tid)
+
+	/* Now the schema is:
+	 * - init
+	 *  - p1_t1
+	 *  - p1_t2
+	 *
+	 * if we remove p1_t2, we should see:
+	 * - thread group info is not deleted from the thread_manager and the alive count is 1
+	 * - init has 1 child
+	 */
+	remove_thread(p1_t2_tid);
+
+	auto tginfo = m_inspector.m_thread_manager->get_thread_group_info(p1_t2_pid).get();
+	ASSERT_TRUE(tginfo);
+	ASSERT_EQ(tginfo->alive_count, 1);
+	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p1_t1_tid)
+	ASSERT_MISSING_THREAD_INFO(p1_t2_tid, true)
+
+	/* Check if the main thread is still there */
+	auto p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false).get();
+	ASSERT_TRUE(p1_t1_tinfo);
+	ASSERT_TRUE(p1_t1_tinfo->m_tginfo);
+	ASSERT_EQ(p1_t1_tinfo->m_tginfo->alive_count, 1);
+
+	/* Now we remove also p1_t1, we should see
+	 * - thread group info is deleted from the thread_manager
+	 * - init has 2 children, but both are expired
+	 * - there are no more thread info for `p1_t1` and `p1_t2`
+	 */
+	remove_thread(p1_t1_tid);
+
+	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p1_t1_tid));
+	ASSERT_MISSING_THREAD_INFO(p1_t1_tid, true)
+	ASSERT_MISSING_THREAD_INFO(p1_t2_tid, true)
+	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 0)
 }
 
 // TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_simulate_old_scap_file)
@@ -704,7 +832,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simple)
 	 * if we remove p1_t1, we should see:
 	 * - thread group info is deleted from the thread_manager.
 	 * - ptid of `p2_t1` is updated to `INIT_TID`
-	 * - init has 1 child that is `p2_t1`
+	 * - init has 2 children but the only one not expired is `p1_t1`
 	 * - there is no more a thread info for `p1_t1`
 	 */
 	remove_thread(p1_t1_tid);
@@ -712,7 +840,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simple)
 	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p1_t1_pid));
 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, INIT_TID)
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p2_t1_tid)
-	ASSERT_MISSING_THREAD_INFO(p1_t1_tid)
+	ASSERT_MISSING_THREAD_INFO(p1_t1_tid, true)
 }
 
 TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_parent_flag)
@@ -746,6 +874,22 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_parent_fla
 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p2_t1_tid)
+
+	/* Now the schema is:
+	 * - init
+	 *  - p1_t1
+	 *   - p2_t2 (where the parent is init)
+	 *
+	 * if we remove p2_t2, we should see:
+	 * - thread group info is deleted from the thread_manager.
+	 * - init has 2 children but the only one not expired is `p1_t1`
+	 * - there is no more a thread info for `p2_t1`
+	 */
+	remove_thread(p2_t1_tid);
+
+	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p2_t1_pid));
+	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p1_t1_tid)
+	ASSERT_MISSING_THREAD_INFO(p2_t1_tid, true)
 }
 
 TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_flag)

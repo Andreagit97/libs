@@ -250,6 +250,8 @@ public:
 	typedef std::function<bool (sinsp_threadinfo *)> visitor_func_t;
 	void traverse_parent_state(visitor_func_t &visitor);
 
+	void assign_children_to_reaper(sinsp_threadinfo* reaper);
+
 	// Note that the provided tid, a thread in this main thread's
 	// pid, has been used in an exec enter event. In the
 	// corresponding exec exit event, the threadinfo for this tid
@@ -413,6 +415,9 @@ public: // types required for use in sets
 	};
 
 protected:
+	/* Note that `fd_table` should be shared with the main thread only if `PPM_CL_CLONE_FILES`
+	 * is specified.
+	 */
 	inline sinsp_fdtable* get_fd_table()
 	{
 		if(!(m_flags & PPM_CL_CLONE_FILES))
@@ -421,6 +426,7 @@ protected:
 		}
 		else
 		{
+			/* this is probably a wrong assumption if we lose the main thread we won't be able to free other threads */
 			sinsp_threadinfo* root = get_main_thread();
 			return (root == nullptr) ? nullptr : &(root->m_fdtable);
 		}
@@ -643,6 +649,7 @@ public:
 	void clear();
 
 	bool add_thread(sinsp_threadinfo *threadinfo, bool from_scap_proctable);
+	sinsp_threadinfo* find_new_reaper(sinsp_threadinfo*);
 	void remove_thread(int64_t tid, bool force);
 	// Returns true if the table is actually scanned
 	// NOTE: this is implemented in sinsp.cpp so we can inline it from there
@@ -721,7 +728,7 @@ public:
 	{ 
 		m_thread_groups.insert({pid, tginfo});
 	}
-private:
+VISIBILITY_PRIVATE
 	void create_thread_dependencies(const std::shared_ptr<sinsp_threadinfo>& tinfo);
 	inline void clear_thread_pointers(sinsp_threadinfo& threadinfo);
 	void free_dump_fdinfos(std::vector<scap_fdinfo*>* fdinfos_to_free);
