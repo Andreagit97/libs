@@ -27,6 +27,10 @@ limitations under the License.
 #include "test_utils.h"
 
 #define DEFAULT_VALUE 0
+#define INIT_TID 1
+#define INIT_PID INIT_TID
+#define INIT_PTID 0
+#define UNUSED __attribute__((unused))
 
 class sinsp_with_test_input : public ::testing::Test {
 protected:
@@ -79,7 +83,7 @@ protected:
 		return nullptr;
 	}
 
-	/*=============================== CLONE GENERATION ===========================*/
+	/*=============================== PROCESS GENERATION ===========================*/
 
 	sinsp_evt* generate_clone_x_event(int64_t retval, int64_t tid, int64_t pid, int64_t ppid, uint32_t flags = 0, int64_t vtid = DEFAULT_VALUE, int64_t vpid = DEFAULT_VALUE, std::string name = "bash")
 	{
@@ -115,7 +119,20 @@ protected:
 		return add_event_advance_ts(increasing_ts(), new_tid, PPME_SYSCALL_EXECVE_19_X, 27, retval, filename.c_str(), empty_bytebuf, new_tid, pid, ppid, "", not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_32, not_relevant_32, not_relevant_32, filename.c_str(), empty_bytebuf, empty_bytebuf, not_relevant_32, not_relevant_64, not_relevant_32, not_relevant_32, not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_32);
 	}
 
-	/*=============================== CLONE GENERATION ===========================*/
+	void remove_thread(int64_t tid_to_remove)
+	{
+		/* Scaffolding needed to call the PPME_PROCEXIT_1_E */
+		int64_t not_relevant_64 = 0;
+		uint8_t not_relevant_8 = 0;
+
+		add_event_advance_ts(increasing_ts(), tid_to_remove, PPME_PROCEXIT_1_E, 4, not_relevant_64, not_relevant_64, not_relevant_8, not_relevant_8);
+		/* Since the removal is performed with the next event, we send a useless event
+		 * through init.
+		 */
+		add_event_advance_ts(increasing_ts(), INIT_TID, PPME_SYSCALL_GETCWD_E, 0);
+	}
+
+	/*=============================== PROCESS GENERATION ===========================*/
 
 	// adds an event and advances the inspector to the new timestamp
 	sinsp_evt* add_event_advance_ts(uint64_t ts, uint64_t tid, ppm_event_code event_type, uint32_t n, ...)
