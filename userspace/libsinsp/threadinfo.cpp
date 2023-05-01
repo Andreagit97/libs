@@ -1638,6 +1638,13 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 		return;
 	}
 
+	///todo(@Andreagit97): before implementing this we need to fix the fdtable management
+	/* This is probably due to a missing proc_exit */
+	if(force)
+	{
+
+	}
+
 	/* All threads should have a m_tginfo a part from the invalid ones which don't have a group.
 	 * We still need to understand if we need invalid thread info.
 	 */

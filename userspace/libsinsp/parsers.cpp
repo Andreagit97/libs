@@ -1057,9 +1057,11 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 	uint16_t etype = evt->get_type();
 	int64_t caller_tid = evt->get_tid();
 
-	/// todo(@Andreagit97): check it with @gnosek
-	// we should avoid collision at all
+	/* We have a collision when we force a removal in the thread table because
+	 * we have 2 entries with the same tid.
+	 */
 	int64_t tid_collision = -1;
+
 	/* By default we have a valid caller. `valid_caller==true` means that we can
 	 * use the caller info to fill some fields of the child, `valid_caller==false`
 	 * means that we will use some info about the child to fill the caller thread info.
@@ -1119,14 +1121,10 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 	ASSERT(parinfo->m_len == sizeof(int64_t));
 	caller_tinfo->m_pid = *(int64_t *)parinfo->m_val;
 
-	/// todo(@Andreagit97) Here we can think of some logic to update the ptid if necessary.
-
 	/* ptid */
 	parinfo = evt->get_param(5);
 	ASSERT(parinfo->m_len == sizeof(int64_t));
 	caller_tinfo->m_ptid = *(int64_t *)parinfo->m_val;
-
-	/// todo(@Andreagit97) Let's see if we need the ppid
 
 	/* comm */
 	switch(etype)
@@ -1213,10 +1211,6 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		}
 		else
 		{
-			///todo(@Andreagit97): possible issue
-			/* This could happen if we forget a `sched_proc_exit`, what to do here?
-			 * we need to remove this thread and if it has child we probably need to give them to init process.
-			 */
 			m_inspector->remove_thread(child_tid, true);
 			tid_collision = child_tid;
 		}
@@ -1278,7 +1272,6 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 	/* Allocate the new thread info and initialize it.
 	 * We must avoid `malloc` here and get the item from a preallocated list.
 	 */
-	// todo(@Andreagit97) this should become a shared pointer
 	child_tinfo = m_inspector->build_threadinfo();
 
 	/* flags */
@@ -1296,6 +1289,7 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 			/* Populate some other info only if we are a thread-leader */
 			child_tinfo->m_env = caller_tinfo->m_env;
 
+			///todo(@Andreagit97): revisit fdtable logic.
 			/* Copy the fd list:
 			* XXX this is a gross oversimplification that will need to be fixed.
 			* What we do is: if the child is NOT a thread, we copy all the parent fds.
@@ -1305,7 +1299,6 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 			sinsp_fdtable* fd_table_ptr = caller_tinfo->get_fd_table();
 			if(fd_table_ptr == NULL)
 			{
-				///todo(@Andreagit97): not sure why we should terminate...
 				ASSERT(false);
 				g_logger.format(sinsp_logger::SEV_DEBUG, "cannot get fd table in sinsp_parser::parse_clone_exit.");
 				delete child_tinfo;
@@ -1560,7 +1553,6 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		m_fd_listener->on_clone(evt, child_tinfo);
 	}
 
-	/// todo(@Andreagit97): understand how to manage it! and if we need it
 	/* If we had to erase a previous entry for this tid and rebalance the table,
 	 * make sure we reinitialize the tinfo pointer for this event, as the thread
 	 * generating it might have gone away.
@@ -1623,6 +1615,7 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 
 		/* The info is too old, we remove it and create a new one */
 		m_inspector->remove_thread(child_tid, true);
+		tid_collision = child_tid;
 		evt->m_tinfo = nullptr;
 	}
 
@@ -1642,7 +1635,6 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 	/* Allocate the new thread info and initialize it.
 	 * We must avoid `malloc` here and get the item from a preallocated list.
 	 */
-	// todo(@Andreagit97): this should become a shared pointer
 	sinsp_threadinfo* tinfo = m_inspector->build_threadinfo();
 
 	/* tid */
@@ -2056,7 +2048,6 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 	{
 		reset(evt);
 #ifdef HAS_ANALYZER
-		/// todo(@Andreagit97): the collision was on the called_tid, probably we need to use it here (?)
 		m_inspector->m_tid_collisions.push_back(tid_collision);
 #endif
 		/* Right now we have collisions only on the clone() caller */
