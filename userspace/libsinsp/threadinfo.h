@@ -414,7 +414,7 @@ public: // types required for use in sets
 		}
 	};
 
-protected:
+VISIBILITY_PROTECTED
 	/* Note that `fd_table` should be shared with the main thread only if `PPM_CL_CLONE_FILES`
 	 * is specified.
 	 */

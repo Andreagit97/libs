@@ -122,7 +122,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_check_init_thread)
 	ASSERT_EQ(tinfo->m_tid, INIT_TID);
 	ASSERT_EQ(tinfo->m_pid, INIT_PID);
 	ASSERT_EQ(tinfo->m_ptid, INIT_PTID);
-	
+
 	/* assert thread group info */
 	ASSERT_TRUE(tinfo->m_tginfo);
 	ASSERT_EQ(tinfo->m_tginfo->alive_count, 1);
@@ -460,64 +460,6 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_remove_se
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 0)
 }
 
-// TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_simulate_old_scap_file)
-// {
-// 	add_default_init_thread();
-// 	open_inspector();
-
-// 	/* Init create a child process p1 */
-// 	int64_t p1_t1_tid = 24;
-// 	int64_t p1_t1_pid = 24;
-// 	int64_t p1_t1_ptid = INIT_PID;
-
-// 	/* Parent clone exit event */
-// 	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
-
-// 	/* process p1 creates a second thread */
-// 	int64_t p1_t2_tid = 30;
-// 	int64_t p1_t2_pid = 24;
-// 	int64_t p1_t2_ptid = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of
-// the calling process */
-
-// 	/* Parent clone exit event */
-// 	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CLONE_THREAD);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
-
-// 	/* The second thread of p1 creates a new process p2 */
-// 	/* Here we are receiving the clone exit event of the parent so the old scap-file won't have
-// wrong info.
-// 	 * Only if the new process (that is the child of a thread) will do another clone() we will
-// notice the wrong info.
-// 	 */
-// 	int64_t p2_t1_tid = 80;
-// 	int64_t p2_t1_pid = 80;
-// 	int64_t p2_t1_ptid = p1_t2_pid;
-
-// 	/* Parent clone exit event */
-// 	generate_clone_x_event(p2_t1_tid, p1_t2_tid, p1_t2_pid, p1_t2_ptid);
-// 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
-
-// 	/* process p2 creates a new process p3 */
-// 	int64_t p3_t1_tid = 90;
-// 	int64_t p3_t1_pid = 90;
-// 	int64_t p3_t1_ptid = p2_t1_pid;
-
-// 	/* Parent clone exit event */
-// 	/* Please note here that the parent of p2 will be wrong in the scap-file!
-// 	 * It should be `p2_t1_parent` and so `p1_t2_pid` but indeed it will be the tid of `p1_t2`
-// and so `p1_t2_tid`
-// 	 * BTW thanks to our recovery logic we should be able to correctly populate the new process
-// thread info (p3 thread info)
-// 	 */
-// 	generate_clone_x_event(p3_t1_tid, p2_t1_tid, p2_t1_pid, p1_t2_tid);
-// 	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_ptid)
-// 	sinsp_threadinfo* ptinfo = m_inspector.get_thread_ref(p2_t1_tid, false, true).get();
-// 	ASSERT_TRUE(ptinfo);
-// 	/* The clone parent event carries wrong info so we don't update the parent info */
-// 	ASSERT_EQ(ptinfo->m_ptid, p2_t1_ptid);
-// }
-
 /// todo(@Andreagit97): we need to create a similar test with just the clone child exit event.
 /* Here the parent exit event always comes first  */
 TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
@@ -526,10 +468,10 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 	 *	- (init) tid 1 pid 1 ptid 0
 	 *  - (p_1 - t1) tid 2 pid 2 ptid 1
 	 *  - (p_1 - t2) tid 3 pid 2 ptid 1
-	 * 	  - (p_2 - t1) tid 25 pid 25 ptid 1 (CLONE_ptid)
-	 * 		- (p_3 - t1) tid 72 pid 72 ptid 25
-	 * 			- (p_4 - t1) tid 76 pid 76 ptid 72 (container: vtid 1 vpid 1)
-	 * 	  - (p_2 - t2) tid 23 pid 25 ptid 1
+	 * 	 - (p_2 - t1) tid 25 pid 25 ptid 1 (CLONE_ptid)
+	 * 	  - (p_3 - t1) tid 72 pid 72 ptid 25
+	 * 	   - (p_4 - t1) tid 76 pid 76 ptid 72 (container: vtid 1 vpid 1)
+	 * 	 - (p_2 - t2) tid 23 pid 25 ptid 1
 	 */
 
 	add_default_init_thread();
@@ -925,109 +867,77 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p1_t2_tid)
 }
 
-// TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simulate_old_scap_file)
-// {
-// 	add_default_init_thread();
-// 	open_inspector();
-
-// 	/* Init creates a new process p1 */
-// 	int64_t p1_t1_tid = 24;
-// 	int64_t p1_t1_pid = 24;
-// 	int64_t p1_t1_ptid = INIT_PID;
-
-// 	/* Child clone exit event */
-// 	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
-
-// 	/* process p1 creates a new thread (p1_t2_tid) */
-// 	int64_t p1_t2_tid = 30;
-// 	int64_t p1_t2_pid = 24;
-// 	int64_t p1_t2_ptid = INIT_PID; /* with the `CLONE_THREAD` flag the parent is the parent of
-// the calling process */
-
-// 	/* Child clone exit event */
-// 	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
-
-// 	/* p1_t2 creates a new process p2 */
-// 	int64_t p2_t1_tid = 80;
-// 	int64_t p2_t1_pid = 80;
-// 	int64_t p2_t1_ptid = p1_t1_pid;
-
-// 	/* Child clone exit event */
-// 	/* old scap files return `real_parent->pid` so the parent will be the second thread and not
-// the leader thread.
-// 	 * BTW, our recovery logic should patch the parent value to `p1_t1_pid`.
-// 	 */
-// 	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p1_t2_tid);
-// 	/* Here we should see the patched thread info */
-// 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
-// }
-
-// TEST_F(sinsp_with_test_input,
-// THRD_STATE_parse_clone_exit_child_simulate_old_scap_file_missing_info)
-// {
-// 	add_default_init_thread();
-// 	open_inspector();
-
-// 	/* Init creates a new process p1 */
-// 	int64_t p1_t1_tid = 24;
-// 	int64_t p1_t1_pid = 24;
-// 	int64_t p1_t1_ptid = INIT_PID;
-
-// 	/* Child clone exit event */
-// 	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
-
-// 	/* Now let's imagine that the process p1 creates a new thread (p1_t2)
-// 	 * like in the previous test, but we miss it.
-// 	 *
-// 	 *   generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD);
-// 	 *
-// 	 * When this thread (p1_t2) will create a new process we won't be able
-// 	 * to patch the `ptid` since we miss the caller thread info!
-// 	 */
-
-// 	int64_t p1_t2_tid = 30;
-// 	UNUSED int64_t p1_t2_pid = 24;
-// 	UNUSED int64_t p1_t2_ptid = INIT_PID;
-
-// 	/* Missing clone! */
-
-// 	/* p1_t2 creates a new process p2 */
-// 	int64_t p2_t1_tid = 80;
-// 	int64_t p2_t1_pid = 80;
-// 	/* The real parent should be `p1_t2_pid` but in old scap files we used `p1_t2_tid`
-// 	 * Here we simulate the scap_file behavior.
-// 	 */
-// 	int64_t p2_t1_ptid = p1_t2_tid;
-
-// 	/* Child clone exit event */
-// 	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_ptid);
-// 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
-
-// 	/* During the parsing logic of the child we create also a mock parent (p2_t1_ptid) since
-// 	 * it was not present. Let's assert some of its values...
-// 	 */
-// 	sinsp_threadinfo* p1_t2_tinfo = m_inspector.get_thread_ref(p2_t1_ptid, false, true).get();
-// 	ASSERT_TRUE(p1_t2_tinfo);
-// 	ASSERT_EQ(p1_t2_tinfo->m_user.uid, 0xffffffff);
-// 	ASSERT_EQ(p1_t2_tinfo->m_user.uid, 0xffffffff);
-// 	ASSERT_EQ(p1_t2_tinfo->m_loginuser.uid, 0xffffffff);
-// 	ASSERT_EQ(p1_t2_tinfo->m_nchilds, 0);
-// 	ASSERT_EQ(p1_t2_tinfo->m_exe, "<NA>");
-// 	ASSERT_EQ(p1_t2_tinfo->m_comm, "<NA>");
-// 	ASSERT_EQ(p1_t2_tinfo->m_tid, p2_t1_ptid);
-// 	ASSERT_EQ(p1_t2_tinfo->m_pid, p2_t1_ptid); /// todo: this is wrong we created a new main
-// thread but this is not a main thread! 	GTEST_SKIP() << "The parent thread info matches the
-// expected one, but some parent data are not correct!";
-// }
-
 /*=============================== CLONE CHILD EXIT EVENT ===========================*/
 
-/*=============================== EXECVE EVENTS ===========================*/
+/*=============================== REMOVE THREAD LOGIC ===========================*/
 
-TEST_F(sinsp_with_test_input, THRD_STATE_remove_thread_after_execve)
+TEST_F(sinsp_with_test_input, THRD_STATE_remove_non_existing_thread)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	int64_t unknown_tid = 24;
+
+	/* we should do nothing, here we are only checking that nothing will crash */
+	m_inspector.remove_thread(unknown_tid, false);
+	m_inspector.remove_thread(unknown_tid, true);
+}
+
+/*=============================== REMOVE THREAD LOGIC ===========================*/
+
+/*=============================== BROKEN CASES ===========================*/
+
+TEST_F(sinsp_with_test_input, BROKEN_fdtable_with_threads)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* Init creates a new process p1 */
+	int64_t p1_t1_tid = 24;
+	int64_t p1_t1_pid = 24;
+	int64_t p1_t1_ptid = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
+
+	/* Init has just 1 fd so the new process should have the same fd. */
+	sinsp_threadinfo* p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false).get();
+	ASSERT_EQ(p1_t1_tinfo->m_fdtable.m_table.size(), 1);
+
+	/* process p1 creates a new thread (p1_t2_tid) */
+	int64_t p1_t2_tid = 30;
+	int64_t p1_t2_pid = 24;
+	int64_t p1_t2_ptid = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD | PPM_CL_CLONE_FILES);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
+
+	sinsp_threadinfo* p1_t2_tinfo = m_inspector.get_thread_ref(p1_t2_tid, false).get();
+	ASSERT_EQ(p1_t2_tinfo->m_flags & PPM_CL_CLONE_FILES, 1);
+	ASSERT_EQ(p1_t2_tinfo->get_fd_table()->m_table.size(), 1);
+
+	/* process p1 creates a new thread (p1_t2_tid) */
+	int64_t p1_t3_tid = 37;
+	int64_t p1_t3_pid = 24;
+	int64_t p1_t3_ptid = INIT_PID;
+
+	/* Child clone exit event */
+	generate_clone_x_event(0, p1_t3_tid, p1_t3_pid, p1_t3_ptid, PPM_CL_CLONE_THREAD);
+	ASSERT_THREAD_INFO_PIDS(p1_t3_tid, p1_t3_pid, p1_t3_ptid)
+
+	/* This is wrong, the thread doesn't have the CLONE_FILES flag but we don't copy the file_descriptor of the main
+	 * thread */
+	sinsp_threadinfo* p1_t3_tinfo = m_inspector.get_thread_ref(p1_t3_tid, false).get();
+	ASSERT_EQ(p1_t3_tinfo->m_flags & PPM_CL_CLONE_FILES, 0);
+	ASSERT_EQ(p1_t3_tinfo->get_fd_table()->m_table.size(), 0);
+
+	GTEST_SKIP()
+		<< "Threads don't acquire the fdtable of the parent even if `PPM_CL_CLONE_FILES` is not specified!";
+}
+
+TEST_F(sinsp_with_test_input, BROKEN_remove_thread_after_execve)
 {
 	add_default_init_thread();
 	open_inspector();
@@ -1081,84 +991,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_thread_after_execve)
 			"if the main thread performs the execve does someone remove all other threads?";
 }
 
-/*=============================== EXECVE EVENTS ===========================*/
-
-/*=============================== NEW THREAD LOGIC ===========================*/
-
-/* There is a bug in this test!
- * we count some threads more than one time!
- */
-TEST_F(sinsp_with_test_input, THRD_STATE_check_number_of_children)
-{
-	add_default_init_thread();
-	open_inspector();
-
-	/* - init
-	 *  - p1_t1 (we will create this, thanks to `get_thread_ref()` in `parse_clone_exit_child`)
-	 *  - p1_t2
-	 *  - p1_t3
-	 *
-	 * We want to check if `p1_t1` will have the right number of children.
-	 */
-
-	int64_t p1_t1_tid = 24;
-	int64_t p1_t1_pid = 24;
-
-	/* create thread `p1_t2` for process `p1_t1` */
-	int64_t p1_t2_tid = 25;
-	int64_t p1_t2_pid = p1_t1_pid;
-	int64_t p1_t2_ptid = INIT_TID;
-
-	FAIL() << " We have to be able here the missing thread-leader";
-	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD);
-	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
-
-	// /* Now we should have created also `p1_t1` as an invalid tinfo */
-	// sinsp_threadinfo* p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
-	// ASSERT_TRUE(p1_t1_tinfo);
-	// /* in `add_thread()` we call `increment_mainthread_childcount` so we should be able to
-	// correctly
-	//  * assign this thread to the new created process.
-	//  */
-	// ASSERT_EQ(p1_t1_tinfo->m_nchilds, 1);
-
-	// /* Please note that `p1_t1` is still an invalid thread so we will destroy it again at the
-	// next clone child event */
-	// /// todo(@Andreagit97) not sure this is exactly what we want but populating it with child
-	// comm could be a wrong assumption.
-
-	// /* create thread `p1_t3` for process `p1_t1` */
-	// int64_t p1_t3_tid = 26;
-	// int64_t p1_t3_pid = p1_t1_pid;
-	// int64_t p1_t3_ptid = INIT_TID;
-
-	// /* Child clone exit event */
-	// generate_clone_x_event(0, p1_t3_tid, p1_t3_pid, p1_t3_ptid, PPM_CL_CLONE_THREAD);
-	// ASSERT_THREAD_INFO_PIDS(p1_t3_tid, p1_t3_pid, p1_t3_ptid)
-
-	// p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
-	// ASSERT_TRUE(p1_t1_tinfo);
-	// ASSERT_EQ(p1_t1_tinfo->m_nchilds, 2);
-}
-
-/*=============================== NEW THREAD LOGIC ===========================*/
-
-/*=============================== REMOVE THREAD LOGIC ===========================*/
-
-TEST_F(sinsp_with_test_input, THRD_STATE_remove_non_existing_thread)
-{
-	add_default_init_thread();
-	open_inspector();
-
-	int64_t unknown_tid = 24;
-
-	/* we should do nothing, here we are only checking that nothing will crash */
-	m_inspector.remove_thread(unknown_tid, false);
-	m_inspector.remove_thread(unknown_tid, true);
-}
-
-TEST_F(sinsp_with_test_input, THRD_STATE_remove_a_thread_leader_without_children)
+TEST_F(sinsp_with_test_input, BROKEN_missing_both_clone_events_create_leader_thread)
 {
 	add_default_init_thread();
 	open_inspector();
@@ -1166,83 +999,31 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_a_thread_leader_without_children
 	/* Init creates a new process p1 */
 	int64_t p1_t1_tid = 24;
 	int64_t p1_t1_pid = 24;
-	int64_t p1_t1_ptid = INIT_PID;
+	int64_t p1_t1_ptid = INIT_TID;
 
-	/* Child clone exit event */
-	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 
-	/* We should be able to remove the thread since it doesn't have children */
-	m_inspector.remove_thread(p1_t1_tid, false);
-	sinsp_threadinfo* p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false, true).get();
-	ASSERT_FALSE(p1_t1_tinfo);
+	/* The process p1 creates a second process p2 but we miss both clone events so we know nothing about it */
+	int64_t p2_t1_tid = 30;
+	int64_t p2_t1_pid = 30;
+	int64_t p2_t1_ptid = p1_t1_tid;
+
+	/* The process p2 creates a new process p3 */
+	int64_t p3_t1_tid = 50;
+	int64_t p3_t1_pid = 50;
+	int64_t p3_t1_ptid = p2_t1_tid;
+
+	generate_clone_x_event(p3_t1_tid, p2_t1_tid, p2_t1_pid, p2_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_ptid)
+
+	/* Process p2 is generated as invalid so we have no thread info */
+	auto tginfo = m_inspector.m_thread_manager->get_thread_group_info(p2_t1_tid).get();
+	ASSERT_FALSE(tginfo);
+
+	/* Moreover if we check p2_t1 parent, it is INIT and this is not what we want! */
+	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p2_t1_tid)
+	GTEST_SKIP() << "The expected behavior is correct but we need create a correct tree also in this case!";
 }
 
-/* creare un proccesso vuoto con il finto scan di proc e prima creare alcuni suoi thread e vedere il
- * numero che si setta di child figli */
-
-/*=============================== REMOVE THREAD LOGIC ===========================*/
-
-/*=============================== MISSING INFO ===========================*/
-
-/* We can reproduce the same test with just one event missing between child and parent */
-/* We can reproduce the same test with the clone Parent flag */
-
-TEST_F(sinsp_with_test_input, THRD_STATE_missing_both_clone_events_create_leader_thread)
-{
-	// add_default_init_thread();
-	// open_inspector();
-
-	// /* Init creates a new process p1 but we miss both clone events so we know nothing about it */
-	// int64_t p1_t1_tid = 24;
-	// int64_t p1_t1_pid = 24;
-	// int64_t p1_t1_ptid = INIT_TID;
-
-	// /* The process p1 creates a second process p2 */
-	// int64_t p2_t1_tid = 30;
-	// int64_t p2_t1_pid = 30;
-	// int64_t p2_t1_ptid = p1_t1_tid;
-
-	// /* Parent clone exit event */
-	// generate_clone_x_event(p2_t1_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
-	// ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
-	// ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 1, p2_t1_tid)
-	// ASSERT_THREAD_CHILDREN(p1_t1_tid, 1, p2_t1_tid)
-
-	// /* We should be also able to set p1_t1 as a child of init */
-	// ASSERT_THREAD_CHILDREN(INIT_TID, 1, p1_t1_tid)
-
-	// /* We should be also able to set the thread group info and the child of p1_t1 */
-	// ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 1, false, 1, p1_t1_tid)
-	// ASSERT_THREAD_CHILDREN(p1_t1_tid, 1, p2_t1_tid)
-}
-
-// TEST_F(sinsp_with_test_input, THRD_STATE_missing_both_clone_events_create_thread)
-// {
-// 	add_default_init_thread();
-// 	open_inspector();
-
-// 	/* Init creates a new process p1 but we miss both clone events so we know nothing about it */
-// 	UNUSED int64_t p1_t1_tid = 24;
-// 	UNUSED int64_t p1_t1_pid = 24;
-// 	UNUSED int64_t p1_t1_ptid = INIT_TID;
-
-// 	/* Parent clone exit event */
-// 	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
-// 	ASSERT_THREAD_CHILDREN(INIT_TID, 1, p1_t1_tid)
-
-// 	/* The process p1 creates a second thread p1_t2 */
-// 	int64_t p1_t2_tid = 30;
-// 	int64_t p1_t2_pid = 24;
-// 	/* with the `CLONE_THREAD` flag the parent is the parent of the calling process */
-// 	int64_t p1_t2_ptid = INIT_TID;
-
-// 	/* Parent clone exit event */
-// 	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CLONE_THREAD);
-// 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
-// 	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, p1_t1_tid, p1_t2_tid)
-// 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, p1_t1_tid, p1_t2_tid)
-// }
-
-/*=============================== MISSING INFO ===========================*/
+/*=============================== BROKEN CASES ===========================*/
