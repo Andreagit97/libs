@@ -63,6 +63,15 @@ limitations under the License.
 			}                                                                                              \
 			ASSERT_TRUE(found);                                                                            \
 		}                                                                                                      \
+		uint16_t not_expired_count = 0;                                                                        \
+		for(const auto& thread : pid_tinfo->m_tginfo->threads)                                                 \
+		{                                                                                                      \
+			if(!thread.expired())                                                                          \
+			{                                                                                              \
+				not_expired_count++;                                                                   \
+			}                                                                                              \
+		}                                                                                                      \
+		ASSERT_EQ(not_expired_count, alive_threads);                                                           \
 	}
 
 #define ASSERT_THREAD_CHILDREN(parent_tid, children_num, not_expired, ...)                                             \
@@ -468,10 +477,15 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 	 *	- (init) tid 1 pid 1 ptid 0
 	 *  - (p_1 - t1) tid 2 pid 2 ptid 1
 	 *  - (p_1 - t2) tid 3 pid 2 ptid 1
-	 * 	 - (p_2 - t1) tid 25 pid 25 ptid 1 (CLONE_ptid)
+	 * 	 - (p_2 - t1) tid 25 pid 25 ptid 1 (CLONE_PARENT)
 	 * 	  - (p_3 - t1) tid 72 pid 72 ptid 25
 	 * 	   - (p_4 - t1) tid 76 pid 76 ptid 72 (container: vtid 1 vpid 1)
+	 * 	   - (p_4 - t2) tid 79 pid 76 ptid 72 (container: vtid 2 vpid 1)
+	 * 		- (p_5 - t1) tid 82 pid 82 ptid 79 (container: vtid 10 vpid 10)
+	 * 		- (p_5 - t2) tid 84 pid 82 ptid 79 (container: vtid 12 vpid 10)
+	 *  	 - (p_6 - t2) tid 87 pid 87 ptid 84 (container: vtid 17 vpid 17)
 	 * 	 - (p_2 - t2) tid 23 pid 25 ptid 1
+	 * 	 - (p_2 - t3) tid 24 pid 25 ptid 1
 	 */
 
 	add_default_init_thread();
@@ -496,6 +510,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	/* Check fields after child parsing */
 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
+	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 1, false, 1, p1_t1_tid)
+	ASSERT_THREAD_CHILDREN(INIT_TID, 1, 1, p1_t1_tid)
 
 	/*=============================== p1_t1 ===========================*/
 
@@ -518,6 +534,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	/* Check fields after child parsing */
 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
+	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, p1_t1_tid, p1_t2_tid)
+	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p1_t2_tid)
 
 	/*=============================== p1_t2 ===========================*/
 
@@ -540,6 +558,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	/* Check fields after child parsing */
 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 1, p2_t1_tid)
+	ASSERT_THREAD_CHILDREN(INIT_TID, 3, 3, p1_t1_tid, p1_t2_tid, p2_t1_tid)
 
 	/*=============================== p2_t1 ===========================*/
 
@@ -562,8 +582,29 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	/* Check fields after child parsing */
 	ASSERT_THREAD_INFO_PIDS(p2_t2_tid, p2_t2_pid, p2_t2_ptid)
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 2, p2_t1_tid, p2_t2_tid)
+	ASSERT_THREAD_CHILDREN(INIT_TID, 4, 4, p1_t1_tid, p1_t2_tid, p2_t1_tid, p2_t2_tid)
 
 	/*=============================== p2_t2 ===========================*/
+	
+	/* p2_t2 creates a new thread p2_t3 */
+
+	/*=============================== p2_t3 ===========================*/
+
+	int64_t p2_t3_tid = 24;
+	int64_t p2_t3_pid = p2_t1_pid;
+	int64_t p2_t3_ptid = INIT_TID;
+
+	/* Parent exit event */
+	generate_clone_x_event(p2_t3_tid, p2_t2_tid, p2_t2_pid, p2_t2_ptid, PPM_CL_CLONE_THREAD);
+
+	/* Check fields after parent parsing */
+	ASSERT_THREAD_INFO_PIDS(p2_t3_tid, p2_t3_pid, p2_t3_ptid)
+
+	/* Child exit event */
+	generate_clone_x_event(0, p2_t3_tid, p2_t3_pid, p2_t3_ptid, PPM_CL_CLONE_THREAD);
+
+	/*=============================== p2_t3 ===========================*/
 
 	/* The leader thread of p2 create a new process p3 */
 
@@ -584,6 +625,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	/* Check fields after child parsing */
 	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_ptid)
+	ASSERT_THREAD_GROUP_INFO(p3_t1_pid, 1, false, 1, p3_t1_tid)
+	ASSERT_THREAD_CHILDREN(p2_t1_pid, 1, 1, p3_t1_tid)
 
 	/*=============================== p3_t1 ===========================*/
 
@@ -613,15 +656,90 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	/* Check fields after child parsing */
 	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t1_tid, p4_t1_pid, p4_t1_ptid, p4_t1_vtid, p4_t1_vpid)
+	/* p4_t1 is the init process of a namespace, reaper should be true! */
+	ASSERT_THREAD_GROUP_INFO(p4_t1_pid, 1, true, 1, p4_t1_tid)
+	ASSERT_THREAD_CHILDREN(p3_t1_tid, 1, 1, p4_t1_tid)
 
 	/*=============================== p4_t1 ===========================*/
+
+	/*=============================== p4_t2 ===========================*/
+
+	int64_t p4_t2_tid = 79;
+	int64_t p4_t2_pid = p4_t1_pid;
+	int64_t p4_t2_ptid = p3_t1_tid;
+	int64_t p4_t2_vtid = 2;
+	int64_t p4_t2_vpid = p4_t1_vpid;
+
+	generate_clone_x_event(0, p4_t2_tid, p4_t2_pid, p4_t2_ptid, PPM_CL_CLONE_THREAD, p4_t2_vtid, p4_t2_vpid);
+
+	/* Check fields after child parsing */
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t2_tid, p4_t2_pid, p4_t2_ptid, p4_t2_vtid, p4_t2_vpid)
+
+	ASSERT_THREAD_GROUP_INFO(p4_t2_pid, 2, true, 2, p4_t1_tid, p4_t2_tid)
+	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 2, p4_t1_tid, p4_t2_tid)
+
+	/*=============================== p4_t2 ===========================*/
+
+	/*=============================== p5_t1 ===========================*/
+
+	int64_t p5_t1_tid = 82;
+	int64_t p5_t1_pid = p5_t1_tid;
+	int64_t p5_t1_ptid = p4_t2_tid;
+	int64_t p5_t1_vtid = 10;
+	int64_t p5_t1_vpid = p5_t1_vtid;
+
+	generate_clone_x_event(0, p5_t1_tid, p5_t1_pid, p5_t1_ptid, DEFAULT_VALUE, p5_t1_vtid, p5_t1_vpid);
+
+	/* Check fields after child parsing */
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p5_t1_tid, p5_t1_pid, p5_t1_ptid, p5_t1_vtid, p5_t1_vpid)
+
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 1, p5_t1_tid)
+	ASSERT_THREAD_CHILDREN(p4_t2_tid, 1, 1, p5_t1_tid)
+
+	/*=============================== p5_t1 ===========================*/
+
+	/*=============================== p5_t2 ===========================*/
+
+	int64_t p5_t2_tid = 84;
+	int64_t p5_t2_pid = p5_t1_pid;
+	int64_t p5_t2_ptid = p4_t2_tid;
+	int64_t p5_t2_vtid = 12;
+	int64_t p5_t2_vpid = p5_t1_vpid;
+
+	generate_clone_x_event(0, p5_t2_tid, p5_t2_pid, p5_t2_ptid, PPM_CL_CLONE_THREAD, p5_t2_vtid, p5_t2_vpid);
+
+	/* Check fields after child parsing */
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p5_t2_tid, p5_t2_pid, p5_t2_ptid, p5_t2_vtid, p5_t2_vpid)
+
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 2, false, 2, p5_t1_tid, p5_t2_tid)
+	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 2, p5_t1_tid, p5_t2_tid)
+
+	/*=============================== p5_t2 ===========================*/
+
+	/*=============================== p6_t1 ===========================*/
+
+	int64_t p6_t1_tid = 87;
+	int64_t p6_t1_pid = p6_t1_tid;
+	int64_t p6_t1_ptid = p5_t2_tid;
+	int64_t p6_t1_vtid = 17;
+	int64_t p6_t1_vpid = p6_t1_vtid;
+
+	generate_clone_x_event(0, p6_t1_tid, p6_t1_pid, p6_t1_ptid, DEFAULT_VALUE, p6_t1_vtid, p6_t1_vpid);
+
+	/* Check fields after child parsing */
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p6_t1_tid, p6_t1_pid, p6_t1_ptid, p6_t1_vtid, p6_t1_vpid)
+
+	ASSERT_THREAD_GROUP_INFO(p6_t1_pid, 1, false, 1, p6_t1_tid)
+	ASSERT_THREAD_CHILDREN(p5_t2_tid, 1, 1, p6_t1_tid)
+
+	/*=============================== p5_t2 ===========================*/
+
+	/*=============================== p4_t1 traverse ===========================*/
 
 	sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(p4_t1_tid, false, true).get();
 
 	std::vector<int64_t> p4_traverse_parents;
-	/* Here we prepare tid of the parents, please note that all the parents will always be
-	 * process so `tid == pid`.
-	 */
+	/* Here we prepare tid of the parents */
 	std::vector<int64_t> expected_p4_traverse_parents = {p4_t1_ptid, p3_t1_ptid, p2_t1_ptid};
 
 	sinsp_threadinfo::visitor_func_t p4_visitor = [&p4_traverse_parents](sinsp_threadinfo* pt)
@@ -638,9 +756,97 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 	tinfo->traverse_parent_state(p4_visitor);
 	ASSERT_EQ(p4_traverse_parents, expected_p4_traverse_parents);
 
+	/*=============================== p4_t1 traverse ===========================*/
+
+	/*=============================== p5_t2 traverse ===========================*/
+
+	tinfo = m_inspector.get_thread_ref(p5_t2_tid, false).get();
+
+	std::vector<int64_t> p5_traverse_parents;
+	/* Here we prepare tid of the parents */
+	std::vector<int64_t> expected_p5_traverse_parents = {p5_t2_ptid, p4_t2_ptid, p3_t1_ptid, p2_t1_ptid};
+
+	sinsp_threadinfo::visitor_func_t p5_visitor = [&p5_traverse_parents](sinsp_threadinfo* pt)
+	{
+		/* we stop when we reach the init parent */
+		p5_traverse_parents.push_back(pt->m_tid);
+		if(pt->m_tid == INIT_TID)
+		{
+			return false;
+		}
+		return true;
+	};
+
+	tinfo->traverse_parent_state(p5_visitor);
+	ASSERT_EQ(p5_traverse_parents, expected_p5_traverse_parents);
+
+	/*=============================== p5_t2 traverse ===========================*/
+
 	/* Remove some threads from the tree... */
 
-	/* Implement reparenting... */
+	/* Remove p4_t2 */
+	ASSERT_THREAD_CHILDREN(p4_t1_tid, 0, 0)
+	remove_thread(p4_t2_tid);
+	ASSERT_THREAD_GROUP_INFO(p4_t1_pid, 1, true, 2, p4_t1_tid)
+	ASSERT_THREAD_CHILDREN(p4_t1_tid, 2, 2, p5_t1_tid, p5_t2_tid)
+
+	/* Remove p5_t2 */
+	ASSERT_THREAD_CHILDREN(p5_t1_tid, 0, 0)
+	remove_thread(p5_t2_tid);
+	ASSERT_THREAD_CHILDREN(p5_t1_tid, 1, 1, p6_t1_tid)
+
+	/* Remove p5_t1 */
+	remove_thread(p5_t1_tid);
+
+	/* Now p6_t1 should be assigned to p4_t1 since it is the reaper */
+	ASSERT_THREAD_CHILDREN(p4_t1_tid, 3, 1, p6_t1_tid)
+
+	/* Set p2_t1 group as reaper, emulate prctl */
+	auto tginfo = m_inspector.m_thread_manager->get_thread_group_info(p2_t1_pid).get();
+	tginfo->reaper = true;
+
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, true, 3, p2_t1_tid, p2_t2_tid, p2_t3_tid)
+
+	/* Remove p2_t1 */
+	ASSERT_THREAD_CHILDREN(p2_t2_tid, 0, 0)
+	remove_thread(p2_t1_tid);
+	ASSERT_THREAD_CHILDREN(p2_t2_tid, 1, 1, p3_t1_tid)
+
+	/* Remove p2_t2 */
+	ASSERT_THREAD_CHILDREN(p2_t3_tid, 0, 0)
+	remove_thread(p2_t2_tid);
+	/* Please note that the parent of `p2_t2` is `init` since it was created with
+	 * CLONE_PARENT flag.
+	 */
+	ASSERT_THREAD_CHILDREN(p2_t3_tid, 1, 1, p3_t1_tid)
+
+	/* Remove p3_t1 */
+	remove_thread(p3_t1_tid);
+	ASSERT_THREAD_CHILDREN(p2_t3_tid, 2, 1, p4_t1_tid)
+
+	/*=============================== p6_t1 traverse ===========================*/
+
+	tinfo = m_inspector.get_thread_ref(p6_t1_tid, false).get();
+
+	std::vector<int64_t> p6_traverse_parents;
+	/* Here we prepare tid of the parents */
+	std::vector<int64_t> expected_p6_traverse_parents = {p4_t1_tid, p2_t3_tid, INIT_TID};
+
+	sinsp_threadinfo::visitor_func_t p6_visitor = [&p6_traverse_parents](sinsp_threadinfo* pt)
+	{
+		/* we stop when we reach the init parent */
+		p6_traverse_parents.push_back(pt->m_tid);
+		if(pt->m_tid == INIT_TID)
+		{
+			return false;
+		}
+		return true;
+	};
+
+	tinfo->traverse_parent_state(p6_visitor);
+	ASSERT_EQ(p6_traverse_parents, expected_p6_traverse_parents);
+
+	/*=============================== p6_t1 traverse ===========================*/
 
 	/* Check again the traverse... */
 }

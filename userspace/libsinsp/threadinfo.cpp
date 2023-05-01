@@ -1591,6 +1591,7 @@ sinsp_threadinfo* sinsp_thread_manager::find_new_reaper(sinsp_threadinfo* tinfo)
 	auto parent_tinfo = tinfo->get_parent_thread();
 	while(parent_tinfo != nullptr)
 	{
+		prev_set_size = loop_detection_set.size();
 		loop_detection_set.insert(parent_tinfo->m_tid);
 		if(loop_detection_set.size() == prev_set_size)
 		{
