@@ -118,6 +118,175 @@ limitations under the License.
 		}                                                                                                      \
 	}
 
+/* This is the default tree:
+ *	- (init) tid 1 pid 1 ptid 0
+ *  - (p_1 - t1) tid 2 pid 2 ptid 1
+ *  - (p_1 - t2) tid 3 pid 2 ptid 1
+ * 	 - (p_2 - t1) tid 25 pid 25 ptid 1 (CLONE_PARENT)
+ * 	  - (p_3 - t1) tid 72 pid 72 ptid 25
+ * 	   - (p_4 - t1) tid 76 pid 76 ptid 72 (container: vtid 1 vpid 1)
+ * 	   - (p_4 - t2) tid 79 pid 76 ptid 72 (container: vtid 2 vpid 1)
+ * 		- (p_5 - t1) tid 82 pid 82 ptid 79 (container: vtid 10 vpid 10)
+ * 		- (p_5 - t2) tid 84 pid 82 ptid 79 (container: vtid 12 vpid 10)
+ *  	 - (p_6 - t2) tid 87 pid 87 ptid 84 (container: vtid 17 vpid 17)
+ * 	 - (p_2 - t2) tid 23 pid 25 ptid 1
+ * 	 - (p_2 - t3) tid 24 pid 25 ptid 1
+ */
+#define DEFAULT_TREE                                                                                                   \
+	add_default_init_thread();                                                                                     \
+	open_inspector();                                                                                              \
+                                                                                                                       \
+	/* Init process creates a child process */                                                                     \
+                                                                                                                       \
+	/*=============================== p1_t1 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p1_t1_tid = 2;                                                                                  \
+	UNUSED int64_t p1_t1_pid = p1_t1_tid;                                                                          \
+	UNUSED int64_t p1_t1_ptid = INIT_TID;                                                                          \
+                                                                                                                       \
+	/* Parent exit event */                                                                                        \
+	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);                                              \
+                                                                                                                       \
+	/*=============================== p1_t1 ===========================*/                                          \
+                                                                                                                       \
+	/* p1 process creates a second thread */                                                                       \
+                                                                                                                       \
+	/*=============================== p1_t2 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p1_t2_tid = 6;                                                                                  \
+	UNUSED int64_t p1_t2_pid = p1_t1_pid;                                                                          \
+	UNUSED int64_t p1_t2_ptid = INIT_TID;                                                                          \
+                                                                                                                       \
+	/* Parent exit event */                                                                                        \
+	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CLONE_THREAD);                      \
+                                                                                                                       \
+	/*=============================== p1_t2 ===========================*/                                          \
+                                                                                                                       \
+	/* The second thread of p1 create a new process p2 */                                                          \
+                                                                                                                       \
+	/*=============================== p2_t1 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p2_t1_tid = 25;                                                                                 \
+	UNUSED int64_t p2_t1_pid = 25;                                                                                 \
+	UNUSED int64_t p2_t1_ptid = INIT_TID;                                                                          \
+                                                                                                                       \
+	/* Parent exit event */                                                                                        \
+	generate_clone_x_event(p2_t1_tid, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_PARENT);                      \
+                                                                                                                       \
+	/*=============================== p2_t1 ===========================*/                                          \
+                                                                                                                       \
+	/* p2 process creates a second thread */                                                                       \
+                                                                                                                       \
+	/*=============================== p2_t2 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p2_t2_tid = 23;                                                                                 \
+	UNUSED int64_t p2_t2_pid = p2_t1_pid;                                                                          \
+	UNUSED int64_t p2_t2_ptid = INIT_TID; /* p2_t2 will have the same parent of p2_t1 */                           \
+                                                                                                                       \
+	/* Parent exit event */                                                                                        \
+	generate_clone_x_event(p2_t2_tid, p2_t1_tid, p2_t1_pid, p2_t1_ptid, PPM_CL_CLONE_THREAD);                      \
+                                                                                                                       \
+	/*=============================== p2_t2 ===========================*/                                          \
+                                                                                                                       \
+	/* p2_t2 creates a new thread p2_t3 */                                                                         \
+                                                                                                                       \
+	/*=============================== p2_t3 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p2_t3_tid = 24;                                                                                 \
+	UNUSED int64_t p2_t3_pid = p2_t1_pid;                                                                          \
+	UNUSED int64_t p2_t3_ptid = INIT_TID;                                                                          \
+                                                                                                                       \
+	/* Parent exit event */                                                                                        \
+	generate_clone_x_event(p2_t3_tid, p2_t2_tid, p2_t2_pid, p2_t2_ptid, PPM_CL_CLONE_THREAD);                      \
+                                                                                                                       \
+	/*=============================== p2_t3 ===========================*/                                          \
+                                                                                                                       \
+	/* The leader thread of p2 create a new process p3 */                                                          \
+                                                                                                                       \
+	/*=============================== p3_t1 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p3_t1_tid = 72;                                                                                 \
+	UNUSED int64_t p3_t1_pid = p3_t1_tid;                                                                          \
+	UNUSED int64_t p3_t1_ptid = p2_t1_tid;                                                                         \
+                                                                                                                       \
+	/* Parent exit event */                                                                                        \
+	generate_clone_x_event(p3_t1_tid, p2_t1_tid, p2_t1_pid, p2_t1_ptid);                                           \
+                                                                                                                       \
+	/*=============================== p3_t1 ===========================*/                                          \
+                                                                                                                       \
+	/* The leader thread of p3 create a new process p4 in a new container */                                       \
+                                                                                                                       \
+	/*=============================== p4_t1 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p4_t1_tid = 76;                                                                                 \
+	UNUSED int64_t p4_t1_pid = p4_t1_tid;                                                                          \
+	UNUSED int64_t p4_t1_ptid = p3_t1_tid;                                                                         \
+	UNUSED int64_t p4_t1_vtid = 1; /* This process will be the `init` one in the new namespace */                  \
+	UNUSED int64_t p4_t1_vpid = p4_t1_vtid;                                                                        \
+                                                                                                                       \
+	generate_clone_x_event(p4_t1_tid, p3_t1_tid, p3_t1_pid, p3_t1_ptid,                                            \
+			       PPM_CL_CHILD_IN_PIDNS | PPM_CL_CLONE_NEWPID);                                           \
+                                                                                                                       \
+	/* Check fields after parent parsing                                                                           \
+	 * Note: here we cannot assert anything because the child will be in a container                               \
+	 * and so the parent doesn't create the `thread-info` for the child.                                           \
+	 */                                                                                                            \
+                                                                                                                       \
+	/* Child exit event */                                                                                         \
+	/* On arm64 the flag `PPM_CL_CLONE_NEWPID` is not sent by the child, so we simulate the                        \
+	 * worst case */                                                                                               \
+	generate_clone_x_event(0, p4_t1_tid, p4_t1_pid, p4_t1_ptid, PPM_CL_CHILD_IN_PIDNS, p4_t1_vtid, p4_t1_vpid);    \
+                                                                                                                       \
+	/*=============================== p4_t1 ===========================*/                                          \
+                                                                                                                       \
+	/*=============================== p4_t2 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p4_t2_tid = 79;                                                                                 \
+	UNUSED int64_t p4_t2_pid = p4_t1_pid;                                                                          \
+	UNUSED int64_t p4_t2_ptid = p3_t1_tid;                                                                         \
+	UNUSED int64_t p4_t2_vtid = 2;                                                                                 \
+	UNUSED int64_t p4_t2_vpid = p4_t1_vpid;                                                                        \
+                                                                                                                       \
+	generate_clone_x_event(0, p4_t2_tid, p4_t2_pid, p4_t2_ptid, PPM_CL_CLONE_THREAD, p4_t2_vtid, p4_t2_vpid);      \
+                                                                                                                       \
+	/*=============================== p4_t2 ===========================*/                                          \
+                                                                                                                       \
+	/*=============================== p5_t1 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p5_t1_tid = 82;                                                                                 \
+	UNUSED int64_t p5_t1_pid = p5_t1_tid;                                                                          \
+	UNUSED int64_t p5_t1_ptid = p4_t2_tid;                                                                         \
+	UNUSED int64_t p5_t1_vtid = 10;                                                                                \
+	UNUSED int64_t p5_t1_vpid = p5_t1_vtid;                                                                        \
+                                                                                                                       \
+	generate_clone_x_event(0, p5_t1_tid, p5_t1_pid, p5_t1_ptid, DEFAULT_VALUE, p5_t1_vtid, p5_t1_vpid);            \
+                                                                                                                       \
+	/*=============================== p5_t1 ===========================*/                                          \
+                                                                                                                       \
+	/*=============================== p5_t2 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p5_t2_tid = 84;                                                                                 \
+	UNUSED int64_t p5_t2_pid = p5_t1_pid;                                                                          \
+	UNUSED int64_t p5_t2_ptid = p4_t2_tid;                                                                         \
+	UNUSED int64_t p5_t2_vtid = 12;                                                                                \
+	UNUSED int64_t p5_t2_vpid = p5_t1_vpid;                                                                        \
+                                                                                                                       \
+	generate_clone_x_event(0, p5_t2_tid, p5_t2_pid, p5_t2_ptid, PPM_CL_CLONE_THREAD, p5_t2_vtid, p5_t2_vpid);      \
+                                                                                                                       \
+	/*=============================== p5_t2 ===========================*/                                          \
+                                                                                                                       \
+	/*=============================== p6_t1 ===========================*/                                          \
+                                                                                                                       \
+	UNUSED int64_t p6_t1_tid = 87;                                                                                 \
+	UNUSED int64_t p6_t1_pid = p6_t1_tid;                                                                          \
+	UNUSED int64_t p6_t1_ptid = p5_t2_tid;                                                                         \
+	UNUSED int64_t p6_t1_vtid = 17;                                                                                \
+	UNUSED int64_t p6_t1_vpid = p6_t1_vtid;                                                                        \
+                                                                                                                       \
+	generate_clone_x_event(0, p6_t1_tid, p6_t1_pid, p6_t1_ptid, DEFAULT_VALUE, p6_t1_vtid, p6_t1_vpid);            \
+                                                                                                                       \
+	/*=============================== p6_t1 ===========================*/
+
 TEST_F(sinsp_with_test_input, THRD_STATE_check_init_thread)
 {
 	/* Right now we have only the init process here */
@@ -469,283 +638,56 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_remove_se
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 0)
 }
 
-/// todo(@Andreagit97): we need to create a similar test with just the clone child exit event.
-/* Here the parent exit event always comes first  */
-TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
+/*=============================== CLONE PARENT EXIT EVENT ===========================*/
+
+/*=============================== DEFAULT TREE ===========================*/
+
+TEST_F(sinsp_with_test_input, THRD_STATE_check_default_tree)
 {
-	/* This test represents the following process tree:
-	 *	- (init) tid 1 pid 1 ptid 0
-	 *  - (p_1 - t1) tid 2 pid 2 ptid 1
-	 *  - (p_1 - t2) tid 3 pid 2 ptid 1
-	 * 	 - (p_2 - t1) tid 25 pid 25 ptid 1 (CLONE_PARENT)
-	 * 	  - (p_3 - t1) tid 72 pid 72 ptid 25
-	 * 	   - (p_4 - t1) tid 76 pid 76 ptid 72 (container: vtid 1 vpid 1)
-	 * 	   - (p_4 - t2) tid 79 pid 76 ptid 72 (container: vtid 2 vpid 1)
-	 * 		- (p_5 - t1) tid 82 pid 82 ptid 79 (container: vtid 10 vpid 10)
-	 * 		- (p_5 - t2) tid 84 pid 82 ptid 79 (container: vtid 12 vpid 10)
-	 *  	 - (p_6 - t2) tid 87 pid 87 ptid 84 (container: vtid 17 vpid 17)
-	 * 	 - (p_2 - t2) tid 23 pid 25 ptid 1
-	 * 	 - (p_2 - t3) tid 24 pid 25 ptid 1
-	 */
-
-	add_default_init_thread();
-	open_inspector();
-
-	/* Init process creates a child process */
-
-	/*=============================== p1_t1 ===========================*/
-
-	int64_t p1_t1_tid = 2;
-	int64_t p1_t1_pid = p1_t1_tid;
-	int64_t p1_t1_ptid = INIT_TID;
-
-	/* Parent exit event */
-	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID);
-
-	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
-
-	/* Child exit event */
-	generate_clone_x_event(0, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
-
-	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
-	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 1, false, 1, p1_t1_tid)
-	ASSERT_THREAD_CHILDREN(INIT_TID, 1, 1, p1_t1_tid)
-
-	/*=============================== p1_t1 ===========================*/
-
-	/* p1 process creates a second thread */
-
-	/*=============================== p1_t2 ===========================*/
-
-	int64_t p1_t2_tid = 6;
-	int64_t p1_t2_pid = p1_t1_pid;
-	int64_t p1_t2_ptid = INIT_TID;
-
-	/* Parent exit event */
-	generate_clone_x_event(p1_t2_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, PPM_CL_CLONE_THREAD);
-
-	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
-
-	/* Child exit event */
-	generate_clone_x_event(0, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_THREAD);
-
-	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid)
-	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, p1_t1_tid, p1_t2_tid)
-	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p1_t2_tid)
-
-	/*=============================== p1_t2 ===========================*/
-
-	/* The second thread of p1 create a new process p2 */
-
-	/*=============================== p2_t1 ===========================*/
-
-	int64_t p2_t1_tid = 25;
-	int64_t p2_t1_pid = 25;
-	int64_t p2_t1_ptid = INIT_TID;
-
-	/* Parent exit event */
-	generate_clone_x_event(p2_t1_tid, p1_t2_tid, p1_t2_pid, p1_t2_ptid, PPM_CL_CLONE_PARENT);
-
-	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
-
-	/* Child exit event */
-	generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_ptid, PPM_CL_CLONE_PARENT);
-
-	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 1, p2_t1_tid)
-	ASSERT_THREAD_CHILDREN(INIT_TID, 3, 3, p1_t1_tid, p1_t2_tid, p2_t1_tid)
-
-	/*=============================== p2_t1 ===========================*/
-
-	/* p2 process creates a second thread */
-
-	/*=============================== p2_t2 ===========================*/
-
-	int64_t p2_t2_tid = 23;
-	int64_t p2_t2_pid = p2_t1_pid;
-	int64_t p2_t2_ptid = INIT_TID; /* p2_t2 will have the same parent of p2_t1 */
-
-	/* Parent exit event */
-	generate_clone_x_event(p2_t2_tid, p2_t1_tid, p2_t1_pid, p2_t1_ptid, PPM_CL_CLONE_THREAD);
-
-	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p2_t2_tid, p2_t2_pid, p2_t2_ptid)
-
-	/* Child exit event */
-	generate_clone_x_event(0, p2_t2_tid, p2_t2_pid, p2_t2_ptid, PPM_CL_CLONE_THREAD);
-
-	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS(p2_t2_tid, p2_t2_pid, p2_t2_ptid)
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 2, p2_t1_tid, p2_t2_tid)
-	ASSERT_THREAD_CHILDREN(INIT_TID, 4, 4, p1_t1_tid, p1_t2_tid, p2_t1_tid, p2_t2_tid)
-
-	/*=============================== p2_t2 ===========================*/
-	
-	/* p2_t2 creates a new thread p2_t3 */
-
-	/*=============================== p2_t3 ===========================*/
-
-	int64_t p2_t3_tid = 24;
-	int64_t p2_t3_pid = p2_t1_pid;
-	int64_t p2_t3_ptid = INIT_TID;
-
-	/* Parent exit event */
-	generate_clone_x_event(p2_t3_tid, p2_t2_tid, p2_t2_pid, p2_t2_ptid, PPM_CL_CLONE_THREAD);
-
-	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p2_t3_tid, p2_t3_pid, p2_t3_ptid)
-
-	/* Child exit event */
-	generate_clone_x_event(0, p2_t3_tid, p2_t3_pid, p2_t3_ptid, PPM_CL_CLONE_THREAD);
-
-	/*=============================== p2_t3 ===========================*/
-
-	/* The leader thread of p2 create a new process p3 */
-
-	/*=============================== p3_t1 ===========================*/
-
-	int64_t p3_t1_tid = 72;
-	int64_t p3_t1_pid = p3_t1_tid;
-	int64_t p3_t1_ptid = p2_t1_tid;
-
-	/* Parent exit event */
-	generate_clone_x_event(p3_t1_tid, p2_t1_tid, p2_t1_pid, p2_t1_ptid);
-
-	/* Check fields after parent parsing */
-	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_ptid)
-
-	/* Child exit event */
-	generate_clone_x_event(0, p3_t1_tid, p3_t1_pid, p3_t1_ptid);
-
-	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_ptid)
-	ASSERT_THREAD_GROUP_INFO(p3_t1_pid, 1, false, 1, p3_t1_tid)
-	ASSERT_THREAD_CHILDREN(p2_t1_pid, 1, 1, p3_t1_tid)
-
-	/*=============================== p3_t1 ===========================*/
-
-	/* The leader thread of p3 create a new process p4 in a new container */
-
-	/*=============================== p4_t1 ===========================*/
-
-	int64_t p4_t1_tid = 76;
-	int64_t p4_t1_pid = p4_t1_tid;
-	int64_t p4_t1_ptid = p3_t1_tid;
-	int64_t p4_t1_vtid = 1; /* This process will be the `init` one in the new namespace */
-	int64_t p4_t1_vpid = p4_t1_vtid;
-
-	/* Parent exit event */
-	generate_clone_x_event(p4_t1_tid, p3_t1_tid, p3_t1_pid, p3_t1_ptid,
-			       PPM_CL_CHILD_IN_PIDNS | PPM_CL_CLONE_NEWPID);
-
-	/* Check fields after parent parsing
-	 * Note: here we cannot assert anything because the child will be in a container
-	 * and so the parent doesn't create the `thread-info` for the child.
-	 */
-
-	/* Child exit event */
-	/* On arm64 the flag `PPM_CL_CLONE_NEWPID` is not sent by the child, so we simulate the
-	 * worst case */
-	generate_clone_x_event(0, p4_t1_tid, p4_t1_pid, p4_t1_ptid, PPM_CL_CHILD_IN_PIDNS, p4_t1_vtid, p4_t1_vpid);
-
-	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t1_tid, p4_t1_pid, p4_t1_ptid, p4_t1_vtid, p4_t1_vpid)
-	/* p4_t1 is the init process of a namespace, reaper should be true! */
-	ASSERT_THREAD_GROUP_INFO(p4_t1_pid, 1, true, 1, p4_t1_tid)
-	ASSERT_THREAD_CHILDREN(p3_t1_tid, 1, 1, p4_t1_tid)
-
-	/*=============================== p4_t1 ===========================*/
-
-	/*=============================== p4_t2 ===========================*/
-
-	int64_t p4_t2_tid = 79;
-	int64_t p4_t2_pid = p4_t1_pid;
-	int64_t p4_t2_ptid = p3_t1_tid;
-	int64_t p4_t2_vtid = 2;
-	int64_t p4_t2_vpid = p4_t1_vpid;
-
-	generate_clone_x_event(0, p4_t2_tid, p4_t2_pid, p4_t2_ptid, PPM_CL_CLONE_THREAD, p4_t2_vtid, p4_t2_vpid);
-
-	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t2_tid, p4_t2_pid, p4_t2_ptid, p4_t2_vtid, p4_t2_vpid)
-
-	ASSERT_THREAD_GROUP_INFO(p4_t2_pid, 2, true, 2, p4_t1_tid, p4_t2_tid)
-	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 2, p4_t1_tid, p4_t2_tid)
-
-	/*=============================== p4_t2 ===========================*/
-
-	/*=============================== p5_t1 ===========================*/
-
-	int64_t p5_t1_tid = 82;
-	int64_t p5_t1_pid = p5_t1_tid;
-	int64_t p5_t1_ptid = p4_t2_tid;
-	int64_t p5_t1_vtid = 10;
-	int64_t p5_t1_vpid = p5_t1_vtid;
-
-	generate_clone_x_event(0, p5_t1_tid, p5_t1_pid, p5_t1_ptid, DEFAULT_VALUE, p5_t1_vtid, p5_t1_vpid);
-
-	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p5_t1_tid, p5_t1_pid, p5_t1_ptid, p5_t1_vtid, p5_t1_vpid)
-
-	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 1, p5_t1_tid)
-	ASSERT_THREAD_CHILDREN(p4_t2_tid, 1, 1, p5_t1_tid)
-
-	/*=============================== p5_t1 ===========================*/
-
-	/*=============================== p5_t2 ===========================*/
-
-	int64_t p5_t2_tid = 84;
-	int64_t p5_t2_pid = p5_t1_pid;
-	int64_t p5_t2_ptid = p4_t2_tid;
-	int64_t p5_t2_vtid = 12;
-	int64_t p5_t2_vpid = p5_t1_vpid;
-
-	generate_clone_x_event(0, p5_t2_tid, p5_t2_pid, p5_t2_ptid, PPM_CL_CLONE_THREAD, p5_t2_vtid, p5_t2_vpid);
-
-	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p5_t2_tid, p5_t2_pid, p5_t2_ptid, p5_t2_vtid, p5_t2_vpid)
-
-	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 2, false, 2, p5_t1_tid, p5_t2_tid)
-	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 2, p5_t1_tid, p5_t2_tid)
-
-	/*=============================== p5_t2 ===========================*/
-
-	/*=============================== p6_t1 ===========================*/
-
-	int64_t p6_t1_tid = 87;
-	int64_t p6_t1_pid = p6_t1_tid;
-	int64_t p6_t1_ptid = p5_t2_tid;
-	int64_t p6_t1_vtid = 17;
-	int64_t p6_t1_vpid = p6_t1_vtid;
-
-	generate_clone_x_event(0, p6_t1_tid, p6_t1_pid, p6_t1_ptid, DEFAULT_VALUE, p6_t1_vtid, p6_t1_vpid);
-
-	/* Check fields after child parsing */
-	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p6_t1_tid, p6_t1_pid, p6_t1_ptid, p6_t1_vtid, p6_t1_vpid)
-
-	ASSERT_THREAD_GROUP_INFO(p6_t1_pid, 1, false, 1, p6_t1_tid)
-	ASSERT_THREAD_CHILDREN(p5_t2_tid, 1, 1, p6_t1_tid)
-
-	/*=============================== p5_t2 ===========================*/
-
-	/*=============================== p4_t1 traverse ===========================*/
-
-	sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(p4_t1_tid, false, true).get();
-
-	std::vector<int64_t> p4_traverse_parents;
-	/* Here we prepare tid of the parents */
-	std::vector<int64_t> expected_p4_traverse_parents = {p4_t1_ptid, p3_t1_ptid, p2_t1_ptid};
-
-	sinsp_threadinfo::visitor_func_t p4_visitor = [&p4_traverse_parents](sinsp_threadinfo* pt)
+	/* Instantiate the default tree */
+	DEFAULT_TREE
+
+	/* Check Thread info */
+	ASSERT_THREAD_INFO_PIDS(INIT_TID, INIT_PID, INIT_PTID);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid);
+	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS(p2_t2_tid, p2_t2_pid, p2_t2_ptid);
+	ASSERT_THREAD_INFO_PIDS(p2_t3_tid, p2_t3_pid, p2_t3_ptid);
+	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_ptid);
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t1_tid, p4_t1_pid, p4_t1_ptid, p4_t1_vtid, p4_t1_vpid);
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t2_tid, p4_t2_pid, p4_t2_ptid, p4_t2_vtid, p4_t2_vpid);
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p5_t1_tid, p5_t1_pid, p5_t1_ptid, p5_t1_vtid, p5_t1_vpid);
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p5_t2_tid, p5_t2_pid, p5_t2_ptid, p5_t2_vtid, p5_t2_vpid);
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p6_t1_tid, p6_t1_pid, p6_t1_ptid, p6_t1_vtid, p6_t1_vpid);
+
+	/* Check Thread group info */
+	ASSERT_THREAD_GROUP_INFO(INIT_PID, 1, true, 1, INIT_TID);
+	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, p1_t1_tid, p1_t2_tid);
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, false, 3, p2_t1_tid, p2_t2_tid, p2_t3_tid);
+	ASSERT_THREAD_GROUP_INFO(p3_t1_pid, 1, false, 1, p3_t1_tid);
+	ASSERT_THREAD_GROUP_INFO(p4_t2_pid, 2, true, 2, p4_t1_tid, p4_t2_tid);
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 2, false, 2, p5_t1_tid, p5_t2_tid);
+	ASSERT_THREAD_GROUP_INFO(p6_t1_pid, 1, false, 1, p6_t1_tid);
+
+	/* Check children */
+	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5, p1_t1_tid, p1_t2_tid, p2_t1_tid, p2_t2_tid, p2_t3_tid);
+	ASSERT_THREAD_CHILDREN(p2_t1_tid, 1, 1, p3_t1_tid);
+	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 2, p4_t1_tid, p4_t2_tid);
+	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 2, p5_t1_tid, p5_t2_tid);
+	ASSERT_THREAD_CHILDREN(p5_t2_tid, 1, 1, p6_t1_tid);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_traverse_default_tree)
+{
+	/* Instantiate the default tree */
+	DEFAULT_TREE
+
+	std::vector<int64_t> traverse_parents;
+	sinsp_threadinfo::visitor_func_t visitor = [&traverse_parents](sinsp_threadinfo* pt)
 	{
 		/* we stop when we reach the init parent */
-		p4_traverse_parents.push_back(pt->m_tid);
+		traverse_parents.push_back(pt->m_tid);
 		if(pt->m_tid == INIT_TID)
 		{
 			return false;
@@ -753,8 +695,14 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 		return true;
 	};
 
-	tinfo->traverse_parent_state(p4_visitor);
-	ASSERT_EQ(p4_traverse_parents, expected_p4_traverse_parents);
+	/*=============================== p4_t1 traverse ===========================*/
+
+	sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(p4_t1_tid, false, true).get();
+
+	std::vector<int64_t> expected_p4_traverse_parents = {p4_t1_ptid, p3_t1_ptid, p2_t1_ptid};
+
+	tinfo->traverse_parent_state(visitor);
+	ASSERT_EQ(traverse_parents, expected_p4_traverse_parents);
 
 	/*=============================== p4_t1 traverse ===========================*/
 
@@ -762,27 +710,15 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 
 	tinfo = m_inspector.get_thread_ref(p5_t2_tid, false).get();
 
-	std::vector<int64_t> p5_traverse_parents;
-	/* Here we prepare tid of the parents */
 	std::vector<int64_t> expected_p5_traverse_parents = {p5_t2_ptid, p4_t2_ptid, p3_t1_ptid, p2_t1_ptid};
 
-	sinsp_threadinfo::visitor_func_t p5_visitor = [&p5_traverse_parents](sinsp_threadinfo* pt)
-	{
-		/* we stop when we reach the init parent */
-		p5_traverse_parents.push_back(pt->m_tid);
-		if(pt->m_tid == INIT_TID)
-		{
-			return false;
-		}
-		return true;
-	};
-
-	tinfo->traverse_parent_state(p5_visitor);
-	ASSERT_EQ(p5_traverse_parents, expected_p5_traverse_parents);
+	traverse_parents.clear();
+	tinfo->traverse_parent_state(visitor);
+	ASSERT_EQ(traverse_parents, expected_p5_traverse_parents);
 
 	/*=============================== p5_t2 traverse ===========================*/
 
-	/* Remove some threads from the tree... */
+	/*=============================== remove threads ===========================*/
 
 	/* Remove p4_t2 */
 	ASSERT_THREAD_CHILDREN(p4_t1_tid, 0, 0)
@@ -824,34 +760,22 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_thread_info_parent_first)
 	remove_thread(p3_t1_tid);
 	ASSERT_THREAD_CHILDREN(p2_t3_tid, 2, 1, p4_t1_tid)
 
+	/*=============================== remove threads ===========================*/
+
 	/*=============================== p6_t1 traverse ===========================*/
 
 	tinfo = m_inspector.get_thread_ref(p6_t1_tid, false).get();
 
-	std::vector<int64_t> p6_traverse_parents;
-	/* Here we prepare tid of the parents */
 	std::vector<int64_t> expected_p6_traverse_parents = {p4_t1_tid, p2_t3_tid, INIT_TID};
 
-	sinsp_threadinfo::visitor_func_t p6_visitor = [&p6_traverse_parents](sinsp_threadinfo* pt)
-	{
-		/* we stop when we reach the init parent */
-		p6_traverse_parents.push_back(pt->m_tid);
-		if(pt->m_tid == INIT_TID)
-		{
-			return false;
-		}
-		return true;
-	};
-
-	tinfo->traverse_parent_state(p6_visitor);
-	ASSERT_EQ(p6_traverse_parents, expected_p6_traverse_parents);
+	traverse_parents.clear();
+	tinfo->traverse_parent_state(visitor);
+	ASSERT_EQ(traverse_parents, expected_p6_traverse_parents);
 
 	/*=============================== p6_t1 traverse ===========================*/
-
-	/* Check again the traverse... */
 }
 
-/*=============================== CLONE PARENT EXIT EVENT ===========================*/
+/*=============================== DEFAULT TREE ===========================*/
 
 /*=============================== CLONE CHILD EXIT EVENT ===========================*/
 
