@@ -1030,12 +1030,110 @@ const std::string& sinsp_threadinfo::get_cgroup(const std::string& subsys) const
 	return notfound;
 }
 
+// void sinsp_threadinfo::traverse_parent_state(visitor_func_t &visitor)
+// {
+// 	// Use two pointers starting at this, traversing the parent
+// 	// state, at different rates. If they ever equal each other
+// 	// before slow is NULL there's a loop.
+
+// 	if(this->m_flags & (1 << 31))
+// 	{
+// 		this->m_flags &= ~(1 << 31);
+// 		if(this->m_tid != this->m_pid)
+// 		{
+// 			printf("\nv NEW THREAD:[%s] tid: %ld, pid: %ld, ptid %ld\n", this->m_comm.c_str(), this->m_tid, this->m_pid, this->m_ptid);
+// 		}
+// 		else
+// 		{
+// 			printf("\nv NEW LEADER-THREAD:[%s] tid: %ld, pid: %ld, ptid %ld\n", this->m_comm.c_str(), this->m_tid, this->m_pid, this->m_ptid);
+// 		}
+// 	}
+	
+// 	sinsp_threadinfo *parent = this->get_parent_thread();
+// 	if(parent && !parent->is_main_thread())
+// 	{
+// 		parent = parent->get_main_thread();
+// 	}
+// 	sinsp_threadinfo *slow=parent, *fast=slow;
+
+// 	// Move fast to its parent
+// 	fast = (fast ? fast->get_parent_thread() : fast);
+// 	if(fast && !fast->is_main_thread())
+// 	{
+// 		fast = fast->get_main_thread();
+// 	}
+
+// 	// The slow pointer must be valid and not have a tid of -1.
+// 	while(slow && slow->m_tid != -1)
+// 	{
+// 		if(!visitor(slow))
+// 		{
+// 			break;
+// 		}
+
+// 		// Advance slow one step and advance fast two steps
+// 		slow = slow->get_parent_thread();
+// 		if(slow && !slow->is_main_thread())
+// 		{
+// 			slow = slow->get_main_thread();
+// 		}
+
+// 		// advance fast 2 steps, checking to see if we meet
+// 		// slow after each step.
+// 		for (uint32_t i = 0; i < 2; i++) {
+// 			fast = (fast ? fast->get_parent_thread() : fast);
+// 			if(fast && !fast->is_main_thread())
+// 			{
+// 				fast = fast->get_main_thread();
+// 			}
+
+// 			// If not at the end but fast == slow or if
+// 			// slow points to itself, there's a loop in
+// 			// the thread state.
+// 			if(slow && (slow == fast ||
+// 				    slow->m_tid == slow->m_ptid))
+// 			{
+// 				// Note we only log a loop once for a given main thread, to avoid flooding logs.
+// 				if(!m_parent_loop_detected)
+// 				{
+// 					g_logger.log(std::string("Loop in parent thread state detected for pid ") +
+// 						     std::to_string(m_pid) +
+// 						     ". stopped at tid= " + std::to_string(slow->m_tid) +
+// 						     " ptid=" + std::to_string(slow->m_ptid),
+// 						     sinsp_logger::SEV_WARNING);
+// 					m_parent_loop_detected = true;
+// 				}
+// 				return;
+// 			}
+// 		}
+// 	}
+// 	if(!slow)
+// 	{
+// 		printf("END\n\n");
+// 	}
+// }
+
+#define GET_MAIN_PARENT(p) this->get_parent_thread() ? this->get_parent_thread()->get_main_thread() : this->get_parent_thread()
+
 void sinsp_threadinfo::traverse_parent_state(visitor_func_t &visitor)
 {
 	// Use two pointers starting at this, traversing the parent
 	// state, at different rates. If they ever equal each other
 	// before slow is NULL there's a loop.
 
+	if(this->m_flags & (1 << 31))
+	{
+		this->m_flags &= ~(1 << 31);
+		if(this->m_tid != this->m_pid)
+		{
+			printf("\nv NEW THREAD:[%s] tid: %ld, pid: %ld, ptid %ld, vtid: %ld, vpid: %ld\n", this->m_comm.c_str(), this->m_tid, this->m_pid, this->m_ptid, this->m_vtid, this->m_vpid);
+		}
+		else
+		{
+			printf("\nv NEW LEADER-THREAD:[%s] tid: %ld, pid: %ld, ptid %ld, vtid: %ld, vpid: %ld\n", this->m_comm.c_str(), this->m_tid, this->m_pid, this->m_ptid, this->m_vtid, this->m_vpid);
+		}
+	}
+	
 	sinsp_threadinfo *slow=this->get_parent_thread(), *fast=slow;
 
 	// Move fast to its parent
@@ -1076,6 +1174,10 @@ void sinsp_threadinfo::traverse_parent_state(visitor_func_t &visitor)
 				return;
 			}
 		}
+	}
+	if(!slow)
+	{
+		printf("END\n\n");
 	}
 }
 

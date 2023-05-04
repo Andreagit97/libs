@@ -1742,6 +1742,46 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 	if (!thread_added) {
 		delete tinfo;
 	}
+	else 
+	{
+		parinfo = evt->get_param(0);
+		ASSERT(parinfo->m_len == sizeof(int64_t));
+		if(parinfo->m_val == NULL)
+		{
+			return;
+		}
+		int64_t retval = *(int64_t *)parinfo->m_val;
+
+		if(retval == 0)
+		{
+			printf("CLONE CHILD EXIT: %ld", evt->get_num());
+		}
+		else
+		{
+			printf("CLONE CALLER EXIT: %ld", evt->get_num());
+		}
+
+		sinsp_threadinfo::visitor_func_t scap_file_visitor = [](sinsp_threadinfo* pt)
+		{
+			if(pt->m_tid != pt->m_pid)
+			{
+				printf("v THREAD:[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld\n", pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid);
+			}
+			else
+			{
+				printf("v LEADER-THREAD:[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld\n", pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid);
+			}
+			if(pt->m_tid == 1)
+			{
+				printf("END\n\n");
+				return false;
+			}
+			return true;
+		};
+
+		tinfo->m_flags |= (1 << 31);
+		tinfo->traverse_parent_state(scap_file_visitor);
+	}
 
 	return;
 }

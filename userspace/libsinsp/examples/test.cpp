@@ -414,6 +414,12 @@ sinsp_evt* get_event(sinsp& inspector, std::function<void(const std::string&)> h
 		return ev;
 	}
 
+	if(res == SCAP_EOF)
+	{
+		g_interrupted = true;
+		return nullptr;
+	}
+
 	if(res != SCAP_TIMEOUT && res != SCAP_FILTERED_EVENT)
 	{
 		handle_error(inspector.getlasterr());
