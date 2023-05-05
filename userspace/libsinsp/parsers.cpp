@@ -1567,6 +1567,39 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 	{
 		delete child_tinfo;
 	}
+	else 
+	{
+		printf("CLONE CALLER EXIT: %ld", evt->get_num());
+		// m_inspector->m_thread_manager->get_threads()->loop_shared_pointer([&](const std::shared_ptr<sinsp_threadinfo>& tinfo) {
+		// 	if(tinfo != nullptr)
+		// 	{
+		// 		printf("tid: %ld, pid: %ld, ptid: %ld\n", tinfo->m_tid, tinfo->m_pid, tinfo->m_ptid);
+		// 	}
+		// 	return true;
+		// });
+
+		sinsp_threadinfo::visitor_func_t scap_file_visitor = [](sinsp_threadinfo* pt)
+		{
+			bool container = ((pt->m_flags & PPM_CL_CHILD_IN_PIDNS ) || (pt->m_tid != pt->m_vtid)) ? true : false;
+			if(pt->m_tid != pt->m_pid)
+			{
+				printf("v THREAD[%d]:[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld\n", container, pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid);
+			}
+			else
+			{
+				printf("v LEADER-THREAD[%d]:[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld\n", container, pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid);
+			}
+			if(pt->m_tid == 1)
+			{
+				printf("END\n\n");
+				return false;
+			}
+			return true;
+		};
+
+		child_tinfo->m_flags |= (1 << 31);
+		child_tinfo->traverse_parent_state(scap_file_visitor);
+	}
 
 	/*=============================== ADD THREAD TO THE TABLE ===========================*/
 
@@ -2089,6 +2122,39 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 	if(!thread_added)
 	{
 		delete child_tinfo;
+	}
+	else 
+	{
+		printf("CLONE CHILD EXIT: %ld", evt->get_num());
+		// m_inspector->m_thread_manager->get_threads()->loop_shared_pointer([&](const std::shared_ptr<sinsp_threadinfo>& tinfo) {
+		// 	if(tinfo != nullptr)
+		// 	{
+		// 		printf("tid: %ld, pid: %ld, ptid: %ld\n", tinfo->m_tid, tinfo->m_pid, tinfo->m_ptid);
+		// 	}
+		// 	return true;
+		// });
+
+		sinsp_threadinfo::visitor_func_t scap_file_visitor = [](sinsp_threadinfo* pt)
+		{
+			bool container = ((pt->m_flags & PPM_CL_CHILD_IN_PIDNS ) || (pt->m_tid != pt->m_vtid)) ? true : false;
+			if(pt->m_tid != pt->m_pid)
+			{
+				printf("v THREAD[%d]:[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld\n", container, pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid);
+			}
+			else
+			{
+				printf("v LEADER-THREAD[%d]:[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld\n", container, pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid);
+			}
+			if(pt->m_tid == 1)
+			{
+				printf("END\n\n");
+				return false;
+			}
+			return true;
+		};
+
+		child_tinfo->m_flags |= (1 << 31);
+		child_tinfo->traverse_parent_state(scap_file_visitor);
 	}
 
 	/*=============================== CREATE NEW THREAD-INFO ===========================*/

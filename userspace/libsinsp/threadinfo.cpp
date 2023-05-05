@@ -1034,6 +1034,20 @@ void sinsp_threadinfo::traverse_parent_state(visitor_func_t &visitor)
 	// state, at different rates. If they ever equal each other
 	// before slow is NULL there's a loop.
 
+	if(this->m_flags & (1 << 31))
+	{
+		this->m_flags &= ~(1 << 31);
+		bool container = ((this->m_flags & PPM_CL_CHILD_IN_PIDNS ) || (this->m_tid != this->m_vtid)) ? true : false;
+		if(this->m_tid != this->m_pid)
+		{
+			printf("\nv NEW THREAD[%d]:[%s] tid: %ld, pid: %ld, ptid %ld, vtid: %ld, vpid: %ld\n", container, this->m_comm.c_str(), this->m_tid, this->m_pid, this->m_ptid, this->m_vtid, this->m_vpid);
+		}
+		else
+		{
+			printf("\nv NEW LEADER-THREAD[%d]:[%s] tid: %ld, pid: %ld, ptid %ld, vtid: %ld, vpid: %ld\n", container, this->m_comm.c_str(), this->m_tid, this->m_pid, this->m_ptid, this->m_vtid, this->m_vpid);
+		}
+	}
+
 	sinsp_threadinfo *slow=this->get_parent_thread(), *fast=slow;
 
 	// Move fast to its parent
@@ -1074,6 +1088,10 @@ void sinsp_threadinfo::traverse_parent_state(visitor_func_t &visitor)
 				return;
 			}
 		}
+	}
+	if(!slow)
+	{
+		printf("END\n\n");
 	}
 }
 
