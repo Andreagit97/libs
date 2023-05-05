@@ -5989,11 +5989,8 @@ void sinsp_parser::parse_cpu_hotplug_enter(sinsp_evt *evt)
 
 void sinsp_parser::parse_prctl_exit_event(sinsp_evt *evt)
 {
-	sinsp_evt_param* parinfo = nullptr;
-	int64_t caller_tid = evt->get_tid();
-
 	/* Parameter 1: res (type: PT_ERRNO) */
-	parinfo = evt->get_param(0);
+	sinsp_evt_param* parinfo = evt->get_param(0);
 	ASSERT(parinfo->m_len == sizeof(int64_t));
 	int64_t retval = *(int64_t *)parinfo->m_val;
 
@@ -6004,7 +6001,7 @@ void sinsp_parser::parse_prctl_exit_event(sinsp_evt *evt)
 	}
 
 	/* prctl could be called by the main thread but also by a secondary thread */
-	auto caller_tinfo = m_inspector->get_thread_ref(caller_tid, true);
+	auto caller_tinfo = evt->get_thread_info();
 	/* only invalid threads have `caller_tinfo->m_tginfo == nullptr` */
 	if(caller_tinfo == nullptr || caller_tinfo->is_invalid())
 	{

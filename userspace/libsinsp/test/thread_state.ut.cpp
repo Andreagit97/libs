@@ -131,6 +131,8 @@ limitations under the License.
 		}                                                                                                      \
 	}
 
+#define DEFAULT_TREE_NUM_PROCS 12
+
 /* This is the default tree:
  *	- (init) tid 1 pid 1 ptid 0
  *  - (p_1 - t1) tid 2 pid 2 ptid 1
@@ -896,6 +898,75 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 
 /*=============================== CLONE CHILD EXIT EVENT ===========================*/
 
+/*=============================== ADD THREAD FROM PROC ===========================*/
+
+TEST_F(sinsp_with_test_input, THRD_STATE_create_thread_dependencies_after_proc_scan)
+{
+	/* - init
+	 *  - p1_t1
+	 *   - p2_t1
+	 *  - p1_t2
+	 *  - p1_t3 (invalid)
+	 *   - p3_t1
+	 */
+
+	add_default_init_thread();
+
+	/* p1_t1 */
+	int64_t p1_t1_tid = 24;
+	int64_t p1_t1_pid = 24;
+	int64_t p1_t1_ptid = INIT_PID;
+
+	/* p2_t1 */
+	int64_t p2_t1_tid = 30;
+	int64_t p2_t1_pid = 30;
+	int64_t p2_t1_ptid = 24;
+
+	/* p1_t2 */
+	int64_t p1_t2_tid = 25;
+	int64_t p1_t2_pid = 24;
+	int64_t p1_t2_ptid = INIT_PID;
+
+	/* p1_t3, this is invalid */
+	int64_t p1_t3_tid = 26;
+	int64_t p1_t3_pid = -1;
+	int64_t p1_t3_ptid = -1;
+
+	/* p3_t1, this is a child of the invalid one */
+	int64_t p3_t1_tid = 40;
+	int64_t p3_t1_pid = 40;
+	int64_t p3_t1_ptid = 26; /* this parent doesn't exist we will reparent it to init */
+
+	/* Populate thread table */
+	add_simple_thread(p2_t1_tid, p2_t1_pid, p2_t1_ptid);
+	add_simple_thread(p3_t1_tid, p3_t1_pid, p3_t1_ptid);
+	add_simple_thread(p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	add_simple_thread(p1_t2_tid, p1_t2_pid, p1_t2_ptid);
+	add_simple_thread(p1_t3_tid, p1_t3_pid, p1_t3_ptid);
+
+	/* Here we fill the thread table */
+	open_inspector();
+	ASSERT_EQ(6, m_inspector.m_thread_manager->get_thread_count());
+
+	/* Children */
+	ASSERT_THREAD_CHILDREN(INIT_TID, 3, 3, p1_t1_tid, p1_t2_tid, p3_t1_tid);
+	ASSERT_THREAD_CHILDREN(p1_t1_tid, 1, 1, p2_t1_tid);
+	ASSERT_THREAD_CHILDREN(p1_t3_tid, 0, 0);
+
+	/* Thread group */
+	ASSERT_THREAD_GROUP_INFO(INIT_PID, 1, true, 1, 1, INIT_TID);
+	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, 2, p1_t1_tid, p1_t2_tid);
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 1, 1, p2_t1_tid)
+	ASSERT_THREAD_GROUP_INFO(p3_t1_pid, 1, false, 1, 1, p3_t1_tid)
+
+	auto p1_t3_tinfo = m_inspector.get_thread_ref(p1_t3_tid, false).get();
+	ASSERT_TRUE(p1_t3_tinfo);
+	ASSERT_FALSE(p1_t3_tinfo->m_tginfo);
+	ASSERT_EQ(p1_t3_tinfo->m_ptid, -1);
+}
+
+/*=============================== ADD THREAD FROM PROC ===========================*/
+
 /*=============================== REMOVE THREAD LOGIC ===========================*/
 
 TEST_F(sinsp_with_test_input, THRD_STATE_remove_non_existing_thread)
@@ -914,24 +985,23 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_1)
 {
 	DEFAULT_TREE
 
-	uint64_t old_thread_count = m_inspector.m_thread_manager->get_thread_count();
 	/* mark p2_t1 and p2_t3 to remove */
-	set_threadinfo_last_access_time(INIT_TID, 80);
-	set_threadinfo_last_access_time(p1_t1_tid, 80);
-	set_threadinfo_last_access_time(p1_t2_tid, 80);
-	set_threadinfo_last_access_time(p2_t1_tid, 80);
-	set_threadinfo_last_access_time(p3_t1_tid, 80);
-	set_threadinfo_last_access_time(p4_t1_tid, 80);
-	set_threadinfo_last_access_time(p4_t2_tid, 80);
-	set_threadinfo_last_access_time(p5_t1_tid, 80);
-	set_threadinfo_last_access_time(p5_t2_tid, 80);
-	set_threadinfo_last_access_time(p6_t1_tid, 80);
-	set_threadinfo_last_access_time(p2_t2_tid, 80);
-	set_threadinfo_last_access_time(p2_t3_tid, 80);
+	set_threadinfo_last_access_time(INIT_TID, 70);
+	set_threadinfo_last_access_time(p1_t1_tid, 70);
+	set_threadinfo_last_access_time(p1_t2_tid, 70);
+	set_threadinfo_last_access_time(p2_t1_tid, 70);
+	set_threadinfo_last_access_time(p3_t1_tid, 70);
+	set_threadinfo_last_access_time(p4_t1_tid, 70);
+	set_threadinfo_last_access_time(p4_t2_tid, 70);
+	set_threadinfo_last_access_time(p5_t1_tid, 70);
+	set_threadinfo_last_access_time(p5_t2_tid, 70);
+	set_threadinfo_last_access_time(p6_t1_tid, 70);
+	set_threadinfo_last_access_time(p2_t2_tid, 70);
+	set_threadinfo_last_access_time(p2_t3_tid, 70);
 
 	/* This should remove no one */
 	remove_inactive_threads(80, 20);
-	ASSERT_EQ(old_thread_count, m_inspector.m_thread_manager->get_thread_count());
+	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS, m_inspector.m_thread_manager->get_thread_count());
 
 	set_threadinfo_last_access_time(p2_t1_tid, 20);
 	set_threadinfo_last_access_time(p2_t3_tid, 20);
@@ -940,29 +1010,34 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_1)
 	 * group while p2_t3 should be removed.
 	 */
 	remove_inactive_threads(80, 20);
-	ASSERT_EQ(old_thread_count - 1, m_inspector.m_thread_manager->get_thread_count());
+	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 3, 2, p2_t1_tid, p2_t2_tid);
 
 	/* Calling PRCTL on an unknown thread should generate an invalid thread */
-	int64_t unknown_tid = 8000;
+	int64_t unknown_tid = 61103;
 	add_event_advance_ts(increasing_ts(), unknown_tid, PPME_SYSCALL_PRCTL_X, 4, (int64_t)0,
 			     PPM_PR_GET_CHILD_SUBREAPER, "<NA>", (int64_t)0);
-
+				
+	auto unknown_tinfo = m_inspector.get_thread_ref(unknown_tid, false).get();
+	ASSERT_TRUE(unknown_tinfo);
+	ASSERT_FALSE(unknown_tinfo->m_tginfo);
+	ASSERT_EQ(unknown_tinfo->m_ptid, -1);
+	
 	/* We want to be sure that this is removed because it is inactive */
-	set_threadinfo_last_access_time(unknown_tid, 80);
+	set_threadinfo_last_access_time(unknown_tid, 70);
 
 	/* This call should remove only invalid threads */
-	old_thread_count = m_inspector.m_thread_manager->get_thread_count();
 	remove_inactive_threads(80, 20);
-	ASSERT_EQ(old_thread_count - 1, m_inspector.m_thread_manager->get_thread_count());
+	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
 
 	/* successive remove call on `p2_t1` do nothing */
 	m_inspector.remove_thread(p2_t1_tid, false);
 	m_inspector.remove_thread(p2_t1_tid, false);
+	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
 
 	/* only a call with force equal to true should remove this thread */
 	m_inspector.remove_thread(p2_t1_tid, true);
-	ASSERT_EQ(old_thread_count - 2, m_inspector.m_thread_manager->get_thread_count());
+	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 2, m_inspector.m_thread_manager->get_thread_count());
 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 3, 1, p2_t2_tid);
 }
 

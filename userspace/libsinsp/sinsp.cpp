@@ -2638,9 +2638,8 @@ bool sinsp_thread_manager::remove_inactive_threads()
 		g_logger.format(sinsp_logger::SEV_INFO, "Flushing thread table");
 
 		/* Here we loop over the table in search of threads to delete. We remove:
-		 * 1. Dead threads. (we mark a thread as "dead" if we receive a "procexit" event for it)
-		 * 2. We have an invalid thread.
-		 * 3. Threads that we are not using and that are no more alive in /proc.
+		 * 1. Invalid threads.
+		 * 2. Threads that we are not using and that are no more alive in /proc.
 		 */
 		m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
 			if(tinfo.is_invalid() ||

@@ -1411,7 +1411,7 @@ void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sins
 	 * They won't have a valid parent or a valid thread group.
 	 * We use them just to see which tid calls a syscall.
 	 */
-	if(tinfo->m_pid == -1 || tinfo->m_ptid == -1)
+	if(tinfo->is_invalid())
 	{
 		return;
 	}
@@ -1455,6 +1455,9 @@ void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sins
 	 * Remember that in `/proc` scan the `ptid` is `ppid`.
 	 * If we don't find the parent in the table we can do nothing, so we consider
 	 * INIT as the new parent.
+	 * 
+	 * Please note that here the parent could not have yet the `tginfo` since maybe
+	 * we still need to parse it.
 	 */
 	auto parent_thread = m_inspector->get_thread_ref(tinfo->m_ptid, false);
 	if(parent_thread == nullptr || parent_thread->is_invalid())

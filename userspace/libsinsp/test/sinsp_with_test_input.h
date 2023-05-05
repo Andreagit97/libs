@@ -335,6 +335,12 @@ protected:
 		add_thread(tinfo, fdinfos);
 	}
 
+	void add_simple_thread(int64_t tid, int64_t pid, int64_t ptid)
+	{
+		scap_threadinfo tinfo = create_threadinfo(tid, pid, ptid, tid, tid, pid, "init", "/sbin/init", "/sbin/init", increasing_ts(), 0, 0, {}, 0, {}, "/root/");
+		add_thread(tinfo, {});
+	}
+
 	uint64_t increasing_ts()
 	{
 		uint64_t ret = m_test_timestamp;
