@@ -218,32 +218,32 @@ public:
 		m_flags |= PPM_CL_CLOSED;
 	}
 
-    /*!
-      \brief Return the number of alive threads in the thread group, including the thread leader.
-    */
-    inline uint64_t get_num_threads() const
-    {
-        return m_tginfo ? m_tginfo->get_thread_count() : 0;
-    }
+	/*!
+		\brief Return the number of alive threads in the thread group, including the thread leader.
+	*/
+	inline uint64_t get_num_threads() const
+	{
+		return m_tginfo ? m_tginfo->get_thread_count() : 0;
+	}
 
-    /*!
-      \brief Return the number of alive threads in the thread group, excluding the thread leader.
-    */
-    inline uint64_t get_num_not_leader_threads() const
-    {
-        if(!m_tginfo)
-        {
-            return 0;
-        }
-        
-        auto main_thread = get_main_thread();
-        if(main_thread != nullptr && !main_thread->is_dead())
-        {
-            return m_tginfo->get_thread_count()-1;
-        }
-        /* we don't have the main thread in the group or it is dead */
-        return m_tginfo->get_thread_count();
-    }
+	/*!
+		\brief Return the number of alive threads in the thread group, excluding the thread leader.
+	*/
+	inline uint64_t get_num_not_leader_threads() const
+	{
+		if(!m_tginfo)
+		{
+			return 0;
+		}
+		
+		auto main_thread = get_main_thread();
+		if(main_thread != nullptr && !main_thread->is_dead())
+		{
+			return m_tginfo->get_thread_count()-1;
+		}
+		/* we don't have the main thread in the group or it is dead */
+		return m_tginfo->get_thread_count();
+	}
 
 	/*
 	  \brief returns true if there is a loop detected in the thread parent state.
@@ -264,9 +264,7 @@ public:
 			return const_cast<sinsp_threadinfo*>(this);
 		}
 
-		/* Here we could use the first element of our list */
-		/* This is possible when we have invalid threads
-		 */
+		/* This is possible when we have invalid threads */
 		if(m_tginfo == nullptr)
 		{
 			return nullptr;
