@@ -57,6 +57,11 @@ typedef struct thread_group_info
 	thread_group_info(int64_t group_pid, bool reaper, std::weak_ptr<sinsp_threadinfo> current_thread):
 		m_pid(group_pid),
 		m_reaper(reaper){
+			if(current_thread.expired())
+			{
+				throw sinsp_exception("we cannot create a thread group info from an expired thread");
+			}
+
 			/* When we create the thread group info the count is 1, because we only have the creator thread */
 			m_alive_count = 1;
 			m_threads.push_front(current_thread);

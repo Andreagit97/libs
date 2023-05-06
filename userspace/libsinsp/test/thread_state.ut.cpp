@@ -1339,7 +1339,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_prctl_set_child_subreaper)
 
 	/* Let's imagine a prctl is called on `p2_t2` */
 	add_event_advance_ts(increasing_ts(), p2_t2_tid, PPME_SYSCALL_PRCTL_X, 4, (int64_t)0,
-			     PPM_PR_SET_CHILD_SUBREAPER, "<NA>", (int64_t)1);
+			     PPM_PR_SET_CHILD_SUBREAPER, "<NA>", (int64_t)80);
 
 	ASSERT_THREAD_GROUP_INFO(p2_t2_pid, 3, true, 3, 3);
 
@@ -1609,6 +1609,155 @@ TEST_F(sinsp_with_test_input, THRD_STATE_caller_comm_update_after_clone_events)
 }
 
 /*=============================== COMM UPDATE ===========================*/
+
+/*=============================== THREAD-GROUP-INFO ===========================*/
+
+TEST(thread_group_info, create_thread_group_info)
+{
+	std::shared_ptr<sinsp_threadinfo> tinfo = std::make_shared<sinsp_threadinfo>();
+	tinfo.reset();
+
+	/* This will throw an exception since tinfo is expired */
+	EXPECT_THROW(thread_group_info(34, true, tinfo), sinsp_exception);
+
+	tinfo = std::make_shared<sinsp_threadinfo>();
+	tinfo->m_tid = 23;
+	tinfo->m_pid = 23;
+
+	thread_group_info tginfo(tinfo->m_pid, true, tinfo);
+	EXPECT_EQ(tginfo.get_thread_count(), 1);
+	EXPECT_TRUE(tginfo.is_reaper());
+	EXPECT_EQ(tginfo.get_tgroup_pid(), 23);
+	auto threads = tginfo.get_thread_list();
+	ASSERT_EQ(threads.size(), 1);
+	ASSERT_EQ(tginfo.get_first_thread(), tinfo.get());
+
+	/* There are no threads in the thread group info, the first thread should be nullprt */
+	tinfo.reset();
+	ASSERT_EQ(tginfo.get_first_thread(), nullptr);
+
+	tginfo.set_reaper(false);
+	EXPECT_FALSE(tginfo.is_reaper());
+
+	tginfo.set_reaper(true);
+	EXPECT_TRUE(tginfo.is_reaper());
+}
+
+TEST(thread_group_info, populate_thread_group_info)
+{
+	auto tinfo = std::make_shared<sinsp_threadinfo>();
+	tinfo->m_tid = 23;
+	tinfo->m_pid = 23;
+
+	thread_group_info tginfo(tinfo->m_pid, false, tinfo);
+	EXPECT_FALSE(tginfo.is_reaper());
+
+	tginfo.increment_thread_count();
+	tginfo.increment_thread_count();
+	EXPECT_EQ(tginfo.get_thread_count(), 3);
+	tginfo.decrement_thread_count();
+	EXPECT_EQ(tginfo.get_thread_count(), 2);
+
+	auto tinfo1 = std::make_shared<sinsp_threadinfo>();
+	tginfo.add_thread_to_the_group(tinfo1, true);
+	ASSERT_EQ(tginfo.get_first_thread(), tinfo1.get());
+	EXPECT_EQ(tginfo.get_thread_count(), 3);
+
+	auto tinfo2 = std::make_shared<sinsp_threadinfo>();
+	tginfo.add_thread_to_the_group(tinfo2, false);
+	ASSERT_EQ(tginfo.get_first_thread(), tinfo1.get());
+	ASSERT_EQ(tginfo.get_thread_list().back().lock().get(), tinfo2.get());
+	EXPECT_EQ(tginfo.get_thread_count(), 4);
+}
+
+TEST(thread_group_info, get_main_thread)
+{
+	auto tinfo = std::make_shared<sinsp_threadinfo>();
+	tinfo->m_tid = 23;
+	tinfo->m_pid = 23;
+
+	auto tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, false, tinfo);
+
+	/* We are the main thread so here we don't use the thread group info */
+	ASSERT_EQ(tinfo->get_main_thread(), tinfo.get());
+
+	/* Now we change the tid so we are no more a main thread and we use the thread group info
+	 * we should obtain a nullptr since tinfo doesn't have any thread info associated.
+	 */
+	tinfo->m_tid = 25;
+	ASSERT_EQ(tinfo->get_main_thread(), nullptr);
+
+	/* We should still obtain a nullptr since the first tinfo in the table is not a main thread. */
+	tinfo->m_tginfo = tginfo;
+	ASSERT_EQ(tinfo->get_main_thread(), nullptr);
+
+	auto main_tinfo = std::make_shared<sinsp_threadinfo>();
+	main_tinfo->m_tid = 23;
+	main_tinfo->m_pid = 23;
+
+	/* We should still obtain a nullptr since we put the main thread as the last element of the list. */
+	tinfo->m_tginfo->add_thread_to_the_group(main_tinfo, false);
+	ASSERT_EQ(tinfo->get_main_thread(), nullptr);
+
+	tinfo->m_tginfo->add_thread_to_the_group(main_tinfo, true);
+	ASSERT_EQ(tinfo->get_main_thread(), main_tinfo.get());
+}
+
+TEST(thread_group_info, get_num_threads)
+{
+	auto tinfo = std::make_shared<sinsp_threadinfo>();
+	tinfo->m_tid = 25;
+	tinfo->m_pid = 23;
+
+	auto tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, false, tinfo);
+
+	/* Thread info doesn't have an associated thread group info */
+	ASSERT_EQ(tinfo->get_num_threads(), 0);
+	ASSERT_EQ(tinfo->get_num_not_leader_threads(), 0);
+
+	tinfo->m_tginfo = tginfo;
+	ASSERT_EQ(tinfo->get_num_threads(), 1);
+	ASSERT_EQ(tinfo->get_num_not_leader_threads(), 1);
+
+	auto main_tinfo = std::make_shared<sinsp_threadinfo>();
+	main_tinfo->m_tid = 23;
+	main_tinfo->m_pid = 23;
+
+	tinfo->m_tginfo->add_thread_to_the_group(main_tinfo, true);
+	ASSERT_EQ(tinfo->get_num_threads(), 2);
+	/* 1 thread is the main thread so we should return just 1 */
+	ASSERT_EQ(tinfo->get_num_not_leader_threads(), 1);
+
+	main_tinfo->set_dead();
+
+	/* Please note that here we still have 2 because we have just marked the thread as Dead without decrementing the
+	 * alive count */
+	ASSERT_EQ(tinfo->get_num_threads(), 2);
+	ASSERT_EQ(tinfo->get_num_not_leader_threads(), 2);
+}
+
+TEST(thread_group_info, thread_group_manager)
+{
+	sinsp inspector;
+	/* We don't have thread group info here */
+	ASSERT_FALSE(inspector.m_thread_manager->get_thread_group_info(8).get());
+
+	auto tinfo = std::make_shared<sinsp_threadinfo>();
+	tinfo->m_pid = 12;
+	auto tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, false, tinfo);
+
+	inspector.m_thread_manager->set_thread_group_info(tinfo->m_pid, tginfo);
+	ASSERT_TRUE(inspector.m_thread_manager->get_thread_group_info(tinfo->m_pid).get());
+
+	auto new_tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, false, tinfo);
+
+	/* We should replace the old thread group info */
+	inspector.m_thread_manager->set_thread_group_info(tinfo->m_pid, new_tginfo);
+	ASSERT_NE(inspector.m_thread_manager->get_thread_group_info(tinfo->m_pid).get(), tginfo.get());
+	ASSERT_EQ(inspector.m_thread_manager->get_thread_group_info(tinfo->m_pid).get(), new_tginfo.get());
+}
+
+/*=============================== THREAD-GROUP-INFO ===========================*/
 
 /*=============================== SCAP-FILES ===========================*/
 
