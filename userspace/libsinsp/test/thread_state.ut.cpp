@@ -1604,7 +1604,196 @@ TEST_F(sinsp_with_test_input, THRD_STATE_caller_comm_update_after_clone_events)
 	 * The child should have its own `comm`.
 	 */
 	ASSERT_THREAD_INFO_COMM(p2_t1_tid, "new-name");
-	GTEST_SKIP() << "The behavior of this test is wrong we don't update the `comm` name of the caller if it changes!";
+	GTEST_SKIP()
+		<< "The behavior of this test is wrong we don't update the `comm` name of the caller if it changes!";
 }
 
 /*=============================== COMM UPDATE ===========================*/
+
+/*=============================== SCAP-FILES ===========================*/
+
+#include <libsinsp_test_var.h>
+
+sinsp_evt* search_evt_by_num(sinsp* inspector, uint64_t evt_num)
+{
+	sinsp_evt* evt;
+	int ret = SCAP_SUCCESS;
+	while(ret != SCAP_EOF)
+	{
+		ret = inspector->next(&evt);
+		if(ret == SCAP_SUCCESS && evt->get_num() == evt_num)
+		{
+			return evt;
+		}
+	}
+	return NULL;
+}
+
+sinsp_evt* search_evt_by_type_and_tid(sinsp* inspector, uint64_t type, int64_t tid)
+{
+	sinsp_evt* evt;
+	int ret = SCAP_SUCCESS;
+	while(ret != SCAP_EOF)
+	{
+		ret = inspector->next(&evt);
+		if(ret == SCAP_SUCCESS && evt->get_type() == type && evt->get_tid() == tid)
+		{
+			return evt;
+		}
+	}
+	return NULL;
+}
+
+TEST(parse_scap_file, simple_tree_with_prctl)
+{
+	/* Scap file:
+	 *  - x86
+	 *  - generated with kmod
+	 *  - generated with libs version 0.11.0
+	 */
+	std::string path = LIBSINSP_TEST_SCAP_FILES_DIR + std::string("simple_tree_with_prctl.scap");
+	sinsp m_inspector;
+	m_inspector.open_savefile(path);
+
+	/* The number of events, pids and all other info are obtained by analyzing the scap-file manually */
+
+	/*
+	 * `zsh` performs a clone and creates a child p1_t1
+	 */
+	sinsp_evt* evt = search_evt_by_num(&m_inspector, 44315);
+
+	int64_t p1_t1_tid = 21104;
+	int64_t p1_t1_pid = 21104;
+	int64_t p1_t1_ptid = 6644; /* zsh */
+
+	/* Parent clone exit event */
+	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_CLONE_20_X);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 1, false, 1, 1, p1_t1_tid);
+	ASSERT_THREAD_CHILDREN(p1_t1_ptid, 1, 1, p1_t1_tid);
+	ASSERT_THREAD_INFO_COMM(p1_t1_tid, "zsh");
+
+	/*
+	 * `p1_t1` performs an execve calling the executable `example1`
+	 */
+	evt = search_evt_by_num(&m_inspector, 44450);
+
+	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_EXECVE_19_X);
+	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 1, false, 1, 1, p1_t1_tid);
+	ASSERT_THREAD_CHILDREN(p1_t1_ptid, 1, 1, p1_t1_tid);
+	ASSERT_THREAD_INFO_COMM(p1_t1_tid, "example1");
+
+	/*
+	 * `p1_t1` that creates a second thread `p1_t2`
+	 */
+	evt = search_evt_by_num(&m_inspector, 44661);
+
+	int64_t p1_t2_tid = 21105;
+	int64_t p1_t2_pid = p1_t1_pid;
+	int64_t p1_t2_ptid = 6644; /* zsh */
+
+	/* Parent clone exit event */
+	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_CLONE3_X);
+	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid);
+	ASSERT_THREAD_GROUP_INFO(p1_t2_pid, 2, false, 2, 2, p1_t1_tid, p1_t2_tid);
+	ASSERT_THREAD_CHILDREN(p1_t1_ptid, 2, 2, p1_t1_tid, p1_t2_tid);
+	ASSERT_THREAD_INFO_COMM(p1_t2_tid, "example1");
+
+	/*
+	 * `p1_t2` calls prctl and sets its group as a reaper
+	 */
+	evt = search_evt_by_num(&m_inspector, 44692);
+
+	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_PRCTL_X);
+	ASSERT_THREAD_GROUP_INFO(p1_t2_pid, 2, true, 2, 2, p1_t1_tid, p1_t2_tid);
+
+	// evt = search_evt_by_type_and_tid(&m_inspector, PPME_SYSCALL_PRCTL_X, p1_t2_tid);
+	// printf("evt num: %ld\n", evt->get_num());
+
+	/*
+	 * `p1_t2` creates a new leader thread `p2_t1`
+	 */
+	evt = search_evt_by_num(&m_inspector, 44765);
+
+	int64_t p2_t1_tid = 21106;
+	int64_t p2_t1_pid = p2_t1_tid;
+	int64_t p2_t1_ptid = p1_t2_tid;
+
+	/* Parent clone exit event */
+	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_CLONE_20_X);
+	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid);
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 1, 1, p2_t1_tid);
+	ASSERT_THREAD_CHILDREN(p1_t2_tid, 1, 1, p2_t1_tid);
+	ASSERT_THREAD_INFO_COMM(p2_t1_tid, "example1");
+
+	/*
+	 * `p2_t1` creates a new leader thread `p3_t1`
+	 */
+	evt = search_evt_by_num(&m_inspector, 44845);
+
+	int64_t p3_t1_tid = 21107;
+	int64_t p3_t1_pid = p3_t1_tid;
+	int64_t p3_t1_ptid = p2_t1_tid;
+
+	/* Parent clone exit event */
+	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_CLONE_20_X);
+	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p3_t1_ptid);
+	ASSERT_THREAD_GROUP_INFO(p3_t1_pid, 1, false, 1, 1, p3_t1_tid);
+	ASSERT_THREAD_CHILDREN(p2_t1_tid, 1, 1, p3_t1_tid);
+	ASSERT_THREAD_INFO_COMM(p3_t1_tid, "example1");
+
+	/*
+	 * `p2_t1` dies and `p3_t1` is reparented to `p1_t1`
+	 */
+	evt = search_evt_by_num(&m_inspector, 76892);
+	ASSERT_EQ(evt->get_type(), PPME_PROCEXIT_1_E);
+
+	/* We need to call the next event since the procexit happens at the next loop */
+	search_evt_by_num(&m_inspector, 76892 + 1);
+	ASSERT_MISSING_THREAD_INFO(p2_t1_tid, true);
+	auto tginfo = m_inspector.m_thread_manager->get_thread_group_info(p2_t1_pid).get();
+	ASSERT_FALSE(tginfo);
+	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, p1_t1_tid);
+	ASSERT_THREAD_CHILDREN(p1_t1_tid, 1, 1, p3_t1_tid);
+	ASSERT_THREAD_CHILDREN(p1_t2_tid, 1, 0);
+
+	/*
+	 * `p1_t2` dies, no reparenting
+	 */
+	evt = search_evt_by_num(&m_inspector, 98898);
+	ASSERT_EQ(evt->get_type(), PPME_PROCEXIT_1_E);
+
+	/* We need to call the next event since the procexit happens at the next loop */
+	search_evt_by_num(&m_inspector, 98898 + 1);
+	ASSERT_MISSING_THREAD_INFO(p1_t2_tid, true);
+	ASSERT_THREAD_GROUP_INFO(p1_t2_pid, 1, true, 2, 1, p1_t1_tid);
+	ASSERT_THREAD_CHILDREN(p1_t1_ptid, 2, 1, p1_t1_tid);
+
+	/*
+	 * `p1_t1` dies `p3_t1` is reparented to `init`
+	 */
+	evt = search_evt_by_num(&m_inspector, 135127);
+	ASSERT_EQ(evt->get_type(), PPME_PROCEXIT_1_E);
+
+	/* We need to call the next event since the procexit happens at the next loop */
+	search_evt_by_num(&m_inspector, 135127 + 1);
+	ASSERT_MISSING_THREAD_INFO(p1_t1_tid, true);
+	tginfo = m_inspector.m_thread_manager->get_thread_group_info(p1_t1_pid).get();
+	ASSERT_FALSE(tginfo);
+	ASSERT_THREAD_INFO_PIDS(p3_t1_tid, p3_t1_pid, INIT_TID);
+
+	/*
+	 * `p3_t1` dies, no reparenting
+	 */
+	evt = search_evt_by_num(&m_inspector, 192655);
+	ASSERT_EQ(evt->get_type(), PPME_PROCEXIT_1_E);
+
+	/* We need to call the next event since the procexit happens at the next loop */
+	search_evt_by_num(&m_inspector, 192655 + 1);
+	ASSERT_MISSING_THREAD_INFO(p3_t1_tid, true);
+	tginfo = m_inspector.m_thread_manager->get_thread_group_info(p3_t1_pid).get();
+	ASSERT_FALSE(tginfo);
+}
+
+/*=============================== SCAP-FILES ===========================*/

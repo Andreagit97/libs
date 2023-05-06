@@ -21,7 +21,13 @@ if(NOT MINIMAL_BUILD)
 endif() # MINIMAL_BUILD
 
 include_directories("..")
-include_directories(${LIBSCAP_INCLUDE_DIR} ${LIBSCAP_DIR}/driver)
+include_directories(${LIBSCAP_INCLUDE_DIR} ${LIBSCAP_DIR}/driver "${CMAKE_CURRENT_BINARY_DIR}")
+
+# Create a libsinsp_test_var.h file with some variables used by our tests
+configure_file (
+    "${CMAKE_CURRENT_SOURCE_DIR}/libsinsp_test_var.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/libsinsp_test_var.h"
+)
 
 ## Public libsinsp API
 file(GLOB_RECURSE PUBLIC_SINSP_API_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/public_sinsp_API/*.cpp)
