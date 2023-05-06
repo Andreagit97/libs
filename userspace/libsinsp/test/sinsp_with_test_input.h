@@ -335,9 +335,9 @@ protected:
 		add_thread(tinfo, fdinfos);
 	}
 
-	void add_simple_thread(int64_t tid, int64_t pid, int64_t ptid)
+	void add_simple_thread(int64_t tid, int64_t pid, int64_t ptid, std::string comm = "random")
 	{
-		scap_threadinfo tinfo = create_threadinfo(tid, pid, ptid, tid, tid, pid, "init", "/sbin/init", "/sbin/init", increasing_ts(), 0, 0, {}, 0, {}, "/root/");
+		scap_threadinfo tinfo = create_threadinfo(tid, pid, ptid, tid, tid, pid, comm, "/sbin/init", "/sbin/init", increasing_ts(), 0, 0, {}, 0, {}, "/root/");
 		add_thread(tinfo, {});
 	}
 

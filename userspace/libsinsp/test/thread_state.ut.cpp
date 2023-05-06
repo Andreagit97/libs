@@ -131,6 +131,13 @@ limitations under the License.
 		}                                                                                                      \
 	}
 
+#define ASSERT_THREAD_INFO_COMM(tid, comm)                                                                             \
+	{                                                                                                              \
+		sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(tid, false).get();                                \
+		ASSERT_TRUE(tinfo);                                                                                    \
+		ASSERT_EQ(tinfo->m_comm, comm);                                                                        \
+	}
+
 #define DEFAULT_TREE_NUM_PROCS 12
 
 /* This is the default tree:
@@ -1017,12 +1024,12 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_1)
 	int64_t unknown_tid = 61103;
 	add_event_advance_ts(increasing_ts(), unknown_tid, PPME_SYSCALL_PRCTL_X, 4, (int64_t)0,
 			     PPM_PR_GET_CHILD_SUBREAPER, "<NA>", (int64_t)0);
-				
+
 	auto unknown_tinfo = m_inspector.get_thread_ref(unknown_tid, false).get();
 	ASSERT_TRUE(unknown_tinfo);
 	ASSERT_FALSE(unknown_tinfo->m_tginfo);
 	ASSERT_EQ(unknown_tinfo->m_ptid, -1);
-	
+
 	/* We want to be sure that this is removed because it is inactive */
 	set_threadinfo_last_access_time(unknown_tid, 70);
 
@@ -1561,3 +1568,43 @@ TEST_F(sinsp_with_test_input, THRD_STATE_missing_process_execve_repair)
 }
 
 /*=============================== MISSING INFO ===========================*/
+
+/*=============================== COMM UPDATE ===========================*/
+
+TEST_F(sinsp_with_test_input, THRD_STATE_caller_comm_update_after_clone_events)
+{
+	add_default_init_thread();
+
+	/* Let's create process p1 */
+	int64_t p1_t1_tid = 24;
+	int64_t p1_t1_pid = 24;
+	int64_t p1_t1_ptid = INIT_TID;
+
+	add_simple_thread(p1_t1_tid, p1_t1_pid, p1_t1_ptid, "old-name");
+
+	open_inspector();
+
+	/* Now imagine that process p1 calls a prctl and changes its name... */
+
+	/* p1_t1 create a new process p2_t1. The clone caller exit event contains the new comm and should update the
+	 * comm of p1
+	 */
+
+	int64_t p2_t1_tid = 26;
+	UNUSED int64_t p2_t1_pid = 26;
+	UNUSED int64_t p2_t1_ptid = p1_t1_tid;
+
+	ASSERT_THREAD_INFO_COMM(p1_t1_tid, "old-name");
+	generate_clone_x_event(p2_t1_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid, DEFAULT_VALUE, DEFAULT_VALUE, DEFAULT_VALUE,
+			       "new-name");
+	/* The caller has a new comm but we don't catch it! */
+	ASSERT_THREAD_INFO_COMM(p1_t1_tid, "old-name");
+
+	/* After this event the child will have the caller `comm` but this is not the right behavior!
+	 * The child should have its own `comm`.
+	 */
+	ASSERT_THREAD_INFO_COMM(p2_t1_tid, "new-name");
+	GTEST_SKIP() << "The behavior of this test is wrong we don't update the `comm` name of the caller if it changes!";
+}
+
+/*=============================== COMM UPDATE ===========================*/
