@@ -1093,7 +1093,7 @@ void sinsp_threadinfo::assign_children_to_reaper(sinsp_threadinfo* reaper)
 		return;
 	}
 
-	for(const auto& child : m_children)
+	for(auto& child : m_children)
 	{
 		/* This child is dead */
 		if(child.expired())
@@ -1106,6 +1106,9 @@ void sinsp_threadinfo::assign_children_to_reaper(sinsp_threadinfo* reaper)
 		
 		/* update ptid of the child with the new parent */
 		child.lock().get()->m_ptid = reaper->m_tid;
+		
+		/* clean the child pointer */
+		child.reset();
 	}
 }
 
@@ -1444,8 +1447,8 @@ void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sins
 	}
 	tinfo->m_tginfo = tginfo;
 
-	/* init has no parent */
-	if(tinfo->m_tid == 1)
+	/* init group has no parent */
+	if(tinfo->m_pid == 1)
 	{
 		return;
 	}
