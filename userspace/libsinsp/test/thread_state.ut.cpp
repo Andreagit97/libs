@@ -915,6 +915,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_create_thread_dependencies_after_proc_s
 	 *  - p1_t2
 	 *  - p1_t3 (invalid)
 	 *   - p3_t1
+	 * - init_t2
+	 * - init_t3
 	 */
 
 	add_default_init_thread();
@@ -944,16 +946,28 @@ TEST_F(sinsp_with_test_input, THRD_STATE_create_thread_dependencies_after_proc_s
 	int64_t p3_t1_pid = 40;
 	int64_t p3_t1_ptid = 26; /* this parent doesn't exist we will reparent it to init */
 
+	/* init_t2, this is a thread of init */
+	int64_t init_t2_tid = 2;
+	int64_t init_t2_pid = INIT_PID;
+	int64_t init_t2_ptid = INIT_PTID;
+
+	/* init_t3, this is a thread of init */
+	int64_t init_t3_tid = 3;
+	int64_t init_t3_pid = INIT_PID;
+	int64_t init_t3_ptid = INIT_PTID;
+
 	/* Populate thread table */
 	add_simple_thread(p2_t1_tid, p2_t1_pid, p2_t1_ptid);
 	add_simple_thread(p3_t1_tid, p3_t1_pid, p3_t1_ptid);
 	add_simple_thread(p1_t1_tid, p1_t1_pid, p1_t1_ptid);
 	add_simple_thread(p1_t2_tid, p1_t2_pid, p1_t2_ptid);
 	add_simple_thread(p1_t3_tid, p1_t3_pid, p1_t3_ptid);
+	add_simple_thread(init_t2_tid, init_t2_pid, init_t2_ptid);
+	add_simple_thread(init_t3_tid, init_t3_pid, init_t3_ptid);
 
 	/* Here we fill the thread table */
 	open_inspector();
-	ASSERT_EQ(6, m_inspector.m_thread_manager->get_thread_count());
+	ASSERT_EQ(8, m_inspector.m_thread_manager->get_thread_count());
 
 	/* Children */
 	ASSERT_THREAD_CHILDREN(INIT_TID, 3, 3, p1_t1_tid, p1_t2_tid, p3_t1_tid);
@@ -961,7 +975,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_create_thread_dependencies_after_proc_s
 	ASSERT_THREAD_CHILDREN(p1_t3_tid, 0, 0);
 
 	/* Thread group */
-	ASSERT_THREAD_GROUP_INFO(INIT_PID, 1, true, 1, 1, INIT_TID);
+	ASSERT_THREAD_GROUP_INFO(INIT_PID, 3, true, 3, 3, INIT_TID, init_t2_tid, init_t3_tid);
 	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, 2, p1_t1_tid, p1_t2_tid);
 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 1, 1, p2_t1_tid)
 	ASSERT_THREAD_GROUP_INFO(p3_t1_pid, 1, false, 1, 1, p3_t1_tid)
@@ -970,6 +984,10 @@ TEST_F(sinsp_with_test_input, THRD_STATE_create_thread_dependencies_after_proc_s
 	ASSERT_TRUE(p1_t3_tinfo);
 	ASSERT_FALSE(p1_t3_tinfo->m_tginfo);
 	ASSERT_EQ(p1_t3_tinfo->m_ptid, -1);
+
+	/* These shouldn't be init children their parent should be `0` */
+	ASSERT_THREAD_INFO_PIDS(init_t2_tid, init_t2_pid, init_t2_ptid);
+	ASSERT_THREAD_INFO_PIDS(init_t3_tid, init_t3_pid, init_t3_ptid);
 }
 
 /*=============================== ADD THREAD FROM PROC ===========================*/
@@ -1757,7 +1775,84 @@ TEST(thread_group_info, thread_group_manager)
 	ASSERT_EQ(inspector.m_thread_manager->get_thread_group_info(tinfo->m_pid).get(), new_tginfo.get());
 }
 
+TEST(thread_group_info, create_thread_dependencies)
+{
+	sinsp m_inspector;
+
+	auto tinfo = std::make_shared<sinsp_threadinfo>();
+	tinfo.reset();
+
+	/* The thread info is nullptr */
+	EXPECT_THROW(m_inspector.m_thread_manager->create_thread_dependencies(tinfo), sinsp_exception);
+
+	/* The thread info is nullptr */
+	tinfo = std::make_shared<sinsp_threadinfo>();
+	tinfo->m_tid = 4;
+	tinfo->m_pid = -1;
+	tinfo->m_ptid = 1;
+
+	/* The thread info is invalid we do nothing */
+	m_inspector.m_thread_manager->create_thread_dependencies(tinfo);
+	ASSERT_FALSE(tinfo->m_tginfo);
+
+	/* The thread info already has a thread group we do nothing */
+	auto tginfo = std::make_shared<thread_group_info>(4, false, tinfo);
+	tinfo->m_tginfo = tginfo;
+	ASSERT_EQ(tinfo->m_tginfo->get_thread_count(), 1);
+	m_inspector.m_thread_manager->create_thread_dependencies(tinfo);
+	ASSERT_EQ(tinfo->m_tginfo->get_thread_count(), 1);
+
+	/* We reset the thread group */
+	tinfo->m_tginfo.reset();
+	tginfo.reset();
+
+	/* The parent is 3, but out threadtable is empty we don't have any thread in it
+	 * so we will search for `3` and we won't find anything. So as a fallback we will search
+	 * for init but also in this case we won't find anything so we will throw an exception.
+	 */
+	tinfo->m_pid = 3;
+	EXPECT_THROW(m_inspector.m_thread_manager->create_thread_dependencies(tinfo), sinsp_exception);
+
+	/* Even if we throw an exception we created a thread group info */
+	ASSERT_THREAD_GROUP_INFO(tinfo->m_pid, 1, false, 1, 1);
+}
+
 /*=============================== THREAD-GROUP-INFO ===========================*/
+
+/*=============================== THREAD-INFO ===========================*/
+
+TEST_F(sinsp_with_test_input, THRD_STATE_assign_children_to_reaper)
+{
+	DEFAULT_TREE
+
+	auto p3_t1_tinfo = m_inspector.get_thread_ref(p3_t1_tid, false).get();
+
+	/* The reaper cannot be null */
+	EXPECT_THROW(p3_t1_tinfo->assign_children_to_reaper(nullptr), sinsp_exception);
+
+	/* children of p3_t1 are p4_t1 and p4_t2 we can reparent them to p1_t1 */
+	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 2, p4_t1_tid, p4_t2_tid);
+	ASSERT_THREAD_CHILDREN(p1_t1_tid, 0, 0);
+
+	auto p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false).get();
+	p3_t1_tinfo->assign_children_to_reaper(p1_t1_tinfo);
+
+	/* all p3_t1 children should be expired */
+	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 0);
+
+	/* the new parent should be p1_t1 */
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t1_tid, p4_t1_pid, p1_t1_tid, p4_t1_vtid, p4_t1_vpid);
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t2_tid, p4_t2_pid, p1_t1_tid, p4_t2_vtid, p4_t2_vpid);
+
+	ASSERT_THREAD_CHILDREN(p1_t1_tid, 2, 2, p4_t1_tid, p4_t2_tid);
+
+	/* Another call to the reparenting function should do nothing */
+	p3_t1_tinfo->assign_children_to_reaper(p1_t1_tinfo);
+	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 0);
+	ASSERT_THREAD_CHILDREN(p1_t1_tid, 2, 2, p4_t1_tid, p4_t2_tid);
+}
+
+/*=============================== THREAD-INFO ===========================*/
 
 /*=============================== SCAP-FILES ===========================*/
 
