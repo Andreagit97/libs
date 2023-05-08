@@ -355,6 +355,8 @@ TEST(Actions, dynamic_snaplen_HTTP_TRACE)
 	const unsigned data_len = DEFAULT_SNAPLEN * 2;
 	char buf[data_len] = "TRACE\0";
 	uint32_t sendto_flags = 0;
+	uint32_t num = *(uint32_t *)(&buf[0]);
+	printf("num: %X\n", num);
 
 	struct clone_args cl_args = {0};
 	cl_args.exit_signal = SIGCHLD;

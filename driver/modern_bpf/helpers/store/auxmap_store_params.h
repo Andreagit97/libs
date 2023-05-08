@@ -1389,10 +1389,10 @@ static __always_inline void auxmap__store_fdlist_param(struct auxiliary_map *aux
 
 static __always_inline void apply_dynamic_snaplen(struct pt_regs *regs, u16 *snaplen, bool only_port_range)
 {
-	if(!maps__get_do_dynamic_snaplen())
-	{
-		return;
-	}
+	// if(!maps__get_do_dynamic_snaplen())
+	// {
+	// 	return;
+	// }
 
 	/* Please note that we can use this helper also for syscalls not related to the network.
 	 * The advantage of using it is that we can handle also socketcalls!
@@ -1549,6 +1549,7 @@ static __always_inline void apply_dynamic_snaplen(struct pt_regs *regs, u16 *sna
 		   h == BPF_HTTP_OPTIONS ||
 		   (h == BPF_HTTP_PREFIX && buf[4] == '/')) /* "HTTP/" */
 		{
+		    bpf_printk("h: %x", h);
 			*snaplen = *snaplen > SNAPLEN_EXTENDED ? *snaplen : SNAPLEN_EXTENDED;
 		}
 		return;
