@@ -1630,6 +1630,16 @@ TEST_F(sinsp_with_test_input, THRD_STATE_caller_comm_update_after_clone_events)
 
 /*=============================== THREAD-GROUP-INFO ===========================*/
 
+static sinsp_threadinfo* add_thread_to_the_table(sinsp* insp, int64_t tid, int64_t pid, int64_t ptid)
+{
+	auto thread_info = new sinsp_threadinfo(insp);
+	thread_info->m_tid = tid;
+	thread_info->m_pid = pid;
+	thread_info->m_ptid = ptid;
+	insp->add_thread(thread_info);
+	return thread_info;
+}
+
 TEST(thread_group_info, create_thread_group_info)
 {
 	std::shared_ptr<sinsp_threadinfo> tinfo = std::make_shared<sinsp_threadinfo>();
@@ -1816,6 +1826,71 @@ TEST(thread_group_info, create_thread_dependencies)
 	/* Even if we throw an exception we created a thread group info */
 	ASSERT_THREAD_GROUP_INFO(tinfo->m_pid, 1, false, 1, 1);
 }
+
+TEST(thread_group_info, find_reaper_with_null_thread_group_info)
+{
+	sinsp m_inspector;
+
+	/* This is the dead thread. This is an invalid thread (ptid==-1) so it won't have a thread group info */
+	auto thread_to_remove = add_thread_to_the_table(&m_inspector, 27, 25, -1);
+
+	/* We need to set the thread as dead before calling the reaper function */
+	thread_to_remove->set_dead();
+
+	/* Call the reaper function without thread group info.
+	 * We should search for init thread info, but init is not there in this example
+	 * so the method should return a nullptr.
+	 */
+	ASSERT_FALSE(m_inspector.m_thread_manager->find_new_reaper(thread_to_remove));
+}
+
+TEST(thread_group_info, find_reaper_in_the_same_thread_group)
+{
+	sinsp m_inspector;
+
+
+	/* Add init to the thread table */
+	add_thread_to_the_table(&m_inspector, INIT_TID, INIT_PID, INIT_PTID);
+
+
+	/* This is the dead thread */
+	auto thread_to_remove = add_thread_to_the_table(&m_inspector, 27, 25, 1);
+	
+	/* We need to set the thread as dead before calling the reaper function */
+	thread_to_remove->set_dead();
+
+	/* Add a new thread to the group that will be the reaper */
+	auto thread_reaper = add_thread_to_the_table(&m_inspector, 25, 25, 1);
+
+	/* Call the find reaper method, the reaper thread should be the unique thread alive in the group  */
+	ASSERT_EQ(m_inspector.m_thread_manager->find_new_reaper(thread_to_remove), thread_reaper);
+}
+
+TEST(thread_group_info, find_a_valid_reaper)
+{
+	sinsp m_inspector;
+
+
+	/* Add init to the thread table */
+	add_thread_to_the_table(&m_inspector, INIT_TID, INIT_PID, INIT_PTID);
+	
+	/* p1_t1 is a child of init */
+	auto p1_t1 = add_thread_to_the_table(&m_inspector, 20, 20, INIT_TID);
+	p1_t1->m_tginfo->set_reaper(true);
+
+	/* p2_t1 is a child of p1_t1 */
+	add_thread_to_the_table(&m_inspector, 21, 21, 20);
+
+	/* p3_t1 is a child of p2_t1 */
+	auto p2_t1 = add_thread_to_the_table(&m_inspector, 22, 22, 21);
+	
+	/* We need to set the thread as dead before calling the reaper function */
+	p2_t1->set_dead();
+
+	/* We have no threads in the same group so we will search for a reaper in the parent hierarchy  */
+	ASSERT_EQ(m_inspector.m_thread_manager->find_new_reaper(p2_t1), p1_t1);
+}
+
 
 /*=============================== THREAD-GROUP-INFO ===========================*/
 
