@@ -118,7 +118,6 @@ void sinsp_threadinfo::init()
 	m_lastexec_ts = 0;
 	m_lastevent_category.m_category = EC_UNKNOWN;
 	m_flags = PPM_CL_NAME_CHANGED;
-	m_nchilds = 0;
 	m_fdlimit = -1;
 	m_vmsize_kb = 0;
 	m_vmrss_kb = 0;
@@ -128,7 +127,6 @@ void sinsp_threadinfo::init()
 	m_vtid = -1;
 	m_vpid = -1;
 	m_pidns_init_start_ts = 0;
-	m_main_thread.reset();
 	m_lastevent_fd = 0;
 	m_last_latency_entertime = 0;
 	m_latency = 0;
@@ -479,7 +477,6 @@ void sinsp_threadinfo::init(scap_threadinfo* pi)
 	m_vmswap_kb = pi->vmswap_kb;
 	m_pfmajor = pi->pfmajor;
 	m_pfminor = pi->pfminor;
-	m_nchilds = 0;
 	m_vtid = pi->vtid;
 	m_vpid = pi->vpid;
 	m_pidns_init_start_ts = pi->pidns_init_start_ts;
@@ -937,6 +934,7 @@ std::string sinsp_threadinfo::get_cwd()
 	}
 	else
 	{
+		///todo(@Andreagit97) not sure we want to return "./" it seems like a valid path
 		ASSERT(false);
 		return "./";
 	}
@@ -1089,26 +1087,39 @@ void sinsp_threadinfo::traverse_parent_state(visitor_func_t &visitor)
 	}
 }
 
-void sinsp_threadinfo::set_exec_enter_tid(int64_t tid)
+/* We should never call this method if we don't have children to reparent
+ * if we want to save some clock cycles
+ */
+void sinsp_threadinfo::assign_children_to_reaper(sinsp_threadinfo* reaper)
 {
-	m_exec_enter_tid.reset(new int64_t(tid));
-}
-
-bool sinsp_threadinfo::get_exec_enter_tid(int64_t* tid)
-{
-	if(m_exec_enter_tid == NULL)
+	if(reaper == nullptr)
 	{
-		return false;
+		throw sinsp_exception("The reaper cannot be nullprt");
 	}
 
-	*tid = *(m_exec_enter_tid.get());
+	/* We have no children to reparent. */
+	if(m_children.size() == 0)
+	{
+		return;
+	}
 
-	return true;
-}
+	for(auto& child : m_children)
+	{
+		/* This child is dead */
+		if(child.expired())
+		{
+			continue;
+		}
 
-void sinsp_threadinfo::clear_exec_enter_tid()
-{
-	m_exec_enter_tid = NULL;
+		/* Add the child to the reaper list */
+		reaper->m_children.push_front(child);
+		
+		/* update ptid of the child with the new parent */
+		child.lock().get()->m_ptid = reaper->m_tid;
+		
+		/* clean the child pointer */
+		child.reset();
+	}
 }
 
 void sinsp_threadinfo::populate_cmdline(std::string &cmdline, const sinsp_threadinfo *tinfo)
@@ -1169,11 +1180,6 @@ std::string sinsp_threadinfo::get_path_for_dir_fd(int64_t dir_fd)
 #endif // _WIN32
 	}
 	return dir_fdinfo->m_name;
-}
-
-std::shared_ptr<sinsp_threadinfo> sinsp_threadinfo::lookup_thread() const
-{
-	return m_inspector->get_thread_ref(m_pid, true, true, true);
 }
 
 size_t sinsp_threadinfo::args_len() const
@@ -1392,8 +1398,8 @@ sinsp_thread_manager::sinsp_thread_manager(sinsp* inspector)
 void sinsp_thread_manager::clear()
 {
 	m_threadtable.clear();
+	m_thread_groups.clear();
 	m_last_tid = 0;
-	m_last_tinfo.reset();
 	m_last_flush_time_ns = 0;
 	m_n_drops = 0;
 
@@ -1406,26 +1412,85 @@ void sinsp_thread_manager::clear()
 #endif
 }
 
-void sinsp_thread_manager::increment_mainthread_childcount(sinsp_threadinfo* threadinfo)
+/* This is called on the table after the `/proc` scan */
+void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sinsp_threadinfo>& tinfo)
 {
-	if(threadinfo->m_flags & PPM_CL_CLONE_THREAD)
+	/* This should never happen */
+	if(tinfo == nullptr)
 	{
-		//
-		// Increment the refcount of the main thread so it won't
-		// be deleted (if it calls pthread_exit()) until we are done
-		//
-		ASSERT(threadinfo->m_pid != threadinfo->m_tid);
-
-		sinsp_threadinfo* main_thread = m_inspector->get_thread_ref(threadinfo->m_pid, true, true).get();
-		if(main_thread)
-		{
-			++main_thread->m_nchilds;
-		}
-		else
-		{
-			ASSERT(false);
-		}
+		throw sinsp_exception("There is a NULL pointer in the thread table, this should never happen");
 	}
+
+	/* For invalid threads we do nothing.
+	 * They won't have a valid parent or a valid thread group.
+	 * We use them just to see which tid calls a syscall.
+	 */
+	if(tinfo->is_invalid())
+	{
+		return;
+	}
+
+	/* This is a defensive check, it should never happen
+	 * a thread that calls this method should never have a thread group info
+	 */
+	if(tinfo->m_tginfo != nullptr)
+	{
+		return;
+	}
+
+	bool reaper = false;
+	/* reaper should be true if we are an init process for the init namespace or for an inner namespace */
+	if(tinfo->m_pid == 1 || tinfo->m_vpid == 1)
+	{
+		reaper = true;
+	}
+
+	/* Create the thread group info for the thread. */
+	auto tginfo = m_inspector->m_thread_manager->get_thread_group_info(tinfo->m_pid);
+	if(tginfo == nullptr)
+	{
+		tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, reaper, tinfo);
+		m_inspector->m_thread_manager->set_thread_group_info(tinfo->m_pid, tginfo);
+	}
+	else
+	{
+		tginfo->add_thread_to_the_group(tinfo, tinfo->is_main_thread());
+	}
+	tinfo->m_tginfo = tginfo;
+
+	/* init group has no parent */
+	if(tinfo->m_pid == 1)
+	{
+		return;
+	}
+
+	/* Assign the child to the parent for the first time, we are a thread
+	 * just created and we need to assign us to a parent. 
+	 * Remember that in `/proc` scan the `ptid` is `ppid`.
+	 * If we don't find the parent in the table we can do nothing, so we consider
+	 * INIT as the new parent.
+	 * 
+	 * Please note that here the parent could not have yet the `tginfo` since maybe
+	 * we still need to parse it.
+	 */
+	auto parent_thread = m_inspector->get_thread_ref(tinfo->m_ptid, false);
+	if(parent_thread == nullptr || parent_thread->is_invalid())
+	{
+		/* If init is not there we can do nothing.
+		 * If for some reason the process with tid `1` is not the reaper, we need to
+		 * implement some custom way to find the init reaper.
+		 * This could become dangerous if we are in a container because the parent would be outside
+		 * the container, but we have no other ways...
+		 */
+		parent_thread = m_inspector->get_thread_ref(1, false);
+		if(parent_thread == nullptr)
+		{
+			throw sinsp_exception("There is no init process (tid 1) under `/proc`. We cannot build a process tree");
+		}
+		/* We update also the parent tid of the thread */
+		tinfo->m_ptid = 1;
+	}
+	parent_thread->m_children.push_front(tinfo);
 }
 
 std::unique_ptr<sinsp_threadinfo> sinsp_thread_manager::new_threadinfo() const
@@ -1434,14 +1499,18 @@ std::unique_ptr<sinsp_threadinfo> sinsp_thread_manager::new_threadinfo() const
 	return std::unique_ptr<sinsp_threadinfo>(tinfo);
 }
 
+/* Can be called when:
+ * 1. We crafted a new event to create in clone parsers. (`from_scap_proctable==false`)
+ * 2. We are doing a proc scan with a callback or without. (`from_scap_proctable==true`)
+ * 3. We are trying to obtain thread info from /proc through `get_thread_ref`
+ */
 bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_scap_proctable)
 {
 #ifdef GATHER_INTERNAL_STATS
 	m_added_threads->increment();
 #endif
 
-	m_last_tinfo.reset();
-
+	/* We have no more space */
 	if(m_threadtable.size() >= m_max_thread_table_size
 #if defined(HAS_CAPTURE)
 	   && threadinfo->m_pid != m_inspector->m_self_pid
@@ -1458,138 +1527,226 @@ bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_sc
 		return false;
 	}
 
+	auto tinfo_shared_ptr = std::shared_ptr<sinsp_threadinfo>(threadinfo);
+
 	if(!from_scap_proctable)
 	{
-		increment_mainthread_childcount(threadinfo);
+		create_thread_dependencies(tinfo_shared_ptr);
 	}
 
-	if (threadinfo->dynamic_fields() == nullptr)
+	if (tinfo_shared_ptr->dynamic_fields() == nullptr)
 	{
-		threadinfo->set_dynamic_fields(dynamic_fields());
+		tinfo_shared_ptr->set_dynamic_fields(dynamic_fields());
 	}
-	if (threadinfo->dynamic_fields() != dynamic_fields())
+	if (tinfo_shared_ptr->dynamic_fields() != dynamic_fields())
 	{
 		throw sinsp_exception("adding entry with incompatible dynamic defs to thread table");
 	}
 
-	threadinfo->compute_program_hash();
-	m_threadtable.put(threadinfo);
+	tinfo_shared_ptr->compute_program_hash();
+	m_threadtable.put(tinfo_shared_ptr);
 
 	return true;
 }
 
+/* Taken from `find_new_reaper` kernel function:
+ *
+ * When we die, we re-parent all our children, and try to:
+ * 1. give them to another thread in our thread group, if such a member exists.
+ * 2. give them to the first ancestor process which prctl'd itself as a
+ *    child_subreaper for its children (like a service manager)
+ * 3. give them to the init process (PID 1) in our pid namespace
+ */
+sinsp_threadinfo* sinsp_thread_manager::find_new_reaper(sinsp_threadinfo* tinfo)
+{
+	/* First we check in our thread group if present */
+	if(tinfo->m_tginfo != nullptr && tinfo->m_tginfo->get_thread_count() > 0)
+	{
+		for(const auto& thread_weak : tinfo->m_tginfo->get_thread_list())
+		{
+			if(thread_weak.expired())
+			{
+				continue;
+			}
+			auto thread = thread_weak.lock().get();
+			if(!thread->is_dead())
+			{
+				return thread;
+			}
+		}
+	}
+
+	/* This is raw logic to detect loops, we can probably do better
+	 * We should never have a self-loop but if we have it
+	 * we break it by changing the parent with `init`.
+	 */
+	std::unordered_set<int64_t> loop_detection_set{};
+	uint16_t prev_set_size = 0;
+
+	auto parent_tinfo = tinfo->get_parent_thread();
+	while(parent_tinfo != nullptr)
+	{
+		prev_set_size = loop_detection_set.size();
+		loop_detection_set.insert(parent_tinfo->m_tid);
+		if(loop_detection_set.size() == prev_set_size)
+		{
+			/* loop detected */
+			ASSERT(false);
+			break;
+		}
+		if(parent_tinfo->m_tginfo && parent_tinfo->m_tginfo->is_reaper())
+		{
+			for(const auto& thread_weak : parent_tinfo->m_tginfo->get_thread_list())
+			{
+				if(thread_weak.expired())
+				{
+					continue;
+				}
+				auto thread = thread_weak.lock().get();
+				if(!thread->is_dead())
+				{
+					return thread;
+				}
+			}
+		}
+		parent_tinfo = parent_tinfo->get_parent_thread();
+	}
+	
+	/* If we don't have the parent the reaper becomes init */
+	return m_threadtable.get(1);	
+}
+
+void sinsp_thread_manager::remove_main_thread_fdtable(sinsp_threadinfo* main_thread)
+{
+	///todo(@Andreagit97): all this logic is useful only if we have a `m_fd_listener`
+	///we could avoid it if not present.
+	
+	/* Please note that the main thread is not always here, it is possible
+	 * that for some reason we lose it!
+	 */
+	if(main_thread == nullptr)
+	{
+		return;
+	}
+	
+	sinsp_fdtable* fd_table_ptr = main_thread->get_fd_table();
+	if(fd_table_ptr == nullptr)
+	{
+		return;
+	}
+
+	std::unordered_map<int64_t, sinsp_fdinfo_t>* fdtable = &(fd_table_ptr->m_table);
+
+	erase_fd_params eparams;
+	eparams.m_remove_from_table = false;
+	eparams.m_tinfo = main_thread;
+	eparams.m_ts = m_inspector->m_lastevent_ts;
+
+	for(auto fdit = fdtable->begin(); fdit != fdtable->end(); ++fdit)
+	{
+		eparams.m_fd = fdit->first;
+
+		//
+		// The canceled fd should always be deleted immediately, so if it appears
+		// here it means we have a problem.
+		//
+		ASSERT(eparams.m_fd != CANCELED_FD_NUMBER);
+		eparams.m_fdinfo = &(fdit->second);
+
+		/* Here we are just calling the `on_erase` callback */
+		m_inspector->m_parser->erase_fd(&eparams);
+	}
+}
+
+/* We use `force` when we have a stale thread in the table, we know it is stale
+ * because we have a thread with the same `tid` and this is not possible unless
+ * the old one is dead.
+ *
+ * `force` is useful only if we want to remove a leader thread that is dead otherwise 
+ * it should never be used.
+ */
 void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 {
-	uint64_t nchilds;
-	sinsp_threadinfo* tinfo = m_threadtable.get(tid);
+	auto thread_to_remove = m_threadtable.get_ref(tid);
 
-	if(tinfo == nullptr)
+	/* This should never happen but just to be sure. */
+	if(thread_to_remove == nullptr)
 	{
-		//
-		// Looks like there's no thread to remove.
-		// Either the thread creation event was dropped or our logic doesn't support the
-		// call that created this thread. The assertion will detect it, while in release mode we just
-		// keep going.
-		//
 #ifdef GATHER_INTERNAL_STATS
 		m_failed_lookups->increment();
 #endif
 		return;
 	}
-	else if((nchilds = tinfo->m_nchilds) == 0 || force)
+
+	/* All threads should have a m_tginfo apart from the invalid ones which don't have a group or children. */
+	if(thread_to_remove->is_invalid() || thread_to_remove->m_tginfo == nullptr)
 	{
-		//
-		// Decrement the refcount of the main thread/program because
-		// this reference is gone
-		//
-		if(tinfo->m_flags & PPM_CL_CLONE_THREAD)
-		{
-			ASSERT(tinfo->m_pid != tinfo->m_tid);
-			sinsp_threadinfo* main_thread = m_inspector->get_thread_ref(tinfo->m_pid, false, true).get();
-			if(main_thread)
-			{
-				if(main_thread->m_nchilds > 0)
-				{
-					--main_thread->m_nchilds;
-				}
-				else
-				{
-					ASSERT(false);
-				}
-
-				// If the main thread has already been
-				// closed and now has no children,
-				// remove it now.
-				if((main_thread->m_flags & PPM_CL_CLOSED) &&
-				   main_thread->m_nchilds == 0)
-				{
-					m_inspector->m_tid_to_remove = main_thread->m_tid;
-				}
-			}
-			else
-			{
-				ASSERT(false);
-			}
-		}
-
-		//
-		// If this is the main thread of a process, erase all the FDs that the process owns
-		//
-		if((tinfo->m_pid == tinfo->m_tid) || tinfo->m_flags & PPM_CL_IS_MAIN_THREAD)
-		{
-			sinsp_fdtable* fd_table_ptr = tinfo->get_fd_table();
-			if(fd_table_ptr == NULL)
-			{
-				ASSERT(false);
-				return;
-			}
-			std::unordered_map<int64_t, sinsp_fdinfo_t>* fdtable = &(fd_table_ptr->m_table);
-
-			std::unordered_map<int64_t, sinsp_fdinfo_t>::iterator fdit;
-
-			erase_fd_params eparams;
-			eparams.m_remove_from_table = false;
-			eparams.m_tinfo = tinfo;
-			eparams.m_ts = m_inspector->m_lastevent_ts;
-
-			for(fdit = fdtable->begin(); fdit != fdtable->end(); ++fdit)
-			{
-				eparams.m_fd = fdit->first;
-
-				//
-				// The canceled fd should always be deleted immediately, so if it appears
-				// here it means we have a problem.
-				//
-				ASSERT(eparams.m_fd != CANCELED_FD_NUMBER);
-				eparams.m_fdinfo = &(fdit->second);
-
-				m_inspector->m_parser->erase_fd(&eparams);
-			}
-		}
-
-		//
-		// Reset the cache
-		//
-		m_last_tid = 0;
-		m_last_tinfo.reset();
-
-#ifdef GATHER_INTERNAL_STATS
-		m_removed_threads->increment();
-#endif
-
 		m_threadtable.erase(tid);
-
-		//
-		// If the thread has a nonzero refcount, it means that we are forcing the removal
-		// of a main process or program that some child refer to.
-		// We need to recalculate the child relationships, or the table will become
-		// corrupted.
-		//
-		if(nchilds != 0)
-		{
-			recreate_child_dependencies();
-		}
+		m_last_tid = -1;
+		return;
 	}
+
+    /* The main thread remains in our thread table even if it is dead so we need to be sure
+	 * that calling this method more than one time with the main thread is safe. We don't decrement
+	 * the counter 2 times.
+	 */
+	if(!thread_to_remove->is_dead())
+	{
+		/* we should decrement only if the thread is alive */
+		thread_to_remove->m_tginfo->decrement_thread_count();
+	}
+
+	/* we could set it just one time but it's ok to set it every time */
+	thread_to_remove->set_dead();
+
+	/* Check if we have children, even if `size!=0`
+	 * all children could be dead, but not sure if we want
+	 * to check it here...
+	 */
+	if(thread_to_remove->m_children.size())
+	{
+		auto reaper = find_new_reaper(thread_to_remove.get());
+		thread_to_remove->assign_children_to_reaper(reaper);
+	}
+
+	if((thread_to_remove->m_tginfo->get_thread_count() == 0))
+	{
+		remove_main_thread_fdtable(thread_to_remove->get_main_thread());
+
+		/* we remove the main thread and the thread group */
+		m_thread_groups.erase(thread_to_remove->m_pid);
+		m_threadtable.erase(thread_to_remove->m_pid);
+	}
+
+	/* if `force==true` and we are the main thread and we are not the last thread of the group 
+	 * we need to remove ourselves and the fdtable. Please note that if we are the last thread
+	 * of the group we have already done it in the previous switch.
+	 * 
+	 * Probably we need to change this logic, here we are removing the fdtable even if other threads
+	 * of the group are still alive, in this way, they can no more access the shared fdtable!
+	 * 
+	 * `force==true` for not main threads do nothing!
+	 */
+	if(force &&
+	   thread_to_remove->is_main_thread() &&
+	   thread_to_remove->m_tginfo->get_thread_count() != 0)
+	{
+		remove_main_thread_fdtable(thread_to_remove->get_main_thread());
+		m_threadtable.erase(tid);
+	}
+
+	if(!thread_to_remove->is_main_thread())
+	{
+		m_threadtable.erase(tid);
+	}
+
+	/* Maybe we removed the thread info that was cached, we clear
+	 * the cache just to be sure.
+	 */
+	m_last_tid = -1;
+#ifdef GATHER_INTERNAL_STATS
+	m_removed_threads->increment();
+#endif
 }
 
 void sinsp_thread_manager::fix_sockets_coming_from_proc()
@@ -1602,8 +1759,6 @@ void sinsp_thread_manager::fix_sockets_coming_from_proc()
 
 void sinsp_thread_manager::clear_thread_pointers(sinsp_threadinfo& tinfo)
 {
-	tinfo.m_main_thread.reset();
-
 	sinsp_fdtable* fdt = tinfo.get_fd_table();
 	if(fdt != NULL)
 	{
@@ -1611,40 +1766,20 @@ void sinsp_thread_manager::clear_thread_pointers(sinsp_threadinfo& tinfo)
 	}
 }
 
-/*
-void sinsp_thread_manager::clear_thread_pointers(threadinfo_map_iterator_t it)
-{
-	it->second.m_main_program_thread = NULL;
-	it->second.m_main_thread = NULL;
-	it->second.m_progid = -1LL;
-	it->second.m_fdtable.reset_cache();
-}
-*/
-
 void sinsp_thread_manager::reset_child_dependencies()
 {
-	m_last_tinfo.reset();
-	m_last_tid = 0;
-
 	m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
-		tinfo.m_nchilds = 0;
 		clear_thread_pointers(tinfo);
 		return true;
 	});
 }
 
-void sinsp_thread_manager::create_child_dependencies()
+void sinsp_thread_manager::create_thread_dependencies_after_proc_scan()
 {
-	m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
-		increment_mainthread_childcount(&tinfo);
+	m_threadtable.loop_shared_pointer([&](const std::shared_ptr<sinsp_threadinfo>& tinfo) {
+		create_thread_dependencies(tinfo);
 		return true;
 	});
-}
-
-void sinsp_thread_manager::recreate_child_dependencies()
-{
-	reset_child_dependencies();
-	create_child_dependencies();
 }
 
 void sinsp_thread_manager::update_statistics()
@@ -1925,27 +2060,14 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::get_thread_ref(int64_t tid, bool q
             // Add a fake entry to avoid a continuous lookup
             //
             newti->m_tid = tid;
-            newti->m_pid = tid;
+            newti->m_pid = -1;
             newti->m_ptid = -1;
             newti->m_comm = "<NA>";
             newti->m_exe = "<NA>";
             newti->m_user.uid = 0xffffffff;
             newti->m_group.gid = 0xffffffff;
-            newti->m_nchilds = 0;
             newti->m_loginuser.uid = 0xffffffff;
         }
-
-        //
-        // Since this thread is created out of thin air, we need to
-        // properly set its reference count, by scanning the table
-        //
-        m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
-            if(tinfo.m_pid == tid)
-            {
-                newti->m_nchilds++;
-            }
-            return true;
-        });
 
         //
         // Done. Add the new thread to the list.
@@ -1957,6 +2079,7 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::get_thread_ref(int64_t tid, bool q
     return sinsp_proc;
 }
 
+/* `lookup_only==true` means that we don't fill the `m_last_tinfo` field */
 threadinfo_map_t::ptr_t sinsp_thread_manager::find_thread(int64_t tid, bool lookup_only)
 {
 	threadinfo_map_t::ptr_t thr;
@@ -1966,7 +2089,8 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::find_thread(int64_t tid, bool look
 	if(tid == m_last_tid)
 	{
 		thr = m_last_tinfo.lock();
-		if (thr)                                                                                     {
+		if (thr)
+		{
 #ifdef GATHER_INTERNAL_STATS
 			m_cached_lookups->increment();
 #endif
@@ -1974,7 +2098,8 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::find_thread(int64_t tid, bool look
 			// for something that may not need to be precise
 			thr->m_lastaccess_ts = m_inspector->get_lastevent_ts();
 			return thr;
-		}                                                                                        }
+		}
+	}
 
 	//
 	// Caching failed, do a real lookup
@@ -1988,6 +2113,7 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::find_thread(int64_t tid, bool look
 #endif
 		if(!lookup_only)
 		{
+			m_last_tinfo.reset();
 			m_last_tid = tid;
 			m_last_tinfo = thr;
 			thr->m_lastaccess_ts = m_inspector->get_lastevent_ts();
