@@ -93,8 +93,9 @@ private:
 	//
 	// Parsers
 	//
+	void parse_clone_exit_child(sinsp_evt* evt);
+	void parse_clone_exit_caller(sinsp_evt* evt, int64_t child_tid);
 	void parse_clone_exit(sinsp_evt* evt);
-	void parse_execve_enter(sinsp_evt* evt);
 	void parse_execve_exit(sinsp_evt* evt);
 	void proc_schedule_removal(sinsp_evt* evt);
 	void parse_open_openat_creat_exit(sinsp_evt* evt);
@@ -123,6 +124,7 @@ private:
 	void parse_select_poll_epollwait_enter(sinsp_evt *evt);
 	void parse_fcntl_enter(sinsp_evt* evt);
 	void parse_fcntl_exit(sinsp_evt* evt);
+	void parse_prctl_exit_event(sinsp_evt *evt);
 	void parse_context_switch(sinsp_evt* evt);
 	void parse_brk_munmap_mmap_exit(sinsp_evt* evt);
 	void parse_setresuid_exit(sinsp_evt* evt);
