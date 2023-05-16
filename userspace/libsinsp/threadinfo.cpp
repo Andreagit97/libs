@@ -1485,7 +1485,9 @@ void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sins
 		parent_thread = m_inspector->get_thread_ref(1, false);
 		if(parent_thread == nullptr)
 		{
-			throw sinsp_exception("There is no init process (tid 1) under `/proc`. We cannot build a process tree");
+			/* This should never happen, it means that we have a system without the init process (tid 1) under `/proc` */
+			tinfo->m_ptid = 0;
+			return;
 		}
 		/* We update also the parent tid of the thread */
 		tinfo->m_ptid = 1;
