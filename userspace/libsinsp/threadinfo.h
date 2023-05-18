@@ -406,14 +406,25 @@ public: // types required for use in sets
 	struct hasher {
 		size_t operator()(sinsp_threadinfo* tinfo) const
 		{
-			return tinfo->get_main_thread()->m_program_hash;
+			auto main_thread = tinfo->get_main_thread();
+			if(main_thread == nullptr)
+			{
+				return 0;
+			}
+			return main_thread->m_program_hash;
 		}
 	};
 
 	struct comparer {
 		size_t operator()(sinsp_threadinfo* lhs, sinsp_threadinfo* rhs) const
 		{
-			return lhs->get_main_thread()->m_program_hash == rhs->get_main_thread()->m_program_hash;
+			auto lhs_main_thread = lhs->get_main_thread();
+			auto rhs_main_thread = rhs->get_main_thread();
+			if(lhs_main_thread == nullptr || rhs_main_thread == nullptr)
+			{
+				return 0;
+			}
+			return lhs_main_thread->m_program_hash == rhs_main_thread->m_program_hash;
 		}
 	};
 
