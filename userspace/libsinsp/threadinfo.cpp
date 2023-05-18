@@ -1015,12 +1015,22 @@ double sinsp_threadinfo::get_fd_usage_pct_d()
 
 uint64_t sinsp_threadinfo::get_fd_opencount() const
 {
-	return get_main_thread()->m_fdtable.size();
+	auto main_thread = get_main_thread();
+	if(main_thread == nullptr)
+	{
+		return 0;
+	}
+	return main_thread->m_fdtable.size();
 }
 
 uint64_t sinsp_threadinfo::get_fd_limit()
 {
-	return get_main_thread()->m_fdlimit;
+	auto main_thread = get_main_thread();
+	if(main_thread == nullptr)
+	{
+		return 0;
+	}
+	return main_thread->m_fdlimit;
 }
 
 const std::string& sinsp_threadinfo::get_cgroup(const std::string& subsys) const
