@@ -403,6 +403,41 @@ int main(int argc, char** argv)
 	return 0;
 }
 
+sinsp_threadinfo::visitor_func_t scap_file_visitor_2 = [](sinsp_threadinfo* pt)
+{
+	if(pt == nullptr)
+	{
+		printf("[WARNING] Null thread info detected\n\n");
+	}
+
+	bool reaper = false;
+	if(pt->m_tginfo == nullptr)
+	{
+		printf("[WARNING] Null thread group info detected. tid: %ld, pid: %ld, ptid: %ld\n\n", pt->m_tid, pt->m_pid, pt->m_ptid);
+	}
+	else
+	{
+		reaper = pt->m_tginfo->is_reaper();
+	}
+
+	bool container = ((pt->m_flags & PPM_CL_CHILD_IN_PIDNS ) || (pt->m_tid != pt->m_vtid)) ? true : false;
+
+	if(pt->m_tid != pt->m_pid)
+	{
+		printf("v THREAD[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d, container: %d\n", pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid, reaper, container);
+	}
+	else
+	{
+		printf("v LEADER-THREAD[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d, container: %d\n", pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid, reaper, container);
+	}
+	if(pt->m_tid == 1)
+	{
+		printf("END\n\n");
+		return false;
+	}
+	return true;
+};
+
 sinsp_evt* get_event(sinsp& inspector, std::function<void(const std::string&)> handle_error)
 {
 	sinsp_evt* ev = nullptr;
@@ -424,6 +459,12 @@ sinsp_evt* get_event(sinsp& inspector, std::function<void(const std::string&)> h
 	{
 		handle_error(inspector.getlasterr());
 		std::this_thread::sleep_for(std::chrono::seconds(g_backoff_timeout_secs));
+	}
+
+	if(ev && ev->get_thread_info() && (ev->get_thread_info()->m_comm.compare("touch")==0))
+	{
+		printf("PRINT IN SINSP-EXAMPLE\n");
+		ev->get_thread_info()->traverse_main_parent_state(scap_file_visitor_2);
 	}
 
 	return nullptr;

@@ -1809,6 +1809,36 @@ void sinsp::stop_capture()
 	{
 		throw sinsp_exception(scap_getlasterr(m_h));
 	}
+
+	uint64_t cnt = 0;
+
+	
+	/* print the content of the thread table */
+	this->m_thread_manager->m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
+		cnt++;
+
+		bool reaper = false;
+		if(tinfo.m_tginfo == nullptr)
+		{
+			printf("[WARNING] Null thread group info detected. tid: %ld, pid: %ld, ptid: %ld\n\n", tinfo.m_tid, tinfo.m_pid, tinfo.m_ptid);
+		}
+		else
+		{
+			reaper = tinfo.m_tginfo->is_reaper();
+		}
+
+		if(!tinfo.is_dead())
+		{
+			printf("%ld)[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d\n", cnt, tinfo.m_comm.c_str(), tinfo.m_tid, tinfo.m_pid, tinfo.m_ptid, tinfo.m_vtid, tinfo.m_vpid, reaper);
+		}
+		else
+		{
+			printf("%ld)[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d ******[DEAD]*****\n", cnt, tinfo.m_comm.c_str(), tinfo.m_tid, tinfo.m_pid, tinfo.m_ptid, tinfo.m_vtid, tinfo.m_vpid, reaper);
+		}
+
+		return true;
+	});
+
 }
 
 void sinsp::start_capture()
