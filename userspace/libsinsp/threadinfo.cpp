@@ -1057,11 +1057,87 @@ const std::string& sinsp_threadinfo::get_cgroup(const std::string& subsys) const
 	return notfound;
 }
 
+void sinsp_threadinfo::traverse_main_parent_state(visitor_func_t &visitor)
+{
+	bool container = ((this->m_flags & PPM_CL_CHILD_IN_PIDNS ) || (this->m_tid != this->m_vtid)) ? true : false;
+	bool reaper = false;
+	if(this->m_tginfo == nullptr)
+	{
+		printf("[WARNING] Null thread group info detected. tid: %ld, pid: %ld, ptid: %ld\n\n", this->m_tid, this->m_pid, this->m_ptid);
+	}
+	else
+	{
+		reaper = this->m_tginfo->is_reaper();
+	}
+
+	if(this->m_tid != this->m_pid)
+	{
+		printf("\nv NEW THREAD[%s] tid: %ld, pid: %ld, ptid %ld, vtid: %ld, vpid: %ld, reaper: %d, container: %d\n", this->m_comm.c_str(), this->m_tid, this->m_pid, this->m_ptid, this->m_vtid, this->m_vpid, reaper, container);
+	}
+	else
+	{
+		printf("\nv NEW LEADER-THREAD[%s] tid: %ld, pid: %ld, ptid %ld, vtid: %ld, vpid: %ld, reaper: %d, container: %d\n", this->m_comm.c_str(), this->m_tid, this->m_pid, this->m_ptid, this->m_vtid, this->m_vpid, reaper, container);
+	}
+
+	sinsp_threadinfo *parent_thread = nullptr;
+	sinsp_threadinfo *main_thread = this->get_main_thread();
+
+	if(!main_thread)
+	{
+		printf("[WARNING] Main thread not existent. tid: %ld, pid: %ld, ptid: %ld\n\n", main_thread->m_tid, main_thread->m_pid, main_thread->m_ptid);
+		return;
+	}
+
+	/* Call the visitor for the main thread */
+	visitor(main_thread);
+
+	while(main_thread && (parent_thread = main_thread->get_parent_thread()))
+	{
+		main_thread = parent_thread->get_main_thread();
+		if (!main_thread)
+		{
+			break;
+		}
+		if (main_thread->m_tid == -1)
+		{
+			break;
+		}
+		if(!visitor(main_thread))
+		{
+			break;
+		}
+	}
+	if(!main_thread)
+	{
+		printf("END\n\n");
+	}
+}
+
 void sinsp_threadinfo::traverse_parent_state(visitor_func_t &visitor)
 {
 	// Use two pointers starting at this, traversing the parent
 	// state, at different rates. If they ever equal each other
 	// before slow is NULL there's a loop.
+
+	bool container = ((this->m_flags & PPM_CL_CHILD_IN_PIDNS ) || (this->m_tid != this->m_vtid)) ? true : false;
+	bool reaper = false;
+	if(this->m_tginfo == nullptr)
+	{
+		printf("[WARNING] Null thread group info detected. tid: %ld, pid: %ld, ptid: %ld\n\n", this->m_tid, this->m_pid, this->m_ptid);
+	}
+	else
+	{
+		reaper = this->m_tginfo->is_reaper();
+	}
+
+	if(this->m_tid != this->m_pid)
+	{
+		printf("\nv NEW THREAD[%s] tid: %ld, pid: %ld, ptid %ld, vtid: %ld, vpid: %ld, reaper: %d, container: %d\n", this->m_comm.c_str(), this->m_tid, this->m_pid, this->m_ptid, this->m_vtid, this->m_vpid, reaper, container);
+	}
+	else
+	{
+		printf("\nv NEW LEADER-THREAD[%s] tid: %ld, pid: %ld, ptid %ld, vtid: %ld, vpid: %ld, reaper: %d, container: %d\n", this->m_comm.c_str(), this->m_tid, this->m_pid, this->m_ptid, this->m_vtid, this->m_vpid, reaper, container);
+	}
 
 	sinsp_threadinfo *slow=this->get_parent_thread(), *fast=slow;
 
@@ -1103,6 +1179,10 @@ void sinsp_threadinfo::traverse_parent_state(visitor_func_t &visitor)
 				return;
 			}
 		}
+	}
+	if(!slow)
+	{
+		printf("END\n\n");
 	}
 }
 
@@ -1546,6 +1626,7 @@ void sinsp_thread_manager::create_thread_dependencies(const std::shared_ptr<sins
 			tinfo->m_ptid = 0;
 			return;
 		}
+		printf("change parent for tid: %ld, pid: %ld. Old parent: %ld, new parent: 1\n", tinfo->m_tid, tinfo->m_pid, tinfo->m_ptid);
 		/* We update also the parent tid of the thread */
 		tinfo->m_ptid = 1;
 	}
@@ -1886,8 +1967,31 @@ void sinsp_thread_manager::reset_child_dependencies()
 
 void sinsp_thread_manager::create_thread_dependencies_after_proc_scan()
 {
+	uint64_t cnt = 0;
 	m_threadtable.loop_shared_pointer([&](const std::shared_ptr<sinsp_threadinfo>& tinfo) {
 		create_thread_dependencies(tinfo);
+
+		cnt++;
+
+		bool reaper = false;
+		if(tinfo->m_tginfo == nullptr)
+		{
+			printf("[WARNING] Null thread group info detected. tid: %ld, pid: %ld, ptid: %ld\n\n", tinfo->m_tid, tinfo->m_pid, tinfo->m_ptid);
+		}
+		else
+		{
+			reaper = tinfo->m_tginfo->is_reaper();
+		}
+
+		if(!tinfo->is_dead())
+		{
+			printf("%ld)[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d\n", cnt, tinfo->m_comm.c_str(), tinfo->m_tid, tinfo->m_pid, tinfo->m_ptid, tinfo->m_vtid, tinfo->m_vpid, reaper);
+		}
+		else
+		{
+			printf("%ld)[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d ******[DEAD]*****\n", cnt, tinfo->m_comm.c_str(), tinfo->m_tid, tinfo->m_pid, tinfo->m_ptid, tinfo->m_vtid, tinfo->m_vpid, reaper);
+		}
+
 		return true;
 	});
 }
