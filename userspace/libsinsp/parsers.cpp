@@ -1160,30 +1160,6 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 
 	/*=============================== ENRICH/CREATE ESSENTIAL CALLER STATE ===========================*/
 
-	/*=============================== CHILD ALREADY THERE ===========================*/
-
-	/* See if the child is already there, if yes and it is valid we return immediately */
-	sinsp_threadinfo* child_tinfo = m_inspector->get_thread_ref(child_tid, false, true).get();
-	if(child_tinfo != nullptr)
-	{
-		/* If this was an inverted clone, all is fine, we've already taken care
-		 * of adding the thread table entry in the child.
-		 * Otherwise, we assume that the entry is there because we missed the exit event
-		 * for a previous thread and we replace the tinfo.
-		 */
-		if(child_tinfo->m_flags & PPM_CL_CLONE_INVERTED)
-		{
-			return;
-		}
-		else
-		{
-			m_inspector->remove_thread(child_tid, true);
-			tid_collision = child_tid;
-		}
-	}
-
-	/*=============================== CHILD ALREADY THERE ===========================*/
-
 	/*=============================== CHILD IN CONTAINER CASE ===========================*/
 
 	/* Get `flags` to check if we are in a container.
@@ -1217,19 +1193,50 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 	ASSERT(parinfo->m_len == sizeof(uint32_t));
 	uint32_t flags = *(uint32_t *)parinfo->m_val;
 
-	/* If the child is running into a container, wait until we see it,
-	 * because the caller just sees the pid in the outermost namespace. 
-	 * If the child is running into a container we set the `PPM_CL_CHILD_IN_PIDNS`
-	 * flag also in the caller clone exit event.
-	 * `PPM_CL_CHILD_IN_PIDNS` should always suffice but leave
-	 * the tid/vtid check for older driver versions
+	/* PPM_CL_CHILD_IN_PIDNS is true when:
+	 * - the caller is running into a container and so the child
+	 * - Only the child is running into a container (when the child is
+	 *   the init process of the new namespace this flag is not set)
+	 * 
+	 * PPM_CL_CLONE_NEWPID is true when:
+	 * - the child is the init process of a new namespace
+	 * 
+	 * When `caller_tid != caller_tinfo->m_vtid` is true we are for sure in a container
+	 * but this is not a strict requirement (leave it here for compatibility with old
+	 * scap-files)
 	 */
-	if(flags & PPM_CL_CHILD_IN_PIDNS || caller_tid != caller_tinfo->m_vtid)
+	if(flags & PPM_CL_CHILD_IN_PIDNS || 
+		flags & PPM_CL_CLONE_NEWPID ||
+		caller_tid != caller_tinfo->m_vtid)
 	{
 		return;
 	}
 
 	/*=============================== CHILD IN CONTAINER CASE ===========================*/
+
+	/*=============================== CHILD ALREADY THERE ===========================*/
+
+	/* See if the child is already there, if yes and it is valid we return immediately */
+	sinsp_threadinfo* child_tinfo = m_inspector->get_thread_ref(child_tid, false, true).get();
+	if(child_tinfo != nullptr)
+	{
+		/* If this was an inverted clone, all is fine, we've already taken care
+		 * of adding the thread table entry in the child.
+		 * Otherwise, we assume that the entry is there because we missed the exit event
+		 * for a previous thread and we replace the tinfo.
+		 */
+		if(child_tinfo->m_flags & PPM_CL_CLONE_INVERTED)
+		{
+			return;
+		}
+		else
+		{
+			m_inspector->remove_thread(child_tid, true);
+			tid_collision = child_tid;
+		}
+	}
+
+	/*=============================== CHILD ALREADY THERE ===========================*/
 
 	/* If we come here it means that we need to create the child thread info */
 
@@ -2074,7 +2081,9 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 		parinfo = evt->get_param(20);
 		ASSERT(parinfo->m_len == sizeof(uint64_t));
 		/* If we are in container! */
-		if(child_tinfo->m_flags & PPM_CL_CHILD_IN_PIDNS || child_tinfo->m_tid != child_tinfo->m_vtid)
+		if(child_tinfo->m_flags & PPM_CL_CHILD_IN_PIDNS || 
+			child_tinfo->m_flags & PPM_CL_CLONE_NEWPID ||
+			child_tinfo->m_tid != child_tinfo->m_vtid)
 		{
 			child_tinfo->m_pidns_init_start_ts =
 				*(uint64_t *)parinfo->m_val + m_inspector->m_machine_info->boot_ts_epoch;
@@ -2144,6 +2153,10 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 		return;
 	}
 	childtid = *(int64_t *)parinfo->m_val;
+	/* Please note that if the child is in a namespace different from the init one
+	 * we should never use this `childtid` otherwise we will use a thread id referred to 
+	 * an internal namespace and not to the init one!
+	 */	
 	if(childtid < 0)
 	{
 		//
