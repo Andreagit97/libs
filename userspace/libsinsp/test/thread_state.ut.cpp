@@ -246,8 +246,7 @@ limitations under the License.
 	UNUSED int64_t p4_t1_vtid = 1; /* This process will be the `init` one in the new namespace */                  \
 	UNUSED int64_t p4_t1_vpid = p4_t1_vtid;                                                                        \
                                                                                                                        \
-	generate_clone_x_event(p4_t1_tid, p3_t1_tid, p3_t1_pid, p3_t1_ptid,                                            \
-			       PPM_CL_CHILD_IN_PIDNS | PPM_CL_CLONE_NEWPID);                                           \
+	generate_clone_x_event(p4_t1_tid, p3_t1_tid, p3_t1_pid, p3_t1_ptid, PPM_CL_CLONE_NEWPID);                      \
                                                                                                                        \
 	/* Check fields after parent parsing                                                                           \
 	 * Note: here we cannot assert anything because the child will be in a container                               \
@@ -269,7 +268,8 @@ limitations under the License.
 	UNUSED int64_t p4_t2_vtid = 2;                                                                                 \
 	UNUSED int64_t p4_t2_vpid = p4_t1_vpid;                                                                        \
                                                                                                                        \
-	generate_clone_x_event(0, p4_t2_tid, p4_t2_pid, p4_t2_ptid, PPM_CL_CLONE_THREAD, p4_t2_vtid, p4_t2_vpid);      \
+	generate_clone_x_event(0, p4_t2_tid, p4_t2_pid, p4_t2_ptid, PPM_CL_CLONE_THREAD | PPM_CL_CHILD_IN_PIDNS,       \
+			       p4_t2_vtid, p4_t2_vpid);                                                                \
                                                                                                                        \
 	/*=============================== p4_t2 ===========================*/                                          \
                                                                                                                        \
@@ -281,7 +281,7 @@ limitations under the License.
 	UNUSED int64_t p5_t1_vtid = 10;                                                                                \
 	UNUSED int64_t p5_t1_vpid = p5_t1_vtid;                                                                        \
                                                                                                                        \
-	generate_clone_x_event(0, p5_t1_tid, p5_t1_pid, p5_t1_ptid, DEFAULT_VALUE, p5_t1_vtid, p5_t1_vpid);            \
+	generate_clone_x_event(0, p5_t1_tid, p5_t1_pid, p5_t1_ptid, PPM_CL_CHILD_IN_PIDNS, p5_t1_vtid, p5_t1_vpid);    \
                                                                                                                        \
 	/*=============================== p5_t1 ===========================*/                                          \
                                                                                                                        \
@@ -293,7 +293,7 @@ limitations under the License.
 	UNUSED int64_t p5_t2_vtid = 12;                                                                                \
 	UNUSED int64_t p5_t2_vpid = p5_t1_vpid;                                                                        \
                                                                                                                        \
-	generate_clone_x_event(0, p5_t2_tid, p5_t2_pid, p5_t2_ptid, PPM_CL_CLONE_THREAD, p5_t2_vtid, p5_t2_vpid);      \
+	generate_clone_x_event(0, p5_t2_tid, p5_t2_pid, p5_t2_ptid, PPM_CL_CHILD_IN_PIDNS, p5_t2_vtid, p5_t2_vpid);    \
                                                                                                                        \
 	/*=============================== p5_t2 ===========================*/                                          \
                                                                                                                        \
@@ -305,7 +305,7 @@ limitations under the License.
 	UNUSED int64_t p6_t1_vtid = 17;                                                                                \
 	UNUSED int64_t p6_t1_vpid = p6_t1_vtid;                                                                        \
                                                                                                                        \
-	generate_clone_x_event(0, p6_t1_tid, p6_t1_pid, p6_t1_ptid, DEFAULT_VALUE, p6_t1_vtid, p6_t1_vpid);            \
+	generate_clone_x_event(0, p6_t1_tid, p6_t1_pid, p6_t1_ptid, PPM_CL_CHILD_IN_PIDNS, p6_t1_vtid, p6_t1_vpid);    \
                                                                                                                        \
 	/*=============================== p6_t1 ===========================*/
 
@@ -364,8 +364,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_in_container)
 	/* We simulate a parent clone exit event that wants to generate a child into a container */
 	int64_t p1_t1_tid = 24;
 
-	/* Parent clone exit event */
-	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID, PPM_CL_CLONE_NEWPID | PPM_CL_CHILD_IN_PIDNS);
+	/* Flag `PPM_CL_CHILD_IN_PIDNS` is not set in this case! */
+	generate_clone_x_event(p1_t1_tid, INIT_TID, INIT_PID, INIT_PTID, PPM_CL_CLONE_NEWPID);
 
 	/* The child process is in a container so the parent doesn't populate the thread_info for
 	 * the child  */
