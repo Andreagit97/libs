@@ -1571,7 +1571,7 @@ bool sinsp_thread_manager::add_thread(sinsp_threadinfo *threadinfo, bool from_sc
  */
 sinsp_threadinfo* sinsp_thread_manager::find_new_reaper(sinsp_threadinfo* tinfo)
 {
-	/* First we check in our thread group if present */
+	/* First we check in our thread group for alive threads */
 	if(tinfo->m_tginfo != nullptr && tinfo->m_tginfo->get_thread_count() > 0)
 	{
 		for(const auto& thread_weak : tinfo->m_tginfo->get_thread_list())
@@ -1581,19 +1581,25 @@ sinsp_threadinfo* sinsp_thread_manager::find_new_reaper(sinsp_threadinfo* tinfo)
 				continue;
 			}
 			auto thread = thread_weak.lock().get();
-			if(!thread->is_dead())
+			if(!thread->is_dead() && thread != tinfo)
 			{
 				return thread;
 			}
 		}
 	}
 
-	/* This is raw logic to detect loops, we can probably do better
+	/* This is a best-effort logic to detect loops.
+	 * If a parent points to a thread that is a child of
+	 * the current `tinfo` it is possible that we are not
+	 * able to detect the loop and we assign the wrong reaper.
+	 * By the way, this should never happen and this logic is here
+	 * just to avoid infinite loops, is not here to guarantee 100% 
+	 * correctness.
 	 * We should never have a self-loop but if we have it
 	 * we break it by changing the parent with `init`.
 	 */
-	std::unordered_set<int64_t> loop_detection_set{};
-	uint16_t prev_set_size = 0;
+	std::unordered_set<int64_t> loop_detection_set{tinfo->m_tid};
+	uint16_t prev_set_size = 1;
 
 	auto parent_tinfo = tinfo->get_parent_thread();
 	while(parent_tinfo != nullptr)
@@ -1606,7 +1612,9 @@ sinsp_threadinfo* sinsp_thread_manager::find_new_reaper(sinsp_threadinfo* tinfo)
 			ASSERT(false);
 			break;
 		}
-		if(parent_tinfo->m_tginfo && parent_tinfo->m_tginfo->is_reaper())
+		if(parent_tinfo->m_tginfo != nullptr && 
+			parent_tinfo->m_tginfo->is_reaper() &&
+			parent_tinfo->m_tginfo->get_thread_count() > 0)
 		{
 			for(const auto& thread_weak : parent_tinfo->m_tginfo->get_thread_list())
 			{
@@ -1624,7 +1632,9 @@ sinsp_threadinfo* sinsp_thread_manager::find_new_reaper(sinsp_threadinfo* tinfo)
 		parent_tinfo = parent_tinfo->get_parent_thread();
 	}
 	
-	/* If we don't have the parent the reaper becomes init */
+	/* If we don't find a reaper in the hierarchy we fallback to init
+	 * WARNING: this could cause a container escape if we are in a container!
+	 */
 	return m_threadtable.get(1);	
 }
 
