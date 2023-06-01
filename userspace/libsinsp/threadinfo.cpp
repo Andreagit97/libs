@@ -46,6 +46,9 @@ static void copy_ipv6_address(uint32_t* dest, uint32_t* src)
 ///////////////////////////////////////////////////////////////////////////////
 // sinsp_threadinfo implementation
 ///////////////////////////////////////////////////////////////////////////////
+
+uint32_t sinsp_threadinfo::expired_children_threshold = DEFAULT_CHILDREN_THRESHOLD;
+
 sinsp_threadinfo::sinsp_threadinfo(sinsp* inspector, std::shared_ptr<libsinsp::state::dynamic_struct::field_infos> dyn_fields):
 	table_entry(dyn_fields),
 	m_cgroups(new cgroups_t),
@@ -1106,6 +1109,30 @@ void sinsp_threadinfo::traverse_parent_state(visitor_func_t &visitor)
 	}
 }
 
+void sinsp_threadinfo::clean_expired_children()
+{
+	/* Loop over all the children to clean up expired ones.
+	 * We don't want to do it every time, we set a threshold.
+	 */
+	if(m_children.size() > sinsp_threadinfo::get_expired_children_threshold())
+	{
+		auto child = m_children.begin();
+		while(child != m_children.end())
+		{
+			/* This child is expired */
+			if(child->expired())
+			{
+				/* `erase` returns the pointer to the next child
+				 * no need for manual increment.
+				 */
+				child = m_children.erase(child);
+				continue;
+			}
+			child++;
+		}
+	}
+}
+
 /* We should never call this method if we don't have children to reparent
  * if we want to save some clock cycles
  */
@@ -1121,6 +1148,11 @@ void sinsp_threadinfo::assign_children_to_reaper(sinsp_threadinfo* reaper)
 	{
 		return;
 	}
+
+	/* Before adding new children we clean expired children
+	 * of the reaper if necessary.
+	 */
+	reaper->clean_expired_children();
 
 	for(auto& child : m_children)
 	{

@@ -17,6 +17,8 @@ limitations under the License.
 
 #pragma once
 
+#define DEFAULT_CHILDREN_THRESHOLD 50
+
 #ifndef VISIBILITY_PRIVATE
 #define VISIBILITY_PRIVATE private:
 #endif
@@ -68,11 +70,27 @@ typedef struct erase_fd_params
 */
 class SINSP_PUBLIC sinsp_threadinfo: public libsinsp::state::table_entry
 {
+private:
+	/* This is the threshold after which we try to clean expired children
+	 * during reparenting.
+	 */
+	static uint32_t expired_children_threshold;
+
 public:
 	sinsp_threadinfo(
 		sinsp *inspector = nullptr,
 		std::shared_ptr<libsinsp::state::dynamic_struct::field_infos> dyn_fields = nullptr);
 	virtual ~sinsp_threadinfo();
+
+	static inline uint32_t get_expired_children_threshold()
+	{
+		return expired_children_threshold;
+	}
+
+	static inline void set_expired_children_threshold(uint32_t threshold)
+	{
+		expired_children_threshold = threshold;
+	}
 
 	/*!
 	  \brief Return the name of the process containing this thread, e.g. "top".
@@ -278,6 +296,8 @@ public:
 	void traverse_parent_state(visitor_func_t &visitor);
 
 	void assign_children_to_reaper(sinsp_threadinfo* reaper);
+
+	void clean_expired_children();
 
 	static void populate_cmdline(std::string &cmdline, const sinsp_threadinfo *tinfo);
 
