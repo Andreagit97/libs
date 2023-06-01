@@ -1010,7 +1010,6 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_1)
 {
 	DEFAULT_TREE
 
-	/* mark p2_t1 and p2_t3 to remove */
 	set_threadinfo_last_access_time(INIT_TID, 70);
 	set_threadinfo_last_access_time(p1_t1_tid, 70);
 	set_threadinfo_last_access_time(p1_t2_tid, 70);
@@ -1028,6 +1027,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_1)
 	remove_inactive_threads(80, 20);
 	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS, m_inspector.m_thread_manager->get_thread_count());
 
+	/* mark p2_t1 and p2_t3 to remove */
 	set_threadinfo_last_access_time(p2_t1_tid, 20);
 	set_threadinfo_last_access_time(p2_t3_tid, 20);
 
@@ -1059,6 +1059,53 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_1)
 	m_inspector.remove_thread(p2_t1_tid);
 	m_inspector.remove_thread(p2_t1_tid);
 	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_2)
+{
+	DEFAULT_TREE
+
+	set_threadinfo_last_access_time(INIT_TID, 70);
+	set_threadinfo_last_access_time(p1_t1_tid, 70);
+	set_threadinfo_last_access_time(p1_t2_tid, 70);
+	set_threadinfo_last_access_time(p2_t1_tid, 70);
+	set_threadinfo_last_access_time(p3_t1_tid, 70);
+	set_threadinfo_last_access_time(p4_t1_tid, 70);
+	set_threadinfo_last_access_time(p4_t2_tid, 70);
+	set_threadinfo_last_access_time(p5_t1_tid, 70);
+	set_threadinfo_last_access_time(p5_t2_tid, 70);
+	set_threadinfo_last_access_time(p6_t1_tid, 70);
+	set_threadinfo_last_access_time(p2_t2_tid, 70);
+	set_threadinfo_last_access_time(p2_t3_tid, 70);
+
+	/* we remove p5_t2, so p4_t2 will have just one not expired child */
+	remove_thread(p5_t2_tid);
+	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 1, p5_t1_tid);
+	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
+
+	/* set the expired children threshold to 3 */
+	sinsp_threadinfo::set_expired_children_threshold(3);
+	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), 3);
+
+	/* p4_t2 has a number of children lower than the threshold so
+	 * `remove_inactive_threads` do nothing.
+	 */
+	remove_inactive_threads(80, 20);
+	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 1, p5_t1_tid);
+
+	/* set the expired children threshold to 1 */
+	sinsp_threadinfo::set_expired_children_threshold(1);
+	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), 1);
+
+	/* This should remove no one, but thanks to `clean_expired_children`
+	 * logic it should clean the expired children of p4_t2_tid
+	 */
+	remove_inactive_threads(80, 20);
+	ASSERT_THREAD_CHILDREN(p4_t2_tid, 1, 1, p5_t1_tid);
+
+	/* restore the threshold */
+	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_CHILDREN_THRESHOLD);
+	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), DEFAULT_CHILDREN_THRESHOLD);
 }
 
 /*=============================== REMOVE THREAD LOGIC ===========================*/
@@ -1148,54 +1195,22 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_default_tree)
 	remove_thread(p4_t2_tid);
 	ASSERT_THREAD_GROUP_INFO(p4_t1_pid, 1, true, 2, 1, p4_t1_tid)
 	ASSERT_THREAD_CHILDREN(p4_t1_tid, 2, 2, p5_t1_tid, p5_t2_tid)
+}
 
-	/* Remove p5_t2 */
-	ASSERT_THREAD_CHILDREN(p5_t1_tid, 0, 0)
-	remove_thread(p5_t2_tid);
-	ASSERT_THREAD_CHILDREN(p5_t1_tid, 1, 1, p6_t1_tid)
+TEST_F(sinsp_with_test_input, THRD_STATE_check_dead_thread_is_not_a_reaper)
+{
+	/* Instantiate the default tree */
+	DEFAULT_TREE
 
-	/* Remove p5_t1 */
+	/* Remove p5_t1, it is the main thread and it is only marked as dead */
 	remove_thread(p5_t1_tid);
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 2, 2, p5_t2_tid)
 
-	/* Now p6_t1 should be assigned to p4_t1 since it is the reaper */
-	ASSERT_THREAD_CHILDREN(p4_t1_tid, 3, 1, p6_t1_tid)
-
-	/* Set p2_t1 group as reaper, emulate prctl */
-	auto tginfo = m_inspector.m_thread_manager->get_thread_group_info(p2_t1_pid).get();
-	tginfo->set_reaper(true);
-
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, true, 3, 3, p2_t1_tid, p2_t2_tid, p2_t3_tid)
-
-	/* Remove p2_t1 */
-	ASSERT_THREAD_CHILDREN(p2_t2_tid, 0, 0)
-	remove_thread(p2_t1_tid);
-	ASSERT_THREAD_CHILDREN(p2_t2_tid, 1, 1, p3_t1_tid)
-
-	/* Remove p2_t2 */
-	ASSERT_THREAD_CHILDREN(p2_t3_tid, 0, 0)
-	remove_thread(p2_t2_tid);
-	/* Please note that the parent of `p2_t2` is `init` since it was created with
-	 * CLONE_PARENT flag.
+	/* Remove p5_t2
+	 * p5_t1 is marked as dead so it shouldn't be considered as a reaper.
 	 */
-	ASSERT_THREAD_CHILDREN(p2_t3_tid, 1, 1, p3_t1_tid)
-
-	/* Remove p3_t1 */
-	remove_thread(p3_t1_tid);
-	ASSERT_THREAD_CHILDREN(p2_t3_tid, 2, 1, p4_t1_tid)
-
-	/*=============================== remove threads ===========================*/
-
-	/*=============================== p6_t1 traverse ===========================*/
-
-	tinfo = m_inspector.get_thread_ref(p6_t1_tid, false).get();
-
-	std::vector<int64_t> expected_p6_traverse_parents = {p4_t1_tid, p2_t3_tid, INIT_TID};
-
-	traverse_parents.clear();
-	tinfo->traverse_parent_state(visitor);
-	ASSERT_EQ(traverse_parents, expected_p6_traverse_parents);
-
-	/*=============================== p6_t1 traverse ===========================*/
+	remove_thread(p5_t2_tid);
+	ASSERT_THREAD_CHILDREN(p4_t1_tid, 1, 1, p6_t1_tid)
 }
 
 /*===============================  TRAVERSE PARENT ===========================*/
@@ -1231,6 +1246,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_fdtable_with_threads)
 	ASSERT_EQ(p2_t3_tinfo->get_env(), main_env);
 	ASSERT_THREAD_INFO_FLAG(p2_t3_tid, PPM_CL_CLONE_FILES, true);
 
+	/* Here we remove the main thread */
 	m_inspector.remove_thread(p2_t1_tid);
 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3, p2_t1_tid, p2_t2_tid, p2_t3_tid);
 	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLOSED, true);
@@ -1244,7 +1260,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_fdtable_with_threads)
 	ASSERT_EQ(p2_t3_tinfo->get_cwd(), main_cwd);
 	ASSERT_EQ(p2_t3_tinfo->get_env(), main_env);
 
-	/* remove the main thread with PROC_EXIT event so again without the `force` flag.
+	/* remove the main thread with PROC_EXIT.
 	 * This call should have no effect.
 	 */
 	remove_thread(p2_t1_tid);
@@ -2101,3 +2117,59 @@ TEST(parse_scap_file, simple_tree_with_prctl)
 }
 
 /*=============================== SCAP-FILES ===========================*/
+
+/*=============================== EXPIRED_CHILDREN ===========================*/
+
+TEST_F(sinsp_with_test_input, THRD_STATE_expired_children)
+{
+	DEFAULT_TREE
+
+	auto init_tinfo = m_inspector.get_thread_ref(INIT_TID, false, true).get();
+	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5);
+
+	/* Do nothing */
+	init_tinfo->clean_expired_children();
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5);
+
+	/* set the expired children threshold */
+	sinsp_threadinfo::set_expired_children_threshold(2);
+	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), 2);
+
+	/* Do nothing */
+	init_tinfo->clean_expired_children();
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5);
+
+	/* remove p1_t2. It has no children so the cleanup logic on INIT process
+	 * is not called
+	 */
+	remove_thread(p1_t2_tid);
+
+	/* Now one thread is expired */
+	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 4);
+
+	/* Same for these threads, they have no children */
+	remove_thread(p1_t1_tid);
+	remove_thread(p2_t2_tid);
+	remove_thread(p2_t3_tid);
+	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 1);
+
+	/* p2_t1 has a child so we move it to the new reaper -> INIT.
+	 * Since INIT has more than 2 (2 is the threshold) children
+	 * in the list (expired or not). We will perform the cleanup.
+	 *
+	 * Please note that the cleanup is performed when p2_t1 is still alive.
+	 * After remove_thread `p2_t1` is correctly removed so we will have a list of 2 elements where:
+	 * - p2_t1 is expired
+	 * - p3_t1 is alive
+	 */
+	remove_thread(p2_t1_tid);
+	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p3_t1_tid);
+
+	/* restore the threshold */
+	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_CHILDREN_THRESHOLD);
+	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), DEFAULT_CHILDREN_THRESHOLD);
+}
+
+/*=============================== EXPIRED_CHILDREN ===========================*/
