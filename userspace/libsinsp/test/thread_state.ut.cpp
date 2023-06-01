@@ -1002,8 +1002,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_non_existing_thread)
 	int64_t unknown_tid = 24;
 
 	/* we should do nothing, here we are only checking that nothing will crash */
-	m_inspector.remove_thread(unknown_tid, false);
-	m_inspector.remove_thread(unknown_tid, true);
+	m_inspector.remove_thread(unknown_tid);
+	m_inspector.remove_thread(unknown_tid);
 }
 
 TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_1)
@@ -1056,14 +1056,9 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_1)
 	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
 
 	/* successive remove call on `p2_t1` do nothing */
-	m_inspector.remove_thread(p2_t1_tid, false);
-	m_inspector.remove_thread(p2_t1_tid, false);
+	m_inspector.remove_thread(p2_t1_tid);
+	m_inspector.remove_thread(p2_t1_tid);
 	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
-
-	/* only a call with force equal to true should remove this thread */
-	m_inspector.remove_thread(p2_t1_tid, true);
-	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 2, m_inspector.m_thread_manager->get_thread_count());
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 3, 1, p2_t2_tid);
 }
 
 /*=============================== REMOVE THREAD LOGIC ===========================*/
@@ -1236,8 +1231,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_fdtable_with_threads)
 	ASSERT_EQ(p2_t3_tinfo->get_env(), main_env);
 	ASSERT_THREAD_INFO_FLAG(p2_t3_tid, PPM_CL_CLONE_FILES, true);
 
-	/* remove the main thread without the `force` flag */
-	m_inspector.remove_thread(p2_t1_tid, false);
+	m_inspector.remove_thread(p2_t1_tid);
 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3, p2_t1_tid, p2_t2_tid, p2_t3_tid);
 	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLOSED, true);
 
@@ -1266,9 +1260,11 @@ TEST_F(sinsp_with_test_input, THRD_STATE_fdtable_with_threads)
 	ASSERT_EQ(p2_t3_tinfo->get_cwd(), main_cwd);
 	ASSERT_EQ(p2_t3_tinfo->get_env(), main_env);
 
-	/* remove the main thread using the `force` flag, now secondary threads should lose access to fdtable, cwd and
-	 * env */
-	m_inspector.remove_thread(p2_t1_tid, true);
+	/* remove the main thread manually from the table...
+	 * now secondary threads should lose access to fdtable, cwd and
+	 * env
+	 */
+	m_inspector.m_thread_manager->m_threadtable.erase(p2_t1_tid);
 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 2, p2_t2_tid, p2_t3_tid);
 
 	/* we should obtain nullptr */
@@ -1279,19 +1275,6 @@ TEST_F(sinsp_with_test_input, THRD_STATE_fdtable_with_threads)
 	ASSERT_EQ(p2_t3_tinfo->get_cwd(), "./");
 	ASSERT_NE(p2_t2_tinfo->m_env, main_env);
 	ASSERT_NE(p2_t3_tinfo->m_env, main_env);
-}
-
-/* test a direct remove(true) */
-TEST_F(sinsp_with_test_input, THRD_STATE_force_remove_with_no_leader_threads)
-{
-	DEFAULT_TREE
-
-	/* remove a not leader thread using the `force` flag. It shouldn't change anything with fdtable */
-	m_inspector.remove_thread(p2_t2_tid, true);
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 2, p2_t1_tid, p2_t3_tid);
-
-	sinsp_threadinfo* p2_t3_tinfo = m_inspector.get_thread_ref(p2_t3_tid, false).get();
-	ASSERT_EQ(p2_t3_tinfo->get_fd_table()->m_table.size(), 1);
 }
 
 /*=============================== FDTABLE ===========================*/
