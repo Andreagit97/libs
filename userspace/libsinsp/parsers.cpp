@@ -1231,7 +1231,7 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		}
 		else
 		{
-			m_inspector->remove_thread(child_tid, true);
+			m_inspector->remove_thread(child_tid);
 			tid_collision = child_tid;
 		}
 	}
@@ -1639,7 +1639,7 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 		}
 
 		/* The info is too old, we remove it and create a new one */
-		m_inspector->remove_thread(child_tid, true);
+		m_inspector->remove_thread(child_tid);
 		tid_collision = child_tid;
 		evt->m_tinfo = nullptr;
 	}
@@ -2682,7 +2682,7 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 			{
 				continue;
 			}
-			m_inspector->remove_thread(thread_ptr->m_tid, false);
+			m_inspector->remove_thread(thread_ptr->m_tid);
 		}
 	}
 	return;

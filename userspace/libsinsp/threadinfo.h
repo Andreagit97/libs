@@ -634,7 +634,7 @@ public:
 	std::unique_ptr<sinsp_threadinfo> new_threadinfo() const;
 	bool add_thread(sinsp_threadinfo *threadinfo, bool from_scap_proctable);
 	sinsp_threadinfo* find_new_reaper(sinsp_threadinfo*);
-	void remove_thread(int64_t tid, bool force);
+	void remove_thread(int64_t tid);
 	// Returns true if the table is actually scanned
 	// NOTE: this is implemented in sinsp.cpp so we can inline it from there
 	inline bool remove_inactive_threads();
@@ -751,7 +751,7 @@ public:
 		// we have more than one thread removed in a given event loop iteration?
 		if(m_threadtable.get(key))
 		{
-			this->remove_thread(key, false);
+			this->remove_thread(key);
 			return true;
 		}
 		return false;
