@@ -449,7 +449,7 @@ public: // types required for use in sets
 		}
 	};
 
-VISIBILITY_PROTECTED
+protected:
 	/* Note that `fd_table` should be shared with the main thread only if `PPM_CL_CLONE_FILES`
 	 * is specified. Today we always specify `PPM_CL_CLONE_FILES` for all threads.
 	 */
@@ -641,7 +641,7 @@ public:
 		return m_threads.size();
 	}
 
-VISIBILITY_PROTECTED
+protected:
 	std::unordered_map<int64_t, ptr_t> m_threads;
 };
 

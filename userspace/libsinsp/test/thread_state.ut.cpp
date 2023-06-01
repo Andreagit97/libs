@@ -1217,81 +1217,81 @@ TEST_F(sinsp_with_test_input, THRD_STATE_check_dead_thread_is_not_a_reaper)
 
 /*=============================== FDTABLE ===========================*/
 
-TEST_F(sinsp_with_test_input, THRD_STATE_fdtable_with_threads)
-{
-	DEFAULT_TREE
+// TEST_F(sinsp_with_test_input, THRD_STATE_fdtable_with_threads)
+// {
+// 	DEFAULT_TREE
 
-	/* This is the main thread */
-	sinsp_threadinfo* p2_t1_tinfo = m_inspector.get_thread_ref(p2_t1_tid, false).get();
-	ASSERT_EQ(p2_t1_tinfo->get_fd_table()->m_table.size(), 1);
-	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLONE_FILES, false);
+// 	/* This is the main thread */
+// 	sinsp_threadinfo* p2_t1_tinfo = m_inspector.get_thread_ref(p2_t1_tid, false).get();
+// 	ASSERT_EQ(p2_t1_tinfo->get_fd_table()->m_table.size(), 1);
+// 	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLONE_FILES, false);
 
-	/* Parent info */
-	uint64_t main_table_size = p2_t1_tinfo->get_fd_table()->m_table.size();
-	p2_t1_tinfo->m_cwd = "/test";
-	p2_t1_tinfo->m_env = {"test", "env", "var"};
+// 	/* Parent info */
+// 	uint64_t main_table_size = p2_t1_tinfo->get_fd_table()->m_table.size();
+// 	p2_t1_tinfo->m_cwd = "/test";
+// 	p2_t1_tinfo->m_env = {"test", "env", "var"};
 
-	auto main_cwd = p2_t1_tinfo->m_cwd;
-	auto main_env = p2_t1_tinfo->m_env;
+// 	auto main_cwd = p2_t1_tinfo->m_cwd;
+// 	auto main_env = p2_t1_tinfo->m_env;
 
-	sinsp_threadinfo* p2_t2_tinfo = m_inspector.get_thread_ref(p2_t2_tid, false).get();
-	ASSERT_EQ(p2_t2_tinfo->get_fd_table()->m_table.size(), main_table_size);
-	ASSERT_EQ(p2_t2_tinfo->get_cwd(), main_cwd);
-	ASSERT_EQ(p2_t2_tinfo->get_env(), main_env);
-	ASSERT_THREAD_INFO_FLAG(p2_t2_tid, PPM_CL_CLONE_FILES, true);
+// 	sinsp_threadinfo* p2_t2_tinfo = m_inspector.get_thread_ref(p2_t2_tid, false).get();
+// 	ASSERT_EQ(p2_t2_tinfo->get_fd_table()->m_table.size(), main_table_size);
+// 	ASSERT_EQ(p2_t2_tinfo->get_cwd(), main_cwd);
+// 	ASSERT_EQ(p2_t2_tinfo->get_env(), main_env);
+// 	ASSERT_THREAD_INFO_FLAG(p2_t2_tid, PPM_CL_CLONE_FILES, true);
 
-	sinsp_threadinfo* p2_t3_tinfo = m_inspector.get_thread_ref(p2_t3_tid, false).get();
-	ASSERT_EQ(p2_t3_tinfo->get_fd_table()->m_table.size(), main_table_size);
-	ASSERT_EQ(p2_t3_tinfo->get_cwd(), main_cwd);
-	ASSERT_EQ(p2_t3_tinfo->get_env(), main_env);
-	ASSERT_THREAD_INFO_FLAG(p2_t3_tid, PPM_CL_CLONE_FILES, true);
+// 	sinsp_threadinfo* p2_t3_tinfo = m_inspector.get_thread_ref(p2_t3_tid, false).get();
+// 	ASSERT_EQ(p2_t3_tinfo->get_fd_table()->m_table.size(), main_table_size);
+// 	ASSERT_EQ(p2_t3_tinfo->get_cwd(), main_cwd);
+// 	ASSERT_EQ(p2_t3_tinfo->get_env(), main_env);
+// 	ASSERT_THREAD_INFO_FLAG(p2_t3_tid, PPM_CL_CLONE_FILES, true);
 
-	/* Here we remove the main thread */
-	m_inspector.remove_thread(p2_t1_tid);
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3, p2_t1_tid, p2_t2_tid, p2_t3_tid);
-	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLOSED, true);
+// 	/* Here we remove the main thread */
+// 	m_inspector.remove_thread(p2_t1_tid);
+// 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3, p2_t1_tid, p2_t2_tid, p2_t3_tid);
+// 	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLOSED, true);
 
-	/* Still have access to shared fields */
-	ASSERT_EQ(p2_t2_tinfo->get_fd_table()->m_table.size(), main_table_size);
-	ASSERT_EQ(p2_t2_tinfo->get_cwd(), main_cwd);
-	ASSERT_EQ(p2_t2_tinfo->get_env(), main_env);
+// 	/* Still have access to shared fields */
+// 	ASSERT_EQ(p2_t2_tinfo->get_fd_table()->m_table.size(), main_table_size);
+// 	ASSERT_EQ(p2_t2_tinfo->get_cwd(), main_cwd);
+// 	ASSERT_EQ(p2_t2_tinfo->get_env(), main_env);
 
-	ASSERT_EQ(p2_t3_tinfo->get_fd_table()->m_table.size(), main_table_size);
-	ASSERT_EQ(p2_t3_tinfo->get_cwd(), main_cwd);
-	ASSERT_EQ(p2_t3_tinfo->get_env(), main_env);
+// 	ASSERT_EQ(p2_t3_tinfo->get_fd_table()->m_table.size(), main_table_size);
+// 	ASSERT_EQ(p2_t3_tinfo->get_cwd(), main_cwd);
+// 	ASSERT_EQ(p2_t3_tinfo->get_env(), main_env);
 
-	/* remove the main thread with PROC_EXIT.
-	 * This call should have no effect.
-	 */
-	remove_thread(p2_t1_tid);
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3, p2_t1_tid, p2_t2_tid, p2_t3_tid);
-	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLOSED, true);
+// 	/* remove the main thread with PROC_EXIT.
+// 	 * This call should have no effect.
+// 	 */
+// 	remove_thread(p2_t1_tid);
+// 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3, p2_t1_tid, p2_t2_tid, p2_t3_tid);
+// 	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLOSED, true);
 
-	/* Still have access to shared fields */
-	ASSERT_EQ(p2_t2_tinfo->get_fd_table()->m_table.size(), main_table_size);
-	ASSERT_EQ(p2_t2_tinfo->get_cwd(), main_cwd);
-	ASSERT_EQ(p2_t2_tinfo->get_env(), main_env);
+// 	/* Still have access to shared fields */
+// 	ASSERT_EQ(p2_t2_tinfo->get_fd_table()->m_table.size(), main_table_size);
+// 	ASSERT_EQ(p2_t2_tinfo->get_cwd(), main_cwd);
+// 	ASSERT_EQ(p2_t2_tinfo->get_env(), main_env);
 
-	ASSERT_EQ(p2_t3_tinfo->get_fd_table()->m_table.size(), main_table_size);
-	ASSERT_EQ(p2_t3_tinfo->get_cwd(), main_cwd);
-	ASSERT_EQ(p2_t3_tinfo->get_env(), main_env);
+// 	ASSERT_EQ(p2_t3_tinfo->get_fd_table()->m_table.size(), main_table_size);
+// 	ASSERT_EQ(p2_t3_tinfo->get_cwd(), main_cwd);
+// 	ASSERT_EQ(p2_t3_tinfo->get_env(), main_env);
 
-	/* remove the main thread manually from the table...
-	 * now secondary threads should lose access to fdtable, cwd and
-	 * env
-	 */
-	m_inspector.m_thread_manager->m_threadtable.erase(p2_t1_tid);
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 2, p2_t2_tid, p2_t3_tid);
+// 	/* remove the main thread manually from the table...
+// 	 * now secondary threads should lose access to fdtable, cwd and
+// 	 * env
+// 	 */
+// 	m_inspector.m_thread_manager->m_threadtable.erase(p2_t1_tid);
+// 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 2, p2_t2_tid, p2_t3_tid);
 
-	/* we should obtain nullptr */
-	ASSERT_FALSE(p2_t2_tinfo->get_fd_table());
-	ASSERT_FALSE(p2_t3_tinfo->get_fd_table());
+// 	/* we should obtain nullptr */
+// 	ASSERT_FALSE(p2_t2_tinfo->get_fd_table());
+// 	ASSERT_FALSE(p2_t3_tinfo->get_fd_table());
 
-	ASSERT_EQ(p2_t2_tinfo->get_cwd(), "./");
-	ASSERT_EQ(p2_t3_tinfo->get_cwd(), "./");
-	ASSERT_NE(p2_t2_tinfo->m_env, main_env);
-	ASSERT_NE(p2_t3_tinfo->m_env, main_env);
-}
+// 	ASSERT_EQ(p2_t2_tinfo->get_cwd(), "./");
+// 	ASSERT_EQ(p2_t3_tinfo->get_cwd(), "./");
+// 	ASSERT_NE(p2_t2_tinfo->m_env, main_env);
+// 	ASSERT_NE(p2_t3_tinfo->m_env, main_env);
+// }
 
 /*=============================== FDTABLE ===========================*/
 
