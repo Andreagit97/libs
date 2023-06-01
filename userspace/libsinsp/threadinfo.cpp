@@ -1748,11 +1748,7 @@ void sinsp_thread_manager::remove_thread(int64_t tid)
 		return;
 	}
 
-	/// TODO: we can move this outside!
-    /* The main thread remains in our thread table even if it is dead so we need to be sure
-	 * that calling this method more than one time with the main thread is safe. We don't decrement
-	 * the counter 2 times.
-	 */
+    /* We cannot decrement the count more than one time for the same thread */
 	if(!thread_to_remove->is_dead())
 	{
 		/* we should decrement only if the thread is alive */

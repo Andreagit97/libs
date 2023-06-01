@@ -4150,10 +4150,24 @@ void sinsp_parser::parse_pipe_exit(sinsp_evt *evt)
 void sinsp_parser::parse_thread_exit(sinsp_evt *evt)
 {
 	/* we set the `m_tinfo` in `reset()` */
-	if(evt->m_tinfo != nullptr)
+	if(evt->m_tinfo == nullptr)
 	{
-		m_inspector->m_tid_to_remove = evt->get_tid();
+		return;
 	}
+
+	/* We mark the thread as dead here and we will remove it 
+	 * from the table during remove_thread().
+	 * Please note that the `!evt->m_tinfo->is_dead()` should be
+	 * necessary at all since here we shouldn't receive dead threads.
+	 * This is first place where we mark threads as dead.
+	 */
+	if(evt->m_tinfo->m_tginfo != nullptr && !evt->m_tinfo->is_dead())
+	{
+		evt->m_tinfo->m_tginfo->decrement_thread_count();
+	}
+	evt->m_tinfo->set_dead();
+
+	m_inspector->m_tid_to_remove = evt->get_tid();
 }
 
 inline bool sinsp_parser::update_ipv4_addresses_and_ports(sinsp_fdinfo_t* fdinfo, 
