@@ -1682,14 +1682,7 @@ void sinsp_thread_manager::remove_main_thread_fdtable(sinsp_threadinfo* main_thr
 	}
 }
 
-/* We use `force` when we have a stale thread in the table, we know it is stale
- * because we have a thread with the same `tid` and this is not possible unless
- * the old one is dead.
- *
- * `force` is useful only if we want to remove a leader thread that is dead otherwise 
- * it should never be used.
- */
-void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
+void sinsp_thread_manager::remove_thread(int64_t tid)
 {
 	auto thread_to_remove = m_threadtable.get_ref(tid);
 
@@ -1710,6 +1703,7 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 		return;
 	}
 
+	/// TODO: we can move this outside!
     /* The main thread remains in our thread table even if it is dead so we need to be sure
 	 * that calling this method more than one time with the main thread is safe. We don't decrement
 	 * the counter 2 times.
@@ -1719,13 +1713,11 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 		/* we should decrement only if the thread is alive */
 		thread_to_remove->m_tginfo->decrement_thread_count();
 	}
-
 	/* we could set it just one time but it's ok to set it every time */
 	thread_to_remove->set_dead();
 
-	/* Check if we have children, even if `size!=0`
-	 * all children could be dead, but not sure if we want
-	 * to check it here...
+	/* Check if we have children
+	 * Please note: even if `size!=0` all children could be dead
 	 */
 	if(thread_to_remove->m_children.size())
 	{
@@ -1740,23 +1732,6 @@ void sinsp_thread_manager::remove_thread(int64_t tid, bool force)
 		/* we remove the main thread and the thread group */
 		m_thread_groups.erase(thread_to_remove->m_pid);
 		m_threadtable.erase(thread_to_remove->m_pid);
-	}
-
-	/* if `force==true` and we are the main thread and we are not the last thread of the group 
-	 * we need to remove ourselves and the fdtable. Please note that if we are the last thread
-	 * of the group we have already done it in the previous switch.
-	 * 
-	 * Probably we need to change this logic, here we are removing the fdtable even if other threads
-	 * of the group are still alive, in this way, they can no more access the shared fdtable!
-	 * 
-	 * `force==true` for not main threads do nothing!
-	 */
-	if(force &&
-	   thread_to_remove->is_main_thread() &&
-	   thread_to_remove->m_tginfo->get_thread_count() != 0)
-	{
-		remove_main_thread_fdtable(thread_to_remove->get_main_thread());
-		m_threadtable.erase(tid);
 	}
 
 	if(!thread_to_remove->is_main_thread())
