@@ -1069,11 +1069,6 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 	uint16_t etype = evt->get_type();
 	int64_t caller_tid = evt->get_tid();
 
-	/* We have a collision when we force a removal in the thread table because
-	 * we have 2 entries with the same tid.
-	 */
-	int64_t tid_collision = -1;
-
 	/* By default we have a valid caller. `valid_caller==true` means that we can
 	 * use the caller info to fill some fields of the child, `valid_caller==false`
 	 * means that we will use some info about the child to fill the caller thread info.
@@ -1232,7 +1227,6 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		else
 		{
 			m_inspector->remove_thread(child_tid);
-			tid_collision = child_tid;
 		}
 	}
 
@@ -1578,21 +1572,6 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		m_fd_listener->on_clone(evt, child_tinfo);
 	}
 
-	/* If we had to erase a previous entry for this tid and rebalance the table,
-	 * make sure we reinitialize the tinfo pointer for this event, as the thread
-	 * generating it might have gone away.
-	 */
-	if(tid_collision != -1)
-	{
-		reset(evt);
-#ifdef HAS_ANALYZER
-		m_inspector->m_tid_collisions.push_back(tid_collision);
-#endif
-		DBG_SINSP_INFO("tid collision for %" PRIu64 "(%s)",
-		               tid_collision,
-		               child_tinfo->m_comm.c_str());
-	}
-
 	if(!thread_added)
 	{
 		delete child_tinfo;
@@ -1609,7 +1588,6 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 	uint16_t etype = evt->get_type();
 	int64_t child_tid = evt->get_tid();
 
-	int64_t tid_collision = -1;
 	bool valid_lookup_thread = true;
 
 	/* The clone child exit event has only 1 main purpose:
@@ -1640,7 +1618,6 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 
 		/* The info is too old, we remove it and create a new one */
 		m_inspector->remove_thread(child_tid);
-		tid_collision = child_tid;
 		evt->m_tinfo = nullptr;
 	}
 
@@ -2111,21 +2088,6 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 	if(m_fd_listener)
 	{
 		m_fd_listener->on_clone(evt, child_tinfo);
-	}
-
-	/* If we had to erase a previous entry for this tid and rebalance the table,
-	 * make sure we reinitialize the child_tinfo pointer for this event, as the thread
-	 * generating it might have gone away.
-	 */
-
-	if(tid_collision != -1)
-	{
-		reset(evt);
-#ifdef HAS_ANALYZER
-		m_inspector->m_tid_collisions.push_back(tid_collision);
-#endif
-		/* Right now we have collisions only on the clone() caller */
-		DBG_SINSP_INFO("tid collision for %" PRIu64 "(%s)", tid_collision, child_tinfo->m_comm.c_str());
 	}
 
 	if(!thread_added)
