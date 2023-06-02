@@ -1151,6 +1151,9 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		m_inspector->m_thread_manager->create_thread_dependencies(caller_tinfo);
 	}
 
+	/* Update the evt->m_tinfo of the caller. */
+	evt->m_tinfo = caller_tinfo.get();
+
 	/// todo(@Andreagit97): here we could update `comm` `exe` and `args` with fresh info from the event
 
 	/*=============================== ENRICH/CREATE ESSENTIAL CALLER STATE ===========================*/
@@ -2076,6 +2079,12 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 	/* Add the new thread to the table */
 	bool thread_added = m_inspector->add_thread(child_tinfo);
 
+	/* Update the evt->m_tinfo of the child.
+	 * We update it here, in this way the `on_clone`
+	 * callback will use updated info.
+	 */
+	evt->m_tinfo = child_tinfo;
+
 	/* Refresh user / loginuser / group */
 	if(child_tinfo->m_container_id.empty() == false)
 	{
@@ -2092,6 +2101,7 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 
 	if(!thread_added)
 	{
+		evt->m_tinfo = nullptr;
 		delete child_tinfo;
 	}
 
