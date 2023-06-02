@@ -681,6 +681,47 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_remove_se
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 0)
 }
 
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_check_event_tinfo)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* Here we call only caller clone parsers.
+	 * `evt->m_tinfo` should be all populated by clone parser.
+	 * Here we check some possible cases
+	 */
+
+	/* New main thread, caller already present */
+	auto evt = generate_clone_x_event(11, 1, 1, 0);
+	ASSERT_TRUE(evt->m_tinfo);
+	ASSERT_FALSE(evt->m_tinfo_ref);
+	ASSERT_EQ(evt->m_tinfo->m_tid, 1);
+
+	/* New main thread, caller not already present */
+	evt = generate_clone_x_event(13, 24, 24, 26);
+	ASSERT_TRUE(evt->m_tinfo);
+	ASSERT_FALSE(evt->m_tinfo_ref);
+	ASSERT_EQ(evt->m_tinfo->m_tid, 24);
+
+	/* New thread */
+	evt = generate_clone_x_event(14, 33, 32, 30, PPM_CL_CLONE_THREAD);
+	ASSERT_TRUE(evt->m_tinfo);
+	ASSERT_FALSE(evt->m_tinfo_ref);
+	ASSERT_EQ(evt->m_tinfo->m_tid, 33);
+
+	/* New main thread container init */
+	evt = generate_clone_x_event(15, 37, 37, 36, PPM_CL_CLONE_NEWNS);
+	ASSERT_TRUE(evt->m_tinfo);
+	ASSERT_FALSE(evt->m_tinfo_ref);
+	ASSERT_EQ(evt->m_tinfo->m_tid, 37);
+
+	/* container */
+	evt = generate_clone_x_event(2, 38, 38, 37, PPM_CL_CHILD_IN_PIDNS);
+	ASSERT_TRUE(evt->m_tinfo);
+	ASSERT_FALSE(evt->m_tinfo_ref);
+	ASSERT_EQ(evt->m_tinfo->m_tid, 38);
+}
+
 /*=============================== CLONE PARENT EXIT EVENT ===========================*/
 
 /*=============================== CLONE CHILD EXIT EVENT ===========================*/
@@ -901,6 +942,47 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_thread_fla
 
 	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, 2, p1_t1_tid, p1_t2_tid)
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p1_t2_tid)
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_check_event_tinfo)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* Here we call only child clone parsers.
+	 * `evt->m_tinfo` should be all populated by clone parser.
+	 * Here we check some possible cases
+	 */
+
+	/* New main thread, caller already present */
+	auto evt = generate_clone_x_event(0, 11, 11, 1);
+	ASSERT_TRUE(evt->m_tinfo);
+	ASSERT_FALSE(evt->m_tinfo_ref);
+	ASSERT_EQ(evt->m_tinfo->m_tid, 11);
+
+	/* New main thread, caller not already present */
+	evt = generate_clone_x_event(0, 24, 24, 26);
+	ASSERT_TRUE(evt->m_tinfo);
+	ASSERT_FALSE(evt->m_tinfo_ref);
+	ASSERT_EQ(evt->m_tinfo->m_tid, 24);
+
+	/* New thread */
+	evt = generate_clone_x_event(0, 33, 32, 30, PPM_CL_CLONE_THREAD);
+	ASSERT_TRUE(evt->m_tinfo);
+	ASSERT_FALSE(evt->m_tinfo_ref);
+	ASSERT_EQ(evt->m_tinfo->m_tid, 33);
+
+	/* New main thread container init */
+	evt = generate_clone_x_event(0, 37, 37, 36, PPM_CL_CLONE_NEWNS | PPM_CL_CHILD_IN_PIDNS);
+	ASSERT_TRUE(evt->m_tinfo);
+	ASSERT_FALSE(evt->m_tinfo_ref);
+	ASSERT_EQ(evt->m_tinfo->m_tid, 37);
+
+	/* container */
+	evt = generate_clone_x_event(0, 38, 38, 37, PPM_CL_CHILD_IN_PIDNS);
+	ASSERT_TRUE(evt->m_tinfo);
+	ASSERT_FALSE(evt->m_tinfo_ref);
+	ASSERT_EQ(evt->m_tinfo->m_tid, 38);
 }
 
 /*=============================== CLONE CHILD EXIT EVENT ===========================*/
