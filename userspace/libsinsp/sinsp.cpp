@@ -1829,6 +1829,24 @@ void sinsp::stop_capture()
 	{
 		throw sinsp_exception(scap_getlasterr(m_h));
 	}
+
+	uint64_t cnt = 0;
+
+	/* print the content of the thread table */
+	this->m_thread_manager->m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
+		cnt++;
+
+		if((tinfo.m_flags & PPM_CL_CLOSED) == 0)
+		{
+			printf("%ld)[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld\n", cnt, tinfo.m_comm.c_str(), tinfo.m_tid, tinfo.m_pid, tinfo.m_ptid, tinfo.m_vtid, tinfo.m_vpid);
+		}
+		else
+		{
+			printf("%ld)[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d ******[DEAD]*****\n", cnt, tinfo.m_comm.c_str(), tinfo.m_tid, tinfo.m_pid, tinfo.m_ptid, tinfo.m_vtid, tinfo.m_vpid);
+		}
+
+		return true;
+	});	
 }
 
 void sinsp::start_capture()

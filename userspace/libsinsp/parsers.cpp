@@ -1061,6 +1061,32 @@ void sinsp_parser::register_event_callback(sinsp_pd_callback_type etype, sinsp_p
 ///////////////////////////////////////////////////////////////////////////////
 // PARSERS
 ///////////////////////////////////////////////////////////////////////////////
+
+sinsp_threadinfo::visitor_func_t scap_file_visitor = [](sinsp_threadinfo* pt)
+{
+	if(pt == nullptr)
+	{
+		printf("[WARNING] Null thread info detected\n\n");
+	}
+
+	bool container = ((pt->m_flags & PPM_CL_CHILD_IN_PIDNS ) || (pt->m_tid != pt->m_vtid)) ? true : false;
+
+	if(pt->m_tid != pt->m_pid)
+	{
+		printf("v THREAD[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, container: %d\n", pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid, container);
+	}
+	else
+	{
+		printf("v LEADER-THREAD[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, container: %d\n", pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid, container);
+	}
+	if(pt->m_tid == 1)
+	{
+		printf("END\n\n");
+		return false;
+	}
+	return true;
+};
+
 void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 {
 	sinsp_evt_param* parinfo;
@@ -1765,6 +1791,25 @@ void sinsp_parser::parse_clone_exit(sinsp_evt *evt)
 	if (!thread_added) {
 		delete tinfo;
 	}
+	else
+	{
+		parinfo = evt->get_param(0);
+		ASSERT(parinfo->m_len == sizeof(int64_t));
+		if(parinfo->m_val == NULL)
+		{
+			return;
+		}
+		int64_t retval = *(int64_t *)parinfo->m_val;
+		if(retval == 0)
+		{
+			printf("CLONE CHILD EXIT: %ld", evt->get_num());
+		}
+		else
+		{
+			printf("CLONE CALLER EXIT: %ld", evt->get_num());
+		}
+		tinfo->traverse_parent_state(scap_file_visitor);
+	}
 
 	return;
 }
@@ -2300,6 +2345,11 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 	// destroyed by doing the exec, so reset the child thread
 	// count.
 	evt->m_tinfo->m_nchilds = 0;
+
+	if(evt->m_tinfo != nullptr)
+	{
+		printf("-----------> EXECVE[%s](%ld) tid: %ld, pid: %ld, ptid: %ld\n\n", evt->m_tinfo->m_comm.c_str(), evt->get_num(),evt->m_tinfo->m_tid, evt->m_tinfo->m_pid, evt->m_tinfo->m_ptid);
+	}
 
 	return;
 }
@@ -3771,6 +3821,8 @@ void sinsp_parser::parse_thread_exit(sinsp_evt *evt)
 	{
 		evt->m_tinfo->m_flags |= PPM_CL_CLOSED;
 		m_inspector->m_tid_to_remove = evt->get_tid();
+
+		printf("-----------> REMOVE[%s](%ld) tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld\n", evt->m_tinfo->m_comm.c_str(), evt->get_num(), evt->m_tinfo->m_tid, evt->m_tinfo->m_pid, evt->m_tinfo->m_ptid, evt->m_tinfo->m_vtid, evt->m_tinfo->m_vpid);
 	}
 }
 
