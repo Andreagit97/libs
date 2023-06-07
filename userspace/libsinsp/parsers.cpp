@@ -2655,7 +2655,18 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 			{
 				continue;
 			}
-			m_inspector->remove_thread(thread_ptr->m_tid);
+
+			/* if true we directly remove the thread otherwise
+			 * we just mark it as dead and we reparent its children
+			 */
+			if(m_inspector->m_automatic_threadtable_purging)
+			{
+				m_inspector->remove_thread(thread_ptr->m_tid);
+			}
+			else
+			{
+				thread_ptr->mark_as_dead_and_reparent();
+			}
 		}
 	}
 	return;
@@ -4118,7 +4129,6 @@ void sinsp_parser::parse_pipe_exit(sinsp_evt *evt)
 	add_pipe(evt, fd2, ino, openflags);
 }
 
-
 void sinsp_parser::parse_thread_exit(sinsp_evt *evt)
 {
 	/* we set the `m_tinfo` in `reset()` */
@@ -4129,15 +4139,12 @@ void sinsp_parser::parse_thread_exit(sinsp_evt *evt)
 
 	/* We mark the thread as dead here and we will remove it 
 	 * from the table during remove_thread().
-	 * Please note that the `!evt->m_tinfo->is_dead()` should be
-	 * necessary at all since here we shouldn't receive dead threads.
-	 * This is first place where we mark threads as dead.
+	 * Please note that the `!evt->m_tinfo->is_dead()` shouldn't be
+	 * necessary at all since here we shouldn't receive dead threads,
+	 * We use it just to be extra-safe.
+	 * This is the first place where we mark threads as dead.
 	 */
-	if(evt->m_tinfo->m_tginfo != nullptr && !evt->m_tinfo->is_dead())
-	{
-		evt->m_tinfo->m_tginfo->decrement_thread_count();
-	}
-	evt->m_tinfo->set_dead();
+	evt->m_tinfo->mark_as_dead_and_reparent();
 
 	m_inspector->m_tid_to_remove = evt->get_tid();
 }

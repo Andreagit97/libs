@@ -2714,11 +2714,14 @@ bool sinsp_thread_manager::remove_inactive_threads()
 
 		/* Here we loop over the table in search of threads to delete. We remove:
 		 * 1. Invalid threads.
-		 * 2. Threads that we are not using and that are no more alive in /proc.
+		 * 2. Dead threads (main threads are not removed by `remove_thread` if there are other alive
+		 * thread in its group).
+		 * 3. Threads that we are not using and that are no more alive in /proc.
 		 */
 		m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
 			tinfo.clean_expired_children();
 			if(tinfo.is_invalid() ||
+				tinfo.is_dead() ||
 				((m_inspector->m_lastevent_ts > tinfo.m_lastaccess_ts + m_inspector->m_thread_timeout_ns) &&
 					!scap_is_thread_alive(m_inspector->m_h, tinfo.m_pid, tinfo.m_tid, tinfo.m_comm.c_str())))
 			{

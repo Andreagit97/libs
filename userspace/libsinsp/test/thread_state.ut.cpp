@@ -1202,6 +1202,69 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_2)
 	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), DEFAULT_CHILDREN_THRESHOLD);
 }
 
+TEST_F(sinsp_with_test_input, THRD_STATE_purging_thread_logic)
+{
+	DEFAULT_TREE
+
+	set_threadinfo_last_access_time(INIT_TID, 70);
+	set_threadinfo_last_access_time(p1_t1_tid, 70);
+	set_threadinfo_last_access_time(p1_t2_tid, 70);
+	set_threadinfo_last_access_time(p2_t1_tid, 70);
+	set_threadinfo_last_access_time(p3_t1_tid, 70);
+	set_threadinfo_last_access_time(p4_t1_tid, 70);
+	set_threadinfo_last_access_time(p4_t2_tid, 70);
+	set_threadinfo_last_access_time(p5_t1_tid, 70);
+	set_threadinfo_last_access_time(p5_t2_tid, 70);
+	set_threadinfo_last_access_time(p6_t1_tid, 70);
+	set_threadinfo_last_access_time(p2_t2_tid, 70);
+	set_threadinfo_last_access_time(p2_t3_tid, 70);
+
+	/* we don't remove threads when we receive PROC_EXIT.
+	 * we will remove them by calling `remove_inactive_threads`
+	 * explicitly.
+	 */
+	m_inspector.disable_automatic_threadtable_purging();
+
+	/* When we remove p4_t2 we should reparent p5_t1 and p5_t2 to
+	 * p4_t1, but p4_t2 should be alive.
+	 */
+	remove_thread(p4_t2_tid);
+	auto p4_t2_tinfo = m_inspector.get_thread_ref(p4_t2_tid, false).get();
+	ASSERT_TRUE(p4_t2_tinfo);
+	ASSERT_THREAD_CHILDREN(p4_t2_tid, 0, 0);
+	ASSERT_THREAD_CHILDREN(p4_t1_tid, 2, 2, p5_t1_tid, p5_t2_tid);
+	ASSERT_THREAD_GROUP_INFO(p4_t2_pid, 1, true, 2, 2, p4_t1_tid, p4_t2_tid);
+
+	/* We remove also p4_t1 */
+	remove_thread(p4_t1_tid);
+	auto p4_t1_tinfo = m_inspector.get_thread_ref(p4_t1_tid, false).get();
+	ASSERT_TRUE(p4_t1_tinfo);
+	ASSERT_THREAD_CHILDREN(p4_t1_tid, 0, 0);
+	/* We reparent children to init */
+	ASSERT_THREAD_CHILDREN(INIT_TID, 7, 7, p5_t1_tid, p5_t2_tid);
+	/* All threads of the thread group info are dead but we never call a
+	 * remove_thread so they are still alive.
+	 */
+	ASSERT_THREAD_GROUP_INFO(p4_t2_pid, 0, true, 2, 2, p4_t1_tid, p4_t2_tid);
+
+	/* `p2_t2` calls an execve and `p2_t1` will take control in the exit event */
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, false, 3, 3);
+	generate_execve_enter_and_exit_event(0, p2_t2_tid, p2_t1_tid, p2_t1_pid, p2_t1_ptid);
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 3, 3, p2_t1_tid);
+
+	/* we shouldn't have removed any thread from the table */
+	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS, m_inspector.m_thread_manager->get_thread_count());
+
+	/* This should remove all dead threads so:
+	 * - p4_t1
+	 * - p4_t2
+	 * - p2_t2
+	 * - p2_t3
+	 */
+	remove_inactive_threads(80, 20);
+	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 4, m_inspector.m_thread_manager->get_thread_count());
+}
+
 /*=============================== REMOVE THREAD LOGIC ===========================*/
 
 /*=============================== TRAVERSE PARENT ===========================*/
@@ -2040,8 +2103,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_assign_children_to_reaper)
 	auto p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false).get();
 	p3_t1_tinfo->assign_children_to_reaper(p1_t1_tinfo);
 
-	/* all p3_t1 children should be expired */
-	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 0);
+	/* all p3_t1 children should be empty */
+	ASSERT_THREAD_CHILDREN(p3_t1_tid, 0, 0);
 
 	/* the new parent should be p1_t1 */
 	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t1_tid, p4_t1_pid, p1_t1_tid, p4_t1_vtid, p4_t1_vpid);
@@ -2051,7 +2114,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_assign_children_to_reaper)
 
 	/* Another call to the reparenting function should do nothing */
 	p3_t1_tinfo->assign_children_to_reaper(p1_t1_tinfo);
-	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 0);
+	ASSERT_THREAD_CHILDREN(p3_t1_tid, 0, 0);
 	ASSERT_THREAD_CHILDREN(p1_t1_tid, 2, 2, p4_t1_tid, p4_t2_tid);
 }
 

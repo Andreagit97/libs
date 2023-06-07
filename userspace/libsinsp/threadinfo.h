@@ -230,6 +230,8 @@ public:
 	*/
 	sinsp_threadinfo* get_parent_thread();
 
+	void mark_as_dead_and_reparent();
+
 	/*!
 	  \brief Retrieve information about one of this thread/process FDs.
 

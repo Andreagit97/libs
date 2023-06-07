@@ -845,6 +845,27 @@ sinsp_fdinfo_t* sinsp_threadinfo::add_fd(int64_t fd, sinsp_fdinfo_t *fdinfo)
 	return res;
 }
 
+void sinsp_threadinfo::mark_as_dead_and_reparent()
+{
+	if(m_tginfo == nullptr || this->is_dead())
+	{
+		return;
+	}
+
+	/* mark thread as dead */
+	m_tginfo->decrement_thread_count();
+	this->set_dead();
+
+	if(m_children.size() == 0)
+	{
+		return;
+	}
+
+	/* Reparent its children */
+	auto reaper = m_inspector->m_thread_manager->find_new_reaper(this);
+	this->assign_children_to_reaper(reaper);
+}
+
 void sinsp_threadinfo::remove_fd(int64_t fd)
 {
 	sinsp_fdtable* fd_table_ptr = get_fd_table();
@@ -1154,23 +1175,27 @@ void sinsp_threadinfo::assign_children_to_reaper(sinsp_threadinfo* reaper)
 	 */
 	reaper->clean_expired_children();
 
-	for(auto& child : m_children)
+	auto child = m_children.begin();
+	while(child != m_children.end())
 	{
-		/* This child is dead */
-		if(child.expired())
+		/* If the child is not expired we move it to the reaper
+		 * and we change its `ptid`.
+		 */
+		if(!child->expired())
 		{
-			continue;
+			/* Add the child to the reaper list */
+			reaper->m_children.push_front(*child);
+		
+			/* update ptid of the child with the new parent */
+			child->lock().get()->m_ptid = reaper->m_tid;
 		}
 
-		/* Add the child to the reaper list */
-		reaper->m_children.push_front(child);
-		
-		/* update ptid of the child with the new parent */
-		child.lock().get()->m_ptid = reaper->m_tid;
-		
-		/* clean the child pointer */
-		child.reset();
+		/* In any case (expired or not) we remove the child
+		 * from the list.
+		 */
+		child = m_children.erase(child);
 	}
+	/* At the end of this loop, m_children.size() should be always 0 */
 }
 
 void sinsp_threadinfo::populate_cmdline(std::string &cmdline, const sinsp_threadinfo *tinfo)
