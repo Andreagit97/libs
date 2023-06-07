@@ -330,6 +330,18 @@ TEST_F(sinsp_with_test_input, THRD_STATE_check_init_thread)
 	ASSERT_EQ(tinfo->m_tginfo->get_thread_list().front().lock().get(), tinfo);
 }
 
+TEST_F(sinsp_with_test_input, check_get_parent_thread)
+{
+	/* Right now we have only the init process here */
+	add_default_init_thread();
+	open_inspector();
+	sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(INIT_TID, false, true).get();
+	ASSERT_TRUE(tinfo);
+	/* Update the ptid to -1, we should not crash with a negative index */
+	tinfo->m_ptid = -1;
+	ASSERT_EQ(tinfo->get_parent_thread(), nullptr);
+}
+
 /*=============================== CLONE PARENT EXIT EVENT ===========================*/
 
 /* Parse a failed PPME_SYSCALL_CLONE_20_X event */
@@ -1781,42 +1793,64 @@ TEST(thread_group_info, populate_thread_group_info)
 
 TEST(thread_group_info, get_main_thread)
 {
+	/* We need to assign this inspetcor to the thread info */
+	sinsp inspector;
 	auto tinfo = std::make_shared<sinsp_threadinfo>();
 	tinfo->m_tid = 23;
 	tinfo->m_pid = 23;
-
-	auto tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, false, tinfo);
+	tinfo->m_inspector = &inspector;
 
 	/* We are the main thread so here we don't use the thread group info */
 	ASSERT_EQ(tinfo->get_main_thread(), tinfo.get());
 
-	/* Now we change the tid so we are no more a main thread and we use the thread group info
-	 * we should obtain a nullptr since tinfo doesn't have any thread info associated.
+	/* Now we change the tid so we are no more a main thread and we don't have the thread group info.
+	 * The inspector is still not open so we should face a nullptr.
 	 */
 	tinfo->m_tid = 25;
 	ASSERT_EQ(tinfo->get_main_thread(), nullptr);
 
-	/* We should still obtain a nullptr since the first tinfo in the table is not a main thread. */
+	/* Now we open the inspector and we should obtain an invalid thread with tid 23 */
+	inspector.open_nodriver();
+
+	auto invalid_main_tinfo = tinfo->get_main_thread();
+	ASSERT_TRUE(invalid_main_tinfo);
+	ASSERT_EQ(invalid_main_tinfo->m_tid, 23);
+	ASSERT_EQ(invalid_main_tinfo->m_pid, 23);
+	ASSERT_TRUE(invalid_main_tinfo->is_invalid());
+
+	/* We should still obtain a pointer to the same invalid thread since the first tinfo in the tginfo is not a main
+	 * thread. */
+	auto tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, false, tinfo);
 	tinfo->m_tginfo = tginfo;
-	ASSERT_EQ(tinfo->get_main_thread(), nullptr);
+	ASSERT_EQ(tinfo->get_main_thread(), invalid_main_tinfo);
 
-	auto main_tinfo = std::make_shared<sinsp_threadinfo>();
-	main_tinfo->m_tid = 23;
-	main_tinfo->m_pid = 23;
+	/* please note that here we are not adding this thread to the table
+	 * otherwise we couldn't have 2 threads with the sam tid!
+	 */
+	auto real_main_tinfo = std::make_shared<sinsp_threadinfo>();
+	real_main_tinfo->m_tid = 23;
+	real_main_tinfo->m_pid = 23;
 
-	/* We should still obtain a nullptr since we put the main thread as the last element of the list. */
-	tinfo->m_tginfo->add_thread_to_the_group(main_tinfo, false);
-	ASSERT_EQ(tinfo->get_main_thread(), nullptr);
+	/* We should still obtain a pointer to the invalid main thread since
+	 * we added the thread_info at the end
+	 */
+	tinfo->m_tginfo->add_thread_to_the_group(real_main_tinfo, false);
+	ASSERT_EQ(tinfo->get_main_thread(), invalid_main_tinfo);
 
-	tinfo->m_tginfo->add_thread_to_the_group(main_tinfo, true);
-	ASSERT_EQ(tinfo->get_main_thread(), main_tinfo.get());
+	/* Now we should obtain the real parent */
+	tinfo->m_tginfo->add_thread_to_the_group(real_main_tinfo, true);
+	ASSERT_EQ(tinfo->get_main_thread(), real_main_tinfo.get());
 }
 
 TEST(thread_group_info, get_num_threads)
 {
+	sinsp inspector;
 	auto tinfo = std::make_shared<sinsp_threadinfo>();
 	tinfo->m_tid = 25;
 	tinfo->m_pid = 23;
+	tinfo->m_ptid = INIT_TID;
+	tinfo->m_inspector = &inspector;
+	inspector.open_nodriver();
 
 	auto tginfo = std::make_shared<thread_group_info>(tinfo->m_pid, false, tinfo);
 
@@ -1831,6 +1865,7 @@ TEST(thread_group_info, get_num_threads)
 	auto main_tinfo = std::make_shared<sinsp_threadinfo>();
 	main_tinfo->m_tid = 23;
 	main_tinfo->m_pid = 23;
+	main_tinfo->m_ptid = INIT_TID;
 
 	tinfo->m_tginfo->add_thread_to_the_group(main_tinfo, true);
 	ASSERT_EQ(tinfo->get_num_threads(), 2);
@@ -1841,6 +1876,16 @@ TEST(thread_group_info, get_num_threads)
 
 	/* Please note that here we still have 2 because we have just marked the thread as Dead without decrementing the
 	 * alive count */
+	ASSERT_EQ(tinfo->get_num_threads(), 2);
+	ASSERT_EQ(tinfo->get_num_not_leader_threads(), 2);
+
+	/* No more dead */
+	main_tinfo->m_flags &= ~PPM_CL_CLOSED;
+	ASSERT_EQ(tinfo->get_num_threads(), 2);
+	ASSERT_EQ(tinfo->get_num_not_leader_threads(), 1);
+
+	/* Mark thread as invalid */
+	main_tinfo->m_ptid = -1;
 	ASSERT_EQ(tinfo->get_num_threads(), 2);
 	ASSERT_EQ(tinfo->get_num_not_leader_threads(), 2);
 }

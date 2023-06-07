@@ -176,7 +176,9 @@ public:
 		}
 		
 		auto main_thread = get_main_thread();
-		if(main_thread != nullptr && !main_thread->is_dead())
+		if(main_thread != nullptr &&
+		   !main_thread->is_dead() &&
+		   !main_thread->is_invalid())
 		{
 			return m_tginfo->get_thread_count()-1;
 		}
@@ -203,17 +205,22 @@ public:
 			return const_cast<sinsp_threadinfo*>(this);
 		}
 
-		/* This is possible when we have invalid threads */
+		/* Only invalid threads have `tginfo==nullptr` but invalid threads
+		 * are always main threads according to our logic so we should never fall
+		 * in this `if` case.
+		 */
 		if(m_tginfo == nullptr)
 		{
-			return nullptr;
+			/* we try to extract it from /proc otherwise we will obtain an invalid thread info */
+			return lookup_main_thread();
 		}
 
 		/* If we have the main thread in the group, it is always the first one */
 		auto possible_main = m_tginfo->get_first_thread();
 		if(possible_main == nullptr || !possible_main->is_main_thread())
 		{
-			return nullptr;
+			/* we try to extract it from /proc otherwise we will obtain an invalid thread info */
+			return  lookup_main_thread();
 		}
 		return possible_main;
 	}
@@ -509,6 +516,7 @@ VISIBILITY_PRIVATE
 		}
 	}
 	void compute_program_hash();
+	sinsp_threadinfo* lookup_main_thread() const;
 
 	size_t strvec_len(const std::vector<std::string> &strs) const;
 	void strvec_to_iovec(const std::vector<std::string> &strs,

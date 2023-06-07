@@ -1239,6 +1239,11 @@ std::string sinsp_threadinfo::get_path_for_dir_fd(int64_t dir_fd)
 	return dir_fdinfo->m_name;
 }
 
+sinsp_threadinfo* sinsp_threadinfo::lookup_main_thread() const
+{
+	return m_inspector->get_thread_ref(m_pid, true, true, true).get();
+}
+
 size_t sinsp_threadinfo::args_len() const
 {
 	return strvec_len(m_args);
@@ -2098,9 +2103,10 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::get_thread_ref(int64_t tid, bool q
         {
             //
             // Add a fake entry to avoid a continuous lookup
+			// We keep `m_pid` equals to `m_tid` for old compatibility
             //
             newti->m_tid = tid;
-            newti->m_pid = -1;
+            newti->m_pid = tid;
             newti->m_ptid = -1;
             newti->m_comm = "<NA>";
             newti->m_exe = "<NA>";
