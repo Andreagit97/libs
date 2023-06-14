@@ -239,7 +239,6 @@
 #define MEMFD_CREATE_E_SIZE HEADER_LEN
 
 /* Generic tracepoints events. */
-#define PROC_EXIT_SIZE HEADER_LEN + sizeof(int64_t) * 2 + sizeof(uint8_t) * 2 + PARAM_LEN * 4
 #define SCHED_SWITCH_SIZE HEADER_LEN + sizeof(int64_t) + sizeof(uint64_t) * 2 + sizeof(uint32_t) * 3 + PARAM_LEN * 6
 #define PAGE_FAULT_SIZE HEADER_LEN + sizeof(uint64_t) * 2 + sizeof(uint32_t) + PARAM_LEN * 3
 #define SIGNAL_DELIVER_SIZE HEADER_LEN + sizeof(int64_t) * 2 + sizeof(uint8_t) + PARAM_LEN * 3
