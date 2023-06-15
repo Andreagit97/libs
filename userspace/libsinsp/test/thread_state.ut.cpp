@@ -1608,6 +1608,37 @@ TEST_F(sinsp_with_test_input, THRD_STATE_execve_from_a_not_leader_thread_with_a_
 	ASSERT_THREAD_CHILDREN(p2_t1_tid, 2, 2, p3_t1_tid, p7_t1_tid);
 }
 
+TEST_F(sinsp_with_test_input, THRD_STATE_execve_with_main_thread_dead)
+{
+	/* Instantiate the default tree */
+	DEFAULT_TREE
+
+	/* This is a corner case in which the main thread dies and after it
+	 * a secondary thread of the same thread group will call an execve
+	 */
+
+	/* `p2t1` dies, p2t2 is the new parent */
+	remove_thread(p2_t1_tid, p2_t2_tid);
+	ASSERT_THREAD_CHILDREN(p2_t2_tid, 1, 1, p3_t1_tid);
+	ASSERT_THREAD_GROUP_INFO(p2_t2_pid, 2, false, 3, 3);
+	auto p2_t1_tinfo = m_inspector.m_thread_manager->get_thread_ref(p2_t1_tid).get();
+	ASSERT_TRUE(p2_t1_tinfo);
+	/* p2t1 is present but dead */
+	ASSERT_TRUE(p2_t1_tinfo->is_dead());
+
+	/* what happens in the execve exit parser is that the main thread resurrect
+	 * and it will acquire again its children, and all other threads of the group will die
+	 */
+	generate_execve_enter_and_exit_event(0, p2_t2_tid, p2_t1_tid, p2_t1_pid, p2_t1_ptid);
+
+	/* The main thread is no more dead and it has again its children */
+	ASSERT_FALSE(p2_t1_tinfo->is_dead());
+	ASSERT_THREAD_CHILDREN(p2_t1_tid, 1, 1, p3_t1_tid);
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 3, 1);
+	ASSERT_MISSING_THREAD_INFO(p2_t2_tid, true);
+	ASSERT_MISSING_THREAD_INFO(p2_t3_tid, true)
+}
+
 /*=============================== EXECVE ===========================*/
 
 /*=============================== MISSING INFO ===========================*/

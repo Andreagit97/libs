@@ -158,6 +158,32 @@ public:
 	}
 
 	/*!
+	  \brief In some corner cases is possible that a dead main thread could
+	  become again alive. For example, when an execve is performed by a secondary
+	  thread and the main thread is already dead
+	*/
+	inline void ressurect_thread()
+	{
+		/* If the thread is not dead we do nothing.
+		 * It should never happen
+		 */
+		if(!is_dead())
+		{
+			return;
+		}
+
+		m_flags &= ~PPM_CL_CLOSED;
+		if(!m_tginfo)
+		{
+			return;
+		}
+		/* we increment again the threadcount since we 
+		 * decremented it during the proc_exit event.
+		 */
+		m_tginfo->increment_thread_count();
+	}
+
+	/*!
 		\brief Return the number of alive threads in the thread group, including the thread leader.
 	*/
 	inline uint64_t get_num_threads() const
