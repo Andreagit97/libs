@@ -1220,7 +1220,7 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 	{
 		/* If this was an inverted clone, all is fine, we've already taken care
 		 * of adding the thread table entry in the child.
-		 * Otherwise, we assume that the entry is there because we missed the exit event
+		 * Otherwise, we assume that the entry is there because we missed the proc exit event
 		 * for a previous thread and we replace the tinfo.
 		 */
 		if(child_tinfo->m_flags & PPM_CL_CLONE_INVERTED)
@@ -4120,13 +4120,16 @@ void sinsp_parser::parse_pipe_exit(sinsp_evt *evt)
 
 void sinsp_parser::parse_thread_exit(sinsp_evt *evt)
 {
-	/* we set the `m_tinfo` in `reset()` */
+	/* We set the `m_tinfo` in `reset()`.
+	 * If we don't have the thread info we do nothing, this thread is already deleted
+	 */
 	if(evt->m_tinfo == nullptr)
 	{
 		return;
 	}
 
-	/* We mark the thread as dead here and we will remove it 
+	/* [Mark thread as dead]
+	 * We mark the thread as dead here and we will remove it 
 	 * from the table during remove_thread().
 	 * Please note that the `!evt->m_tinfo->is_dead()` should be
 	 * necessary at all since here we shouldn't receive dead threads.
@@ -4138,7 +4141,32 @@ void sinsp_parser::parse_thread_exit(sinsp_evt *evt)
 	}
 	evt->m_tinfo->set_dead();
 
+	/* [Store the tid to remove] 
+	 * We set the current tid to remove. We don't remove it here so we can parse the event
+	 */
 	m_inspector->m_tid_to_remove = evt->get_tid();
+
+	/* If this thread has no children we don't send the reaper info from the kernel,
+	 * so we do nothing.
+	 */
+	if(evt->m_tinfo->m_children.size() == 0)
+	{
+		return;
+	}
+
+	/* [Set the reaper to the current thread]
+	 * We need to set the reaper for this thread
+	 */
+	if(evt->get_type() == PPME_PROCEXIT_1_E && evt->get_num_params() > 4)
+	{
+		sinsp_evt_param *parinfo = evt->get_param(4);
+		ASSERT(parinfo->m_len == sizeof(int64_t));
+		evt->m_tinfo->m_reaper_tid = *(int64_t *)parinfo->m_val;
+	}
+	else
+	{
+		evt->m_tinfo->m_reaper_tid = -1;
+	}
 }
 
 inline bool sinsp_parser::update_ipv4_addresses_and_ports(sinsp_fdinfo_t* fdinfo, 

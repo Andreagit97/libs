@@ -113,6 +113,7 @@ void sinsp_threadinfo::init()
 	m_ptid = (uint64_t) - 1LL;
 	m_vpgid = (uint64_t) - 1LL;
 	set_lastevent_data_validity(false);
+	m_reaper_tid = - 1;
 	m_lastevent_type = -1;
 	m_lastevent_ts = 0;
 	m_prevevent_ts = 0;
@@ -452,7 +453,10 @@ void sinsp_threadinfo::init(scap_threadinfo* pi)
 	m_exepath = pi->exepath;
 	m_exe_writable = pi->exe_writable;
 	m_exe_upper_layer = pi->exe_upper_layer;
-	
+
+	/* We cannot obtain the reaper_tid from a /proc scan */
+	m_reaper_tid = -1;
+
 	set_args(pi->args, pi->args_len);
 	if(is_main_thread())
 	{
@@ -1136,6 +1140,11 @@ void sinsp_threadinfo::assign_children_to_reaper(sinsp_threadinfo* reaper)
 		throw sinsp_exception("The reaper cannot be nullprt");
 	}
 
+	if(reaper == this)
+	{
+		throw sinsp_exception("the current process is reaper of itself, this should never happen!");
+	}
+
 	/* We have no children to reparent. */
 	if(m_children.size() == 0)
 	{
@@ -1147,23 +1156,27 @@ void sinsp_threadinfo::assign_children_to_reaper(sinsp_threadinfo* reaper)
 	 */
 	reaper->clean_expired_children();
 
-	for(auto& child : m_children)
+	auto child = m_children.begin();
+	while(child != m_children.end())
 	{
-		/* This child is dead */
-		if(child.expired())
+		/* If the child is not expired we move it to the reaper
+		 * and we change its `ptid`.
+		 */
+		if(!child->expired())
 		{
-			continue;
+			/* Add the child to the reaper list */
+			reaper->m_children.push_front(*child);
+		
+			/* update ptid of the child with the new parent */
+			child->lock().get()->m_ptid = reaper->m_tid;
 		}
 
-		/* Add the child to the reaper list */
-		reaper->m_children.push_front(child);
-		
-		/* update ptid of the child with the new parent */
-		child.lock().get()->m_ptid = reaper->m_tid;
-		
-		/* clean the child pointer */
-		child.reset();
+		/* In any case (expired or not) we remove the child
+		 * from the list.
+		 */
+		child = m_children.erase(child);
 	}
+	/* At the end of this loop, m_children.size() should be always 0 */
 }
 
 void sinsp_threadinfo::populate_cmdline(std::string &cmdline, const sinsp_threadinfo *tinfo)
@@ -1669,7 +1682,12 @@ sinsp_threadinfo* sinsp_thread_manager::find_new_reaper(sinsp_threadinfo* tinfo)
 	/* If we don't find a reaper in the hierarchy we fallback to init
 	 * WARNING: this could cause a container escape if we are in a container!
 	 */
-	return m_threadtable.get(1);	
+	auto reaper_tinfo = m_threadtable.get(1);
+	if(reaper_tinfo == nullptr)
+	{
+		throw sinsp_exception("we don't have the init process (tid==1) in the table");
+	}
+	return reaper_tinfo;	
 }
 
 void sinsp_thread_manager::remove_main_thread_fdtable(sinsp_threadinfo* main_thread)
@@ -1727,7 +1745,10 @@ void sinsp_thread_manager::remove_thread(int64_t tid)
 		return;
 	}
 
-	/* All threads should have a m_tginfo apart from the invalid ones which don't have a group or children. */
+	/* [Remove invalid threads]
+	 * All threads should have a m_tginfo apart from the invalid ones
+	 * which don't have a group or children.
+	 */
 	if(thread_to_remove->is_invalid() || thread_to_remove->m_tginfo == nullptr)
 	{
 		m_threadtable.erase(tid);
@@ -1735,24 +1756,81 @@ void sinsp_thread_manager::remove_thread(int64_t tid)
 		return;
 	}
 
-    /* We cannot decrement the count more than one time for the same thread */
+	/* [Mark the thread as dead]
+	 * If didn't lose the PROC_EXIT event we have already done it
+	 */
 	if(!thread_to_remove->is_dead())
 	{
 		/* we should decrement only if the thread is alive */
 		thread_to_remove->m_tginfo->decrement_thread_count();
+		thread_to_remove->set_dead();
 	}
-	/* we could set it just one time but it's ok to set it every time */
-	thread_to_remove->set_dead();
 
-	/* Check if we have children
-	 * Please note: even if `size!=0` all children could be dead
+	/* [Reparent children]
+	 * There are different cases:
+	 * 1. We have no children so we have nothing to reparent.
+	 * 2. We receive a PROC_EXIT event for this thread, with reaper info:
+	 *   - Reaper 0 means that the kernel didn't find any children for this thread,
+	 *     probably we are not correctly aligned with it. In this case, we will use our userspace logic
+	 *     to find a reaper.
+	 *   - Reaper -1 means that we cannot find the correct reaper info in the kernel due
+	 *     to BPF verifier limits. In this case, we will use our userspace logic to find a reaper.
+	 *   - Reaper > 0 means the kernel sent us a valid reaper we will use it if present in our thread table.
+	 * 	   If not present we will use our userspace logic.	
+	 * 3. We receive an old version of the PROC_EXIT event without reaper info. In this case,
+	 *    we use our userspace logic.
+	 * 4. We lost the PROC_EXIT event, so we are here because the purging logic called us. Also
+	 *    in this case we use our userspace logic.
+	 * 
+	 * So excluding the case in which the kernel sent us a valid reaper we always fallback to
+	 * our userspace logic.
 	 */
 	if(thread_to_remove->m_children.size())
 	{
-		auto reaper = find_new_reaper(thread_to_remove.get());
-		thread_to_remove->assign_children_to_reaper(reaper);
+		sinsp_threadinfo *reaper_tinfo = nullptr;
+
+		if(thread_to_remove->m_reaper_tid > 0)
+		{
+			/* The kernel sent us a valid reaper
+			 * We should have the reaper thread in the table, but if we don't have
+			 * it, we try to create it from /proc
+			 */
+			reaper_tinfo = m_inspector->get_thread_ref(thread_to_remove->m_reaper_tid , true).get();
+		}
+
+		if(reaper_tinfo == nullptr || reaper_tinfo->is_invalid())
+		{
+			/* Fallback case:
+		 	 * We search for a reaper in best effort traversing our table
+		 	 */
+			reaper_tinfo = find_new_reaper(thread_to_remove.get());
+		}
+
+		/* We update the reaper tid if necessary.
+		 * Please note that `reaper_info` is never nullptr, otherwise we should
+		 * have thrown an exception in `find_new_reaper`.  
+		 */
+		thread_to_remove->m_reaper_tid = reaper_tinfo->m_tid;
+		thread_to_remove->assign_children_to_reaper(reaper_tinfo);
+
+		/* If that thread group was not marked as a reaper we mark it now.
+		 * Since the reaper could be also a thread in the same thread group
+		 * we need to exclude that case. In all other cases, we want to mark
+		 * the thread group as a reaper:
+		 * - init process of a namespace.
+		 * - process that called prctl on itself.
+		 * Please note that in the kernel init processes are not marked with `is_child_subreaper`
+		 * but here we don't make distinctions we mark reapers and sub reapers with the same flag.
+		 */
+		if(reaper_tinfo->m_pid != thread_to_remove->m_pid && reaper_tinfo->m_tginfo)
+		{
+			reaper_tinfo->m_tginfo->set_reaper(true);
+		}
 	}
 
+	/* [Remove main thread]
+	 * We remove the main thread if there are no other threads in the group
+	 */
 	if((thread_to_remove->m_tginfo->get_thread_count() == 0))
 	{
 		remove_main_thread_fdtable(thread_to_remove->get_main_thread());
@@ -1762,6 +1840,11 @@ void sinsp_thread_manager::remove_thread(int64_t tid)
 		m_threadtable.erase(thread_to_remove->m_pid);
 	}
 
+	/* [Remove the current thread]
+	 * We remove the current thread if it is not the main one.
+	 * If we are the main thread and it's time to be removed, we are removed
+	 * in the previous `if`.
+	 */
 	if(!thread_to_remove->is_main_thread())
 	{
 		m_threadtable.erase(tid);
@@ -2089,6 +2172,7 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::get_thread_ref(int64_t tid, bool q
             newti->m_tid = tid;
             newti->m_pid = -1;
             newti->m_ptid = -1;
+            newti->m_reaper_tid = -1;
             newti->m_comm = "<NA>";
             newti->m_exe = "<NA>";
             newti->m_user.uid = 0xffffffff;

@@ -186,13 +186,13 @@ protected:
 		return add_event_advance_ts(increasing_ts(), new_tid, PPME_SYSCALL_EXECVE_19_X, 27, retval, filename.c_str(), empty_bytebuf, new_tid, pid, ppid, "", not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_32, not_relevant_32, not_relevant_32, filename.c_str(), empty_bytebuf, empty_bytebuf, not_relevant_32, not_relevant_64, not_relevant_32, not_relevant_32, not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_64, not_relevant_32);
 	}
 
-	void remove_thread(int64_t tid_to_remove)
+	void remove_thread(int64_t tid_to_remove, int64_t reaper_tid)
 	{
 		/* Scaffolding needed to call the PPME_PROCEXIT_1_E */
 		int64_t not_relevant_64 = 0;
 		uint8_t not_relevant_8 = 0;
 
-		add_event_advance_ts(increasing_ts(), tid_to_remove, PPME_PROCEXIT_1_E, 4, not_relevant_64, not_relevant_64, not_relevant_8, not_relevant_8);
+		add_event_advance_ts(increasing_ts(), tid_to_remove, PPME_PROCEXIT_1_E, 5, not_relevant_64, not_relevant_64, not_relevant_8, not_relevant_8, reaper_tid);
 		/* Since the removal is performed with the next event, we send a useless event
 		 * through init.
 		 */

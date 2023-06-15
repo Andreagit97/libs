@@ -478,7 +478,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_simple)
 	 * - init has 2 children but the only one not expired is `p2_t1`
 	 * - there is no more a thread info for `p1_t1`
 	 */
-	remove_thread(p1_t1_tid);
+	remove_thread(p1_t1_tid, INIT_TID);
 
 	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p1_t1_pid));
 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, INIT_TID)
@@ -525,7 +525,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_parent_fl
 	 * - init has 2 children but the only one not expired is `p1_t1`
 	 * - there is no more thread info for `p2_t1`
 	 */
-	remove_thread(p2_t1_tid);
+	/* p2_t1 has no children so the reaper should be 0 */
+	remove_thread(p2_t1_tid, 0);
 
 	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p2_t1_pid));
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p1_t1_tid)
@@ -585,7 +586,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_remove_ma
 	 * - init has 2 children
 	 * - there is still thread info for `p1_t1`
 	 */
-	remove_thread(p1_t1_tid);
+	remove_thread(p1_t1_tid, 0);
 
 	/* We generate just a mock event to assert filterchecks */
 	evt = add_event_advance_ts(increasing_ts(), p1_t2_tid, PPME_SYSCALL_GETCWD_E, 0);
@@ -610,7 +611,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_remove_ma
 	 * - init has 2 children, but both are expired
 	 * - there are no more thread info for `p1_t1` and `p1_t2`
 	 */
-	remove_thread(p1_t2_tid);
+	remove_thread(p1_t2_tid, 0);
 
 	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p1_t1_tid));
 	ASSERT_MISSING_THREAD_INFO(p1_t1_tid, true)
@@ -654,7 +655,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_remove_se
 	 * - thread group info is not deleted from the thread_manager and the alive count is 1
 	 * - init has 1 child
 	 */
-	remove_thread(p1_t2_tid);
+	remove_thread(p1_t2_tid, 0);
 
 	auto tginfo = m_inspector.m_thread_manager->get_thread_group_info(p1_t2_pid).get();
 	ASSERT_TRUE(tginfo);
@@ -673,7 +674,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_parent_clone_remove_se
 	 * - init has 2 children, but both are expired
 	 * - there are no more thread info for `p1_t1` and `p1_t2`
 	 */
-	remove_thread(p1_t1_tid);
+	remove_thread(p1_t1_tid, 0);
 
 	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p1_t1_tid));
 	ASSERT_MISSING_THREAD_INFO(p1_t1_tid, true)
@@ -859,7 +860,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_simple)
 	 * - init has 2 children but the only one not expired is `p1_t1`
 	 * - there is no more a thread info for `p1_t1`
 	 */
-	remove_thread(p1_t1_tid);
+	remove_thread(p1_t1_tid, INIT_TID);
 
 	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p1_t1_pid));
 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, INIT_TID)
@@ -909,7 +910,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_parse_clone_exit_child_clone_parent_fla
 	 * - init has 2 children but the only one not expired is `p1_t1`
 	 * - there is no more a thread info for `p2_t1`
 	 */
-	remove_thread(p2_t1_tid);
+	remove_thread(p2_t1_tid, 0);
 
 	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p2_t1_pid));
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p1_t1_tid)
@@ -1161,7 +1162,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_2)
 	set_threadinfo_last_access_time(p2_t3_tid, 70);
 
 	/* we remove p5_t2, so p4_t2 will have just one not expired child */
-	remove_thread(p5_t2_tid);
+	remove_thread(p5_t2_tid, p5_t1_tid);
 	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 1, p5_t1_tid);
 	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
 
@@ -1274,9 +1275,58 @@ TEST_F(sinsp_with_test_input, THRD_STATE_traverse_default_tree)
 
 	/* Remove p4_t2 */
 	ASSERT_THREAD_CHILDREN(p4_t1_tid, 0, 0)
-	remove_thread(p4_t2_tid);
+	/* the reaper is the other thread in the group */
+	remove_thread(p4_t2_tid, p4_t1_tid);
 	ASSERT_THREAD_GROUP_INFO(p4_t1_pid, 1, true, 2, 1, p4_t1_tid)
 	ASSERT_THREAD_CHILDREN(p4_t1_tid, 2, 2, p5_t1_tid, p5_t2_tid)
+
+	/* Remove p5_t2 */
+	ASSERT_THREAD_CHILDREN(p5_t1_tid, 0, 0)
+	remove_thread(p5_t2_tid, p5_t1_tid);
+	ASSERT_THREAD_CHILDREN(p5_t1_tid, 1, 1, p6_t1_tid)
+
+	/* Remove p5_t1 */
+	remove_thread(p5_t1_tid, p4_t1_tid);
+
+	/* Now p6_t1 should be assigned to p4_t1 since it is the reaper */
+	ASSERT_THREAD_CHILDREN(p4_t1_tid, 3, 1, p6_t1_tid)
+
+	/* Set p2_t1 group as reaper, emulate prctl */
+	auto tginfo = m_inspector.m_thread_manager->get_thread_group_info(p2_t1_pid).get();
+	tginfo->set_reaper(true);
+
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, true, 3, 3, p2_t1_tid, p2_t2_tid, p2_t3_tid)
+
+	/* Remove p2_t1 */
+	ASSERT_THREAD_CHILDREN(p2_t2_tid, 0, 0)
+	remove_thread(p2_t1_tid, p2_t2_tid);
+	ASSERT_THREAD_CHILDREN(p2_t2_tid, 1, 1, p3_t1_tid)
+
+	/* Remove p2_t2 */
+	ASSERT_THREAD_CHILDREN(p2_t3_tid, 0, 0)
+	remove_thread(p2_t2_tid, p2_t3_tid);
+	/* Please note that the parent of `p2_t2` is `init` since it was created with
+	 * CLONE_PARENT flag.
+	 */
+	ASSERT_THREAD_CHILDREN(p2_t3_tid, 1, 1, p3_t1_tid)
+
+	/* Remove p3_t1 */
+	remove_thread(p3_t1_tid, p2_t3_tid);
+	ASSERT_THREAD_CHILDREN(p2_t3_tid, 2, 1, p4_t1_tid)
+
+	/*=============================== remove threads ===========================*/
+
+	/*=============================== p6_t1 traverse ===========================*/
+
+	tinfo = m_inspector.get_thread_ref(p6_t1_tid, false).get();
+
+	std::vector<int64_t> expected_p6_traverse_parents = {p4_t1_tid, p2_t3_tid, INIT_TID};
+
+	traverse_parents.clear();
+	tinfo->traverse_parent_state(visitor);
+	ASSERT_EQ(traverse_parents, expected_p6_traverse_parents);
+
+	/*=============================== p6_t1 traverse ===========================*/
 }
 
 TEST_F(sinsp_with_test_input, THRD_STATE_check_dead_thread_is_not_a_reaper)
@@ -1284,14 +1334,16 @@ TEST_F(sinsp_with_test_input, THRD_STATE_check_dead_thread_is_not_a_reaper)
 	/* Instantiate the default tree */
 	DEFAULT_TREE
 
-	/* Remove p5_t1, it is the main thread and it is only marked as dead */
-	remove_thread(p5_t1_tid);
+	/* Remove p5_t1, it is the main thread and it is only marked as dead
+	 * Using `-1` we are saying to use our userspace logic to find the reaper.
+	 */
+	remove_thread(p5_t1_tid, -1);
 	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 2, 2, p5_t2_tid)
 
 	/* Remove p5_t2
 	 * p5_t1 is marked as dead so it shouldn't be considered as a reaper.
 	 */
-	remove_thread(p5_t2_tid);
+	remove_thread(p5_t2_tid, -1);
 	ASSERT_THREAD_CHILDREN(p4_t1_tid, 1, 1, p6_t1_tid)
 }
 
@@ -1920,7 +1972,9 @@ TEST(thread_group_info, find_reaper_with_null_thread_group_info)
 {
 	sinsp m_inspector;
 
-	/* This is the dead thread. This is an invalid thread (ptid==-1) so it won't have a thread group info */
+	/* This is the thread we will remove.
+	 * This is an invalid thread (ptid==-1) so it won't have a thread group info
+	 */
 	auto thread_to_remove = add_thread_to_the_table(&m_inspector, 27, 25, -1);
 
 	/* We need to set the thread as dead before calling the reaper function */
@@ -1928,9 +1982,9 @@ TEST(thread_group_info, find_reaper_with_null_thread_group_info)
 
 	/* Call the reaper function without thread group info.
 	 * We should search for init thread info, but init is not there in this example
-	 * so the method should return a nullptr.
+	 * so the method should throw an exception
 	 */
-	ASSERT_FALSE(m_inspector.m_thread_manager->find_new_reaper(thread_to_remove));
+	EXPECT_THROW(m_inspector.m_thread_manager->find_new_reaper(thread_to_remove), sinsp_exception);
 }
 
 TEST(thread_group_info, find_reaper_in_the_same_thread_group)
@@ -1977,6 +2031,38 @@ TEST(thread_group_info, find_a_valid_reaper)
 	ASSERT_EQ(m_inspector.m_thread_manager->find_new_reaper(p2_t1), p1_t1);
 }
 
+TEST_F(sinsp_with_test_input, detect_a_loop_during_find_new_reaper)
+{
+	DEFAULT_TREE
+
+	/* If we detect a loop the new reaper will be init.
+	 * To be sure that init is the new reaper due to a loop and not
+	 * because it is the real reaper, we set p2_t1 group as a reaper.
+	 */
+	auto p2_t1_tinfo = m_inspector.get_thread_ref(p2_t1_tid, false).get();
+	ASSERT_TRUE(p2_t1_tinfo);
+	p2_t1_tinfo->m_tginfo->set_reaper(true);
+
+	/* We explicitly set p3_t1 ptid to p4_t1, so we create a loop */
+	auto p3_t1_tinfo = m_inspector.get_thread_ref(p3_t1_tid, false).get();
+	ASSERT_TRUE(p3_t1_tinfo);
+	p3_t1_tinfo->m_ptid = p4_t1_tid;
+
+	/* We will call find_new_reaper on p4_t1 but before doing this we need to
+	 * remove p4_t2 otherwise we will have a valid thread in the same group as a new reaper
+	 */
+	remove_thread(p4_t2_tid, p4_t1_tid);
+
+	/* We call find_new_reaper on p4_t1.
+	 * The new reaper should be init since we detected a loop.
+	 */
+	auto p4_t1_tinfo = m_inspector.get_thread_ref(p4_t1_tid, false).get();
+	ASSERT_TRUE(p4_t1_tinfo);
+	auto init_tinfo = m_inspector.get_thread_ref(INIT_TID, false).get();
+	ASSERT_TRUE(init_tinfo);
+	ASSERT_EQ(m_inspector.m_thread_manager->find_new_reaper(p4_t1_tinfo), init_tinfo);
+}
+
 /*=============================== THREAD-GROUP-INFO ===========================*/
 
 /*=============================== THREAD-INFO ===========================*/
@@ -1990,6 +2076,9 @@ TEST_F(sinsp_with_test_input, THRD_STATE_assign_children_to_reaper)
 	/* The reaper cannot be null */
 	EXPECT_THROW(p3_t1_tinfo->assign_children_to_reaper(nullptr), sinsp_exception);
 
+	/* The reaper cannot be the current process */
+	EXPECT_THROW(p3_t1_tinfo->assign_children_to_reaper(p3_t1_tinfo), sinsp_exception);
+
 	/* children of p3_t1 are p4_t1 and p4_t2 we can reparent them to p1_t1 */
 	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 2, p4_t1_tid, p4_t2_tid);
 	ASSERT_THREAD_CHILDREN(p1_t1_tid, 0, 0);
@@ -1997,8 +2086,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_assign_children_to_reaper)
 	auto p1_t1_tinfo = m_inspector.get_thread_ref(p1_t1_tid, false).get();
 	p3_t1_tinfo->assign_children_to_reaper(p1_t1_tinfo);
 
-	/* all p3_t1 children should be expired */
-	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 0);
+	/* all p3_t1 children should be removed */
+	ASSERT_THREAD_CHILDREN(p3_t1_tid, 0, 0);
 
 	/* the new parent should be p1_t1 */
 	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p4_t1_tid, p4_t1_pid, p1_t1_tid, p4_t1_vtid, p4_t1_vpid);
@@ -2008,11 +2097,291 @@ TEST_F(sinsp_with_test_input, THRD_STATE_assign_children_to_reaper)
 
 	/* Another call to the reparenting function should do nothing */
 	p3_t1_tinfo->assign_children_to_reaper(p1_t1_tinfo);
-	ASSERT_THREAD_CHILDREN(p3_t1_tid, 2, 0);
+	ASSERT_THREAD_CHILDREN(p3_t1_tid, 0, 0);
 	ASSERT_THREAD_CHILDREN(p1_t1_tid, 2, 2, p4_t1_tid, p4_t2_tid);
 }
 
 /*=============================== THREAD-INFO ===========================*/
+
+/*=============================== PROC_EXIT ENTER EVENT ===========================*/
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_proc_exit_not_existent_thread)
+{
+	DEFAULT_TREE
+
+	/* Before this proc exit init had 5 children */
+	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5);
+
+	/* Scaffolding needed to call the PPME_PROCEXIT_1_E */
+	int64_t not_relevant_64 = 0;
+	uint8_t not_relevant_8 = 0;
+
+	/* we call the proc_exit event on a not existing thread */
+	int64_t unknown_tid = 50000;
+	auto evt = add_event_advance_ts(increasing_ts(), unknown_tid, PPME_PROCEXIT_1_E, 5, not_relevant_64,
+					not_relevant_64, not_relevant_8, not_relevant_8, INIT_TID);
+
+	/* The thread info associated with the event should be null and INIT should have the same number of children */
+	ASSERT_FALSE(evt->get_thread_info());
+	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_proc_exit_no_children)
+{
+	DEFAULT_TREE
+
+	/* Before this proc exit init had 5 children */
+	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5);
+
+	/* Scaffolding needed to call the PPME_PROCEXIT_1_E */
+	int64_t not_relevant_64 = 0;
+	uint8_t not_relevant_8 = 0;
+
+	/* we call the proc_exit event on thread without children */
+	add_event_advance_ts(increasing_ts(), p5_t1_tid, PPME_PROCEXIT_1_E, 5, not_relevant_64, not_relevant_64,
+			     not_relevant_8, not_relevant_8, INIT_TID);
+
+	/* INIT should have the same number of children */
+	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5);
+
+	/* After the PROC_EXIT event we still have the thread but it is marked as dead */
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 2, 2);
+
+	/* The reaper of p5_t1_tinfo should be always -1, p5_t1 has no children so we don't set it */
+	auto p5_t1_tinfo = m_inspector.get_thread_ref(p5_t1_tid, false).get();
+	ASSERT_TRUE(p5_t1_tinfo);
+	ASSERT_EQ(p5_t1_tinfo->m_reaper_tid, -1);
+	ASSERT_THREAD_INFO_FLAG(p5_t1_tid, PPM_CL_CLOSED, true);
+
+	/* After the next event, nothing should change, p5_t1 is a main thread */
+	add_event_advance_ts(increasing_ts(), INIT_TID, PPME_SYSCALL_GETCWD_E, 0);
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 2, 2);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_proc_exit_reaper_0)
+{
+	DEFAULT_TREE
+
+	/* Scaffolding needed to call the PPME_PROCEXIT_1_E */
+	int64_t not_relevant_64 = 0;
+	uint8_t not_relevant_8 = 0;
+
+	/* we call the proc_exit with a reaper equal to 0
+	 * our userspace logic should be able to assign the right
+	 * reaper even if the kernel one is missing.
+	 */
+	int64_t empty_reaper = 0;
+	add_event_advance_ts(increasing_ts(), p5_t2_tid, PPME_PROCEXIT_1_E, 5, not_relevant_64, not_relevant_64,
+			     not_relevant_8, not_relevant_8, empty_reaper);
+
+	/* we don't remove the children from p5_t2 */
+	ASSERT_THREAD_CHILDREN(p5_t2_tid, 1, 1, p6_t1_tid);
+
+	/* After the PROC_EXIT event we still have the thread but it is marked as dead */
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 2, 2);
+
+	auto p5_t2_tinfo = m_inspector.get_thread_ref(p5_t2_tid, false).get();
+	ASSERT_TRUE(p5_t2_tinfo);
+	ASSERT_EQ(p5_t2_tinfo->m_reaper_tid, 0);
+	ASSERT_THREAD_INFO_FLAG(p5_t2_tid, PPM_CL_CLOSED, true);
+
+	/* After the next event, we should reparent p5_t2 children to p5_t1 */
+	add_event_advance_ts(increasing_ts(), INIT_TID, PPME_SYSCALL_GETCWD_E, 0);
+
+	/* p5_t2 should be expired and the reaper flag should not be set */
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 2, 1);
+
+	/* p5_t1 is the reaper */
+	ASSERT_THREAD_CHILDREN(p5_t1_tid, 1, 1, p6_t1_tid);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_proc_exit_negative_reaper)
+{
+	DEFAULT_TREE
+
+	/* Scaffolding needed to call the PPME_PROCEXIT_1_E */
+	int64_t not_relevant_64 = 0;
+	uint8_t not_relevant_8 = 0;
+
+	/* Same behavior we have with reaper 0 */
+	int64_t negative_reaper = -1;
+	add_event_advance_ts(increasing_ts(), p5_t2_tid, PPME_PROCEXIT_1_E, 5, not_relevant_64, not_relevant_64,
+			     not_relevant_8, not_relevant_8, negative_reaper);
+
+	/* we don't remove the children from p5_t2 */
+	ASSERT_THREAD_CHILDREN(p5_t2_tid, 1, 1, p6_t1_tid);
+
+	/* After the PROC_EXIT event we still have the thread but it is marked as dead */
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 2, 2);
+
+	auto p5_t2_tinfo = m_inspector.get_thread_ref(p5_t2_tid, false).get();
+	ASSERT_TRUE(p5_t2_tinfo);
+	ASSERT_EQ(p5_t2_tinfo->m_reaper_tid, -1);
+	ASSERT_THREAD_INFO_FLAG(p5_t2_tid, PPM_CL_CLOSED, true);
+
+	/* After the next event, we should reparent p5_t2 children to p5_t1 */
+	add_event_advance_ts(increasing_ts(), INIT_TID, PPME_SYSCALL_GETCWD_E, 0);
+
+	/* p5_t2 should be expired and the reaper flag should not be set */
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 2, 1);
+
+	/* p5_t1 is the reaper */
+	ASSERT_THREAD_CHILDREN(p5_t1_tid, 1, 1, p6_t1_tid);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_proc_exit_valid_reaper_in_the_same_group)
+{
+	DEFAULT_TREE
+
+	/* Scaffolding needed to call the PPME_PROCEXIT_1_E */
+	int64_t not_relevant_64 = 0;
+	uint8_t not_relevant_8 = 0;
+
+	add_event_advance_ts(increasing_ts(), p5_t2_tid, PPME_PROCEXIT_1_E, 5, not_relevant_64, not_relevant_64,
+			     not_relevant_8, not_relevant_8, p5_t1_tid);
+
+	/* we don't remove the children from p5_t2 */
+	ASSERT_THREAD_CHILDREN(p5_t2_tid, 1, 1, p6_t1_tid);
+
+	/* After the PROC_EXIT event we still have the thread but it is marked as dead */
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 2, 2);
+
+	auto p5_t2_tinfo = m_inspector.get_thread_ref(p5_t2_tid, false).get();
+	ASSERT_TRUE(p5_t2_tinfo);
+	ASSERT_EQ(p5_t2_tinfo->m_reaper_tid, p5_t1_tid);
+	ASSERT_THREAD_INFO_FLAG(p5_t2_tid, PPM_CL_CLOSED, true);
+
+	/* After the next event, we should reparent p5_t2 children to p5_t1 */
+	add_event_advance_ts(increasing_ts(), INIT_TID, PPME_SYSCALL_GETCWD_E, 0);
+
+	/* p5_t2 should be expired and the reaper flag should not be set */
+	ASSERT_THREAD_GROUP_INFO(p5_t1_pid, 1, false, 2, 1);
+
+	/* p5_t1 is the reaper */
+	ASSERT_THREAD_CHILDREN(p5_t1_tid, 1, 1, p6_t1_tid);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_proc_exit_valid_reaper_in_another_group)
+{
+	DEFAULT_TREE
+
+	/* Initially p2_t1 doesn't belong to a reaper group, but after the kernel tells us
+	 * it is, we mark it.
+	 */
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, false, 3, 3);
+	ASSERT_THREAD_CHILDREN(p2_t1_tid, 1, 1, p3_t1_tid);
+
+	/* Scaffolding needed to call the PPME_PROCEXIT_1_E */
+	int64_t not_relevant_64 = 0;
+	uint8_t not_relevant_8 = 0;
+
+	add_event_advance_ts(increasing_ts(), p5_t2_tid, PPME_PROCEXIT_1_E, 5, not_relevant_64, not_relevant_64,
+			     not_relevant_8, not_relevant_8, p2_t1_tid);
+
+	auto p5_t2_tinfo = m_inspector.get_thread_ref(p5_t2_tid, false).get();
+	ASSERT_TRUE(p5_t2_tinfo);
+	ASSERT_EQ(p5_t2_tinfo->m_reaper_tid, p2_t1_tid);
+
+	/* After the next event, we should reparent p5_t2 children to p2_t1 */
+	add_event_advance_ts(increasing_ts(), INIT_TID, PPME_SYSCALL_GETCWD_E, 0);
+
+	/* now p2_t1 group is a reaper since the kernel tells it */
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, true, 3, 3);
+	ASSERT_THREAD_CHILDREN(p2_t1_tid, 2, 2, p6_t1_tid);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_proc_exit_not_existent_reaper)
+{
+	DEFAULT_TREE
+
+	/* Scaffolding needed to call the PPME_PROCEXIT_1_E */
+	int64_t not_relevant_64 = 0;
+	uint8_t not_relevant_8 = 0;
+
+	/* not existent reaper, our userspace logic should be able
+	 * to assign the right reaper.
+	 */
+	int64_t unknonw_repaer_tid = 50000;
+	add_event_advance_ts(increasing_ts(), p2_t1_tid, PPME_PROCEXIT_1_E, 5, not_relevant_64, not_relevant_64,
+			     not_relevant_8, not_relevant_8, unknonw_repaer_tid);
+
+	auto p2_t1_tinfo = m_inspector.get_thread_ref(p2_t1_tid, false).get();
+	ASSERT_TRUE(p2_t1_tinfo);
+	/* right now the reaper tid is `unknonw_repaer_tid` */
+	ASSERT_EQ(p2_t1_tinfo->m_reaper_tid, unknonw_repaer_tid);
+	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLOSED, true);
+
+	/* After the next event, we should reparent p2_t1 children to p2_t2 */
+	add_event_advance_ts(increasing_ts(), INIT_TID, PPME_SYSCALL_GETCWD_E, 0);
+
+	/* p2_t1 is not expired since it is a main thread and the reaper flag should not be set */
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3);
+	p2_t1_tinfo = m_inspector.get_thread_ref(p2_t1_tid, false).get();
+	ASSERT_TRUE(p2_t1_tinfo);
+	/* The reaper tid should be changed */
+	ASSERT_EQ(p2_t1_tinfo->m_reaper_tid, p2_t2_tid);
+
+	/* During the process we create also an invalid thread with id `unknonw_repaer_tid` */
+	auto unknonw_repaer_tinfo = m_inspector.get_thread_ref(unknonw_repaer_tid, false).get();
+	ASSERT_TRUE(unknonw_repaer_tinfo);
+	ASSERT_TRUE(unknonw_repaer_tinfo->is_invalid());
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_proc_exit_old_event)
+{
+	DEFAULT_TREE
+
+	/* This version of proc_exit event doesn't have the reaper info */
+	add_event_advance_ts(increasing_ts(), p5_t2_tid, PPME_PROCEXIT_E, 0);
+
+	auto p5_t2_tinfo = m_inspector.get_thread_ref(p5_t2_tid, false).get();
+	ASSERT_TRUE(p5_t2_tinfo);
+	ASSERT_EQ(p5_t2_tinfo->m_reaper_tid, -1);
+	ASSERT_THREAD_INFO_FLAG(p5_t2_tid, PPM_CL_CLOSED, true);
+	ASSERT_EQ(m_inspector.m_tid_to_remove, p5_t2_tid);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_proc_exit_lost_event)
+{
+	DEFAULT_TREE
+
+	/* Let's imagine we miss the exit event on p5_t2. At a certain point
+	 * we will try to remove it.
+	 */
+	m_inspector.remove_thread(p5_t2_tid);
+
+	/* Thanks to userspace logic p5_t1 should be the new reaper */
+	ASSERT_THREAD_GROUP_INFO(p5_t1_tid, 1, false, 2, 1);
+	ASSERT_THREAD_CHILDREN(p5_t1_tid, 1, 1, p6_t1_tid);
+	ASSERT_MISSING_THREAD_INFO(p5_t2_tid, true);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_parse_proc_exit_complete_flow)
+{
+	DEFAULT_TREE
+
+	/* p5_t1 has no children, when p5_t2 dies p5_t1 receives p6_t1 as child */
+	ASSERT_THREAD_CHILDREN(p5_t1_tid, 0, 0);
+	ASSERT_THREAD_CHILDREN(p5_t2_tid, 1, 1, p6_t1_tid);
+	remove_thread(p5_t2_tid, p5_t1_tid);
+	ASSERT_THREAD_CHILDREN(p5_t1_tid, 1, 1, p6_t1_tid);
+	ASSERT_MISSING_THREAD_INFO(p5_t2_tid, true);
+
+	remove_thread(p4_t2_tid, p4_t1_tid);
+	ASSERT_THREAD_CHILDREN(p4_t1_tid, 1, 1, p5_t1_tid);
+	ASSERT_MISSING_THREAD_INFO(p4_t2_tid, true);
+
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, false, 3, 3);
+	/* The kernel says that p2_t1 is a new reaper */
+	remove_thread(p4_t1_tid, p2_t1_tid);
+	ASSERT_THREAD_CHILDREN(p2_t1_tid, 2, 2, p5_t1_tid);
+	ASSERT_MISSING_THREAD_INFO(p4_t1_tid, true);
+
+	/* the reaper flag should be set */
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, true, 3, 3);
+}
+
+/*=============================== PROC_EXIT ENTER EVENT ===========================*/
 
 /*=============================== SCAP-FILES ===========================*/
 
@@ -2228,15 +2597,15 @@ TEST_F(sinsp_with_test_input, THRD_STATE_expired_children)
 	/* remove p1_t2. It has no children so the cleanup logic on INIT process
 	 * is not called
 	 */
-	remove_thread(p1_t2_tid);
+	remove_thread(p1_t2_tid, 0);
 
 	/* Now one thread is expired */
 	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 4);
 
 	/* Same for these threads, they have no children */
-	remove_thread(p1_t1_tid);
-	remove_thread(p2_t2_tid);
-	remove_thread(p2_t3_tid);
+	remove_thread(p1_t1_tid, 0);
+	remove_thread(p2_t2_tid, 0);
+	remove_thread(p2_t3_tid, 0);
 	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 1);
 
 	/* p2_t1 has a child so we move it to the new reaper -> INIT.
@@ -2248,7 +2617,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_expired_children)
 	 * - p2_t1 is expired
 	 * - p3_t1 is alive
 	 */
-	remove_thread(p2_t1_tid);
+	remove_thread(p2_t1_tid, INIT_TID);
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p3_t1_tid);
 
 	/* restore the threshold */
