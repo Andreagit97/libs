@@ -1185,7 +1185,6 @@ public:
 #ifdef GATHER_INTERNAL_STATS
 	sinsp_stats m_stats;
 #endif
-	/* This is no more used we could remove that */
 #ifdef HAS_ANALYZER
 	std::vector<uint64_t> m_tid_collisions;
 #endif
