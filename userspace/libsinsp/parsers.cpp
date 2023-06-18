@@ -2221,6 +2221,18 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 		return;
 	}
 
+	/* In some corner cases an execve is thrown by a secondary thread when 
+	 * the main thread is already dead. In these cases the secondary thread
+	 * will become a main thread (it will change its tid) and here we will have
+	 * an execve exit event called by a main thread that is "theorically" dead.
+	 * What we need to do is to set the main thread as alive again and then
+	 * a new PROC_EXIT event will kill it again.
+	 */
+	if(evt->m_tinfo->is_dead() && evt->m_tinfo->is_main_thread())
+	{
+		evt->m_tinfo->resurrect_main_thread();
+	}
+
 	// Get the exe
 	parinfo = evt->get_param(1);
 	evt->m_tinfo->m_exe = parinfo->m_val;
