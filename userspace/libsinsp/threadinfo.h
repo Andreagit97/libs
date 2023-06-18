@@ -17,7 +17,7 @@ limitations under the License.
 
 #pragma once
 
-#define DEFAULT_CHILDREN_THRESHOLD 50
+#define DEFAULT_CHILDREN_THRESHOLD 40
 
 #ifndef VISIBILITY_PRIVATE
 #define VISIBILITY_PRIVATE private:
@@ -323,7 +323,36 @@ public:
 
 	void assign_children_to_reaper(sinsp_threadinfo* reaper);
 
-	void clean_expired_children();
+	inline void add_child(const std::shared_ptr<sinsp_threadinfo>& child)
+	{
+		m_children.push_front(child);
+		/* Set current thread as parent */
+		child->m_ptid = m_tid;
+
+		/* Clean expired children if necessary */
+		if(m_children.size() > sinsp_threadinfo::get_expired_children_threshold())
+		{
+			clean_expired_children();
+		}		
+	}
+
+	inline void clean_expired_children()
+	{
+		auto child = m_children.begin();
+		while(child != m_children.end())
+		{
+			/* This child is expired */
+			if(child->expired())
+			{
+				/* `erase` returns the pointer to the next child
+				 * no need for manual increment.
+				 */
+				child = m_children.erase(child);
+				continue;
+			}
+			child++;
+		}
+	}
 
 	static void populate_cmdline(std::string &cmdline, const sinsp_threadinfo *tinfo);
 
