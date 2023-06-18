@@ -23,9 +23,19 @@ limitations under the License.
 /* Forward declaration */
 class sinsp_threadinfo;
 
+#define DEFAULT_THREADS_THRESHOLD 40
+
 /* New struct that keep information regarding the thread group */
 typedef struct thread_group_info
 {
+private:
+	static uint32_t expired_threads_threshold;
+
+public:
+	static inline uint32_t get_expired_threads_threshold() { return expired_threads_threshold; }
+
+	static inline void set_expired_threads_threshold(uint32_t threshold) { expired_threads_threshold = threshold; }
+
 	thread_group_info(int64_t group_pid, bool reaper, std::weak_ptr<sinsp_threadinfo> current_thread):
 		m_pid(group_pid), m_reaper(reaper)
 	{
@@ -68,6 +78,30 @@ typedef struct thread_group_info
 		}
 		/* we are adding a thread so we increment the count */
 		m_alive_count++;
+
+		/* Clean expired threads if necessary */
+		if(m_threads.size() > thread_group_info::get_expired_threads_threshold())
+		{
+			clean_expired_threads();
+		}
+	}
+
+	inline void clean_expired_threads()
+	{
+		auto thread = m_threads.begin();
+		while(thread != m_threads.end())
+		{
+			/* This child is expired */
+			if(thread->expired())
+			{
+				/* `erase` returns the pointer to the next child
+				 * no need for manual increment.
+				 */
+				thread = m_threads.erase(thread);
+				continue;
+			}
+			thread++;
+		}
 	}
 
 	inline sinsp_threadinfo* get_first_thread() const { return m_threads.front().lock().get(); }
