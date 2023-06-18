@@ -1177,25 +1177,15 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_2)
 	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 1, p5_t1_tid);
 	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
 
-	/* set the expired children threshold to 3 */
-	sinsp_threadinfo::set_expired_children_threshold(3);
-	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), 3);
-
-	/* p4_t2 has a number of children lower than the threshold so
-	 * `remove_inactive_threads` do nothing.
-	 */
-	remove_inactive_threads(80, 20);
-	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 1, p5_t1_tid);
-
 	/* set the expired children threshold to 1 */
 	sinsp_threadinfo::set_expired_children_threshold(1);
 	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), 1);
 
-	/* This should remove no one, but thanks to `clean_expired_children`
-	 * logic it should clean the expired children of p4_t2_tid
+	/* This should remove no one, the cleanup logic is no more called in the
+	 * remove_inactive_threads
 	 */
 	remove_inactive_threads(80, 20);
-	ASSERT_THREAD_CHILDREN(p4_t2_tid, 1, 1, p5_t1_tid);
+	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 1, p5_t1_tid);
 
 	/* restore the threshold */
 	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_CHILDREN_THRESHOLD);
@@ -2308,7 +2298,7 @@ TEST(parse_scap_file, simple_tree_with_prctl)
 
 /*=============================== SCAP-FILES ===========================*/
 
-/*=============================== EXPIRED_CHILDREN ===========================*/
+/*=============================== EXPIRED_THREADS ===========================*/
 
 TEST_F(sinsp_with_test_input, THRD_STATE_expired_children)
 {
@@ -2362,4 +2352,32 @@ TEST_F(sinsp_with_test_input, THRD_STATE_expired_children)
 	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), DEFAULT_CHILDREN_THRESHOLD);
 }
 
-/*=============================== EXPIRED_CHILDREN ===========================*/
+TEST_F(sinsp_with_test_input, THRD_STATE_expired_threads)
+{
+	DEFAULT_TREE
+
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, false, 3, 3);
+
+	thread_group_info::set_expired_threads_threshold(1);
+	ASSERT_EQ(thread_group_info::get_expired_threads_threshold(), 1);
+
+	remove_thread(p2_t1_tid);
+
+	/* we remove the main thread but it is still alive */
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3);
+
+	/* we remove a secondary thread, it will become expired */
+	remove_thread(p2_t2_tid);
+
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 3, 2);
+
+	/* we set our threshold to 1, so p2_t2 should be remove since it is expired */
+	int64_t p2_t4_tid = 26;
+	generate_clone_x_event(p2_t4_tid, p2_t3_tid, p2_t3_pid, p2_t3_ptid, PPM_CL_CLONE_THREAD);
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3);
+
+	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_THREADS_THRESHOLD);
+	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), DEFAULT_THREADS_THRESHOLD);	
+}
+
+/*=============================== EXPIRED_THREADS ===========================*/

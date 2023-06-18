@@ -2719,7 +2719,6 @@ bool sinsp_thread_manager::remove_inactive_threads()
 		 * 3. Threads that we are not using and that are no more alive in /proc.
 		 */
 		m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
-			tinfo.clean_expired_children();
 			if(tinfo.is_invalid() ||
 				tinfo.is_dead() ||
 				((m_inspector->m_lastevent_ts > tinfo.m_lastaccess_ts + m_inspector->m_thread_timeout_ns) &&
