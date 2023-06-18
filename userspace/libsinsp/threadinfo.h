@@ -303,6 +303,7 @@ public:
 	//
 	typedef std::function<bool (sinsp_threadinfo *)> visitor_func_t;
 	void traverse_parent_state(visitor_func_t &visitor);
+	void traverse_main_parent_state(visitor_func_t &visitor);
 
 	void assign_children_to_reaper(sinsp_threadinfo* reaper);
 

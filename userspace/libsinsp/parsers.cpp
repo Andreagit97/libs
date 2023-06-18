@@ -728,6 +728,10 @@ bool sinsp_parser::reset(sinsp_evt *evt)
 	else
 	{
 		evt->m_tinfo = m_inspector->get_thread_ref(evt->m_pevt->tid, query_os, false).get();
+		if(evt->m_tinfo == nullptr && (etype == PPME_PROCEXIT_E || etype == PPME_PROCEXIT_1_E))
+		{
+			printf("Try to remove a thread that is not there: %ld\n\n", evt->m_pevt->tid);
+		}
 	}
 
 	if(etype == PPME_SCHEDSWITCH_6_E)
@@ -1063,6 +1067,41 @@ void sinsp_parser::register_event_callback(sinsp_pd_callback_type etype, sinsp_p
 // PARSERS
 ///////////////////////////////////////////////////////////////////////////////
 
+sinsp_threadinfo::visitor_func_t scap_file_visitor = [](sinsp_threadinfo* pt)
+{
+	if(pt == nullptr)
+	{
+		printf("[WARNING] Null thread info detected\n\n");
+	}
+
+	bool reaper = false;
+	if(pt->m_tginfo == nullptr)
+	{
+		printf("[WARNING] Null thread group info detected. tid: %ld, pid: %ld, ptid: %ld\n\n", pt->m_tid, pt->m_pid, pt->m_ptid);
+	}
+	else
+	{
+		reaper = pt->m_tginfo->is_reaper();
+	}
+
+	bool container = ((pt->m_flags & PPM_CL_CHILD_IN_PIDNS ) || (pt->m_tid != pt->m_vtid)) ? true : false;
+
+	if(pt->m_tid != pt->m_pid)
+	{
+		printf("v THREAD[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d, container: %d\n", pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid, reaper, container);
+	}
+	else
+	{
+		printf("v LEADER-THREAD[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d, container: %d\n", pt->m_comm.c_str(), pt->m_tid, pt->m_pid, pt->m_ptid, pt->m_vtid, pt->m_vpid, reaper, container);
+	}
+	if(pt->m_tid == 1)
+	{
+		printf("END\n\n");
+		return false;
+	}
+	return true;
+};
+
 void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 {
 	sinsp_evt_param* parinfo = nullptr;
@@ -1151,6 +1190,8 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		default:
 			ASSERT(false);
 		}
+
+		printf("INVALID CALLER tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld (child: %ld)\n", caller_tinfo->m_tid, caller_tinfo->m_pid, caller_tinfo->m_ptid, caller_tinfo->m_vtid, caller_tinfo->m_vpid, child_tid);
 
 		/* Create thread groups and parenting relationships */
 		m_inspector->m_thread_manager->create_thread_dependencies(caller_tinfo);
@@ -1600,6 +1641,11 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 	{
 		delete child_tinfo;
 	}
+	else 
+	{
+		printf("CLONE CALLER EXIT: %ld", evt->get_num());
+		child_tinfo->traverse_parent_state(scap_file_visitor);
+	}
 
 	/*=============================== ADD THREAD TO THE TABLE ===========================*/
 
@@ -1779,6 +1825,7 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 			/* Create thread groups and parenting relationships */
 			m_inspector->m_thread_manager->create_thread_dependencies(lookup_tinfo);
 		}
+		printf("INVALID LOOKUP tid: %ld, pid: %ld, ptid: %ld\n", lookup_tinfo->m_tid, lookup_tinfo->m_pid, lookup_tinfo->m_ptid);
 	}
 
 	/* We need to do this here, in this way we can use this info to populate the lookup thread
@@ -2142,6 +2189,11 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 		evt->m_tinfo = nullptr;
 		delete child_tinfo;
 	}
+	else 
+	{
+		printf("CLONE CHILD EXIT: %ld", evt->get_num());
+		child_tinfo->traverse_parent_state(scap_file_visitor);
+	}
 
 	/*=============================== CREATE NEW THREAD-INFO ===========================*/
 
@@ -2271,6 +2323,8 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 		evt->m_tinfo->m_ptid = *(uint64_t *)parinfo->m_val;
 
 		auto tinfo = m_inspector->get_thread_ref(evt->m_tinfo->m_tid, false);
+		printf("INVALID CURRENT THREAD tid: %ld, pid: %ld, ptid: %ld\n", evt->m_tinfo->m_tid, evt->m_tinfo->m_pid, evt->m_tinfo->m_ptid);
+
 		/* Create thread groups and parenting relationships */
 		m_inspector->m_thread_manager->create_thread_dependencies(tinfo);
 	}
@@ -2707,6 +2761,21 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 			}
 		}
 	}
+
+	if(evt->m_tinfo != nullptr)
+	{
+		bool reaper = false;
+		if(evt->m_tinfo->m_tginfo == nullptr)
+		{
+			printf("[WARNING] Null thread group info detected. tid: %ld, pid: %ld, ptid: %ld\n\n", evt->m_tinfo->m_tid, evt->m_tinfo->m_pid, evt->m_tinfo->m_ptid);
+		}
+		else
+		{
+			reaper = evt->m_tinfo->m_tginfo->is_reaper();
+		}
+		printf("-----------> EXECVE[%s](%ld) tid: %ld, pid: %ld, ptid: %ld, reaper: %d\n\n", evt->m_tinfo->m_comm.c_str(), evt->get_num(),evt->m_tinfo->m_tid, evt->m_tinfo->m_pid, evt->m_tinfo->m_ptid, reaper);
+	}
+
 	return;
 }
 
@@ -4175,7 +4244,24 @@ void sinsp_parser::parse_thread_exit(sinsp_evt *evt)
 		return;
 	}
 
-	/* We mark the thread as dead here and we will remove it 
+	if(evt->m_tinfo->m_tginfo == nullptr)
+	{
+		printf("[WARNING] Null thread group info detected. tid: %ld, pid: %ld, ptid: %ld\n\n", evt->m_tinfo->m_tid, evt->m_tinfo->m_pid, evt->m_tinfo->m_ptid);
+	}
+
+	printf("-----------> REMOVE[%s](%ld) tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld\n", evt->m_tinfo->m_comm.c_str(), evt->get_num(), evt->m_tinfo->m_tid, evt->m_tinfo->m_pid, evt->m_tinfo->m_ptid, evt->m_tinfo->m_vtid, evt->m_tinfo->m_vpid);
+	for(const auto& child : evt->m_tinfo->m_children)
+	{
+		if(!child.expired())
+		{
+			auto child_shr = child.lock().get();
+			printf("- move child, tid: %ld, ptid: %ld (dead) to a new reaper. Still alive threads in the parent group %ld(here the parent is still alive)\n", child_shr->m_tid, child_shr->m_ptid, evt->m_tinfo->m_tginfo->get_thread_count());
+		}
+	}
+	printf("\n\n");
+
+	/* [Mark thread as dead]
+	 * We mark the thread as dead here and we will remove it 
 	 * from the table during remove_thread().
 	 * Please note that the `!evt->m_tinfo->is_dead()` shouldn't be
 	 * necessary at all since here we shouldn't receive dead threads,
@@ -6104,6 +6190,7 @@ void sinsp_parser::parse_prctl_exit_event(sinsp_evt *evt)
 			 */
 			child_subreaper = (*(int64_t *)parinfo->m_val) != 0 ? true : false;
 			caller_tinfo->m_tginfo->set_reaper(child_subreaper);
+			printf("-----------> PRCTL[%s](%ld) tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d\n\n", caller_tinfo->m_comm.c_str(), evt->get_num(), caller_tinfo->m_tid, caller_tinfo->m_pid, caller_tinfo->m_ptid, caller_tinfo->m_vtid, caller_tinfo->m_vpid, caller_tinfo->m_tginfo->is_reaper());
 			break;
 
 		case PPM_PR_GET_CHILD_SUBREAPER:
@@ -6113,6 +6200,7 @@ void sinsp_parser::parse_prctl_exit_event(sinsp_evt *evt)
 			/* arg2 != 0 means the calling process is a child_subreaper */
 			child_subreaper = (*(int64_t *)parinfo->m_val) != 0 ? true : false;
 			caller_tinfo->m_tginfo->set_reaper(child_subreaper);
+			printf("-----------> PRCTL[%s](%ld) tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d\n\n", caller_tinfo->m_comm.c_str(), evt->get_num(), caller_tinfo->m_tid, caller_tinfo->m_pid, caller_tinfo->m_ptid, caller_tinfo->m_vtid, caller_tinfo->m_vpid, caller_tinfo->m_tginfo->is_reaper());
 			break;
 
 		default:
@@ -6322,6 +6410,7 @@ void sinsp_parser::parse_getsockopt_exit(sinsp_evt *evt)
 		auto main_thread = evt->m_tinfo->get_main_thread();
 		if(main_thread == nullptr)
 		{
+			printf("---------> Missing main thread! Actual thread tid: %ld, pid: %ld, ptid: %ld\n", evt->m_tinfo->m_tid, evt->m_tinfo->m_pid, evt->m_tinfo->m_ptid);
 			return;
 		}
 		evt->m_fdinfo = main_thread->get_fd(fd);

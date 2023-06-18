@@ -1841,6 +1841,106 @@ void sinsp::stop_capture()
 	{
 		throw sinsp_exception(scap_getlasterr(m_h));
 	}
+
+	uint64_t cnt = 0;
+
+	int64_t main_threads = 0;
+	int64_t children = 0;
+	int64_t children_not_expired = 0;
+	int64_t mark_as_dead = 0;
+	int64_t mark_as_invalid = 0;
+	/* print the content of the thread table */
+	this->m_thread_manager->m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
+		cnt++;
+	
+
+		bool reaper = false;
+		if(tinfo.m_tginfo == nullptr)
+		{
+			printf("[WARNING] Null thread group info detected. tid: %ld, pid: %ld, ptid: %ld\n\n", tinfo.m_tid, tinfo.m_pid, tinfo.m_ptid);
+		}
+		else
+		{
+			reaper = tinfo.m_tginfo->is_reaper();
+		}
+
+		if(!tinfo.is_dead())
+		{
+			printf("%ld)[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d\n", cnt, tinfo.m_comm.c_str(), tinfo.m_tid, tinfo.m_pid, tinfo.m_ptid, tinfo.m_vtid, tinfo.m_vpid, reaper);
+		}
+		else
+		{
+			printf("%ld)[%s] tid: %ld, pid: %ld, ptid: %ld, vtid: %ld, vpid: %ld, reaper: %d ******[DEAD]*****\n", cnt, tinfo.m_comm.c_str(), tinfo.m_tid, tinfo.m_pid, tinfo.m_ptid, tinfo.m_vtid, tinfo.m_vpid, reaper);
+		}
+
+
+
+
+		if(tinfo.is_main_thread())
+		{
+			main_threads++;
+		}
+
+		if(tinfo.is_dead())
+		{
+			mark_as_dead++;
+		}
+
+		if(tinfo.is_invalid())
+		{
+			mark_as_invalid++;
+		}
+
+		int64_t not_expired = 0;
+		auto it = tinfo.m_children.begin();
+		while(it != tinfo.m_children.end())
+		{
+			if(!it->expired())
+			{
+				not_expired++;
+			}
+			it++;
+		}
+		children_not_expired += not_expired; 
+
+		children += tinfo.m_children.size();
+		return true;
+	});
+
+	int64_t total_threads_in_groups = 0;
+	int64_t alive_threads_in_groups = 0;
+	int64_t alive_thread_groups = 0;
+	auto iter = this->m_thread_manager->m_thread_groups.begin();
+	while(iter != this->m_thread_manager->m_thread_groups.end())
+	{
+		alive_thread_groups++;
+		int64_t not_expired = 0;
+		auto list = iter->second->get_thread_list();
+		auto it = list.begin();
+		while(it != list.end())
+		{
+			if(!it->expired())
+			{
+				not_expired++;
+			}
+			it++;
+		}
+		printf("[PID: %ld] present_threads: %ld, alive_threads_in_groups: %ld\n", iter->first, iter->second->get_thread_count(), not_expired);
+		alive_threads_in_groups += not_expired;
+		total_threads_in_groups += iter->second->get_thread_count();
+		iter++;
+	}
+
+
+	printf("\n\n\n-----> alive thread groups: %ld\n", alive_thread_groups);
+	printf("-----> main threads: %ld\n", main_threads);
+	printf("-----> alive thread from thread group info: %ld\n",alive_threads_in_groups);
+	printf("-----> alive threads: %ld\n", cnt);
+	printf("-----> total threads from thread group info: %ld\n", total_threads_in_groups);	
+	printf("-----> total num children: %ld\n", children);
+	printf("-----> total children not expired: %ld\n", children_not_expired);
+	printf("-----> mark as dead: %ld\n", mark_as_dead);	
+	printf("-----> mark as invalid: %ld\n", mark_as_invalid);	
 }
 
 void sinsp::start_capture()
