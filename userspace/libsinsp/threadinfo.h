@@ -232,6 +232,7 @@ public:
 		/* This is possible when we have invalid threads */
 		if(m_tginfo == nullptr)
 		{
+			printf("[WARN]: invalid thread called `get_main_thread`, tid: %ld\n", this->m_tid);
 			return nullptr;
 		}
 
@@ -239,6 +240,7 @@ public:
 		auto possible_main = m_tginfo->get_first_thread();
 		if(possible_main == nullptr || !possible_main->is_main_thread())
 		{
+			printf("[WARN]: missing main thread for tid %ld\n", this->m_tid);
 			return nullptr;
 		}
 		return possible_main;
@@ -320,6 +322,7 @@ public:
 	//
 	typedef std::function<bool (sinsp_threadinfo *)> visitor_func_t;
 	void traverse_parent_state(visitor_func_t &visitor);
+	void traverse_main_parent_state(visitor_func_t &visitor);
 
 	void assign_children_to_reaper(sinsp_threadinfo* reaper);
 
