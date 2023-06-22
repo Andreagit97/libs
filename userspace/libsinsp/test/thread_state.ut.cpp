@@ -2408,7 +2408,27 @@ TEST_F(sinsp_with_test_input, THRD_STATE_expired_threads)
 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3);
 
 	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_THREADS_THRESHOLD);
-	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), DEFAULT_THREADS_THRESHOLD);	
+	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), DEFAULT_THREADS_THRESHOLD);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_missing_init)
+{
+	int64_t p1_t1_tid = 2;
+	int64_t p1_t1_pid = 2;
+	int64_t p1_t1_ptid = INIT_TID;
+	add_simple_thread(p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+
+	/* with open_inspector we will create thread_dependencies for p1_t1_tid
+	 * more in detail since we don't have `init` in the table we will create a fake one
+	 */
+	open_inspector();
+
+	/* Check the fake init thread info just created */
+	auto init_tinfo = m_inspector.get_thread_ref(INIT_TID, false).get();
+	ASSERT_TRUE(init_tinfo)
+	/* This is an invalid thread so we should expect the following values */;
+	ASSERT_EQ(init_tinfo->m_ptid, -1);
+	ASSERT_STREQ(init_tinfo->m_comm.c_str(), "<NA>");
 }
 
 /*=============================== EXPIRED_THREADS ===========================*/
