@@ -62,7 +62,7 @@ limitations under the License.
 			}                                                                                              \
 			ASSERT_TRUE(found);                                                                            \
 		}                                                                                                      \
-		uint16_t not_expired_count = 0;                                                                        \
+		uint64_t not_expired_count = 0;                                                                        \
 		for(const auto& thread : tginfo->get_thread_list())                                                    \
 		{                                                                                                      \
 			if(!thread.expired())                                                                          \
@@ -136,6 +136,13 @@ limitations under the License.
 		sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(tid, false).get();                                \
 		ASSERT_TRUE(tinfo);                                                                                    \
 		ASSERT_EQ(tinfo->m_comm, comm);                                                                        \
+	}
+
+#define ASSERT_ALIVE_CHILDREN(parent_tid, alive_children)                                                              \
+	{                                                                                                              \
+		sinsp_threadinfo* parent_tinfo = m_inspector.get_thread_ref(parent_tid, false, true).get();            \
+		ASSERT_TRUE(parent_tinfo);                                                                             \
+		ASSERT_EQ(parent_tinfo->m_alive_children, alive_children);                                             \
 	}
 
 #define DEFAULT_TREE_NUM_PROCS 12
@@ -1130,7 +1137,7 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_1)
 	 */
 	remove_inactive_threads(80, 20);
 	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 3, 2, p2_t1_tid, p2_t2_tid);
+	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 2, 2, p2_t1_tid, p2_t2_tid);
 
 	/* Calling PRCTL on an unknown thread should generate an invalid thread */
 	int64_t unknown_tid = 61103;
@@ -1177,19 +1184,8 @@ TEST_F(sinsp_with_test_input, THRD_STATE_remove_inactive_threads_2)
 	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 1, p5_t1_tid);
 	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 1, m_inspector.m_thread_manager->get_thread_count());
 
-	/* set the expired children threshold to 1 */
-	sinsp_threadinfo::set_expired_children_threshold(1);
-	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), 1);
-
-	/* This should remove no one, the cleanup logic is no more called in the
-	 * remove_inactive_threads
-	 */
 	remove_inactive_threads(80, 20);
-	ASSERT_THREAD_CHILDREN(p4_t2_tid, 2, 1, p5_t1_tid);
-
-	/* restore the threshold */
-	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_CHILDREN_THRESHOLD);
-	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), DEFAULT_CHILDREN_THRESHOLD);
+	ASSERT_THREAD_CHILDREN(p4_t2_tid, 1, 1, p5_t1_tid);
 }
 
 TEST_F(sinsp_with_test_input, THRD_STATE_purging_thread_logic)
@@ -1253,6 +1249,10 @@ TEST_F(sinsp_with_test_input, THRD_STATE_purging_thread_logic)
 	 */
 	remove_inactive_threads(80, 20);
 	ASSERT_EQ(DEFAULT_TREE_NUM_PROCS - 4, m_inspector.m_thread_manager->get_thread_count());
+
+	/* Restore threshold values */
+	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_CHILDREN_THRESHOLD);
+	thread_group_info::set_expired_threads_threshold(DEFAULT_THREADS_THRESHOLD);
 }
 
 /*=============================== REMOVE THREAD LOGIC ===========================*/
@@ -2331,85 +2331,27 @@ TEST(parse_scap_file, simple_tree_with_prctl)
 
 /*=============================== EXPIRED_THREADS ===========================*/
 
-TEST_F(sinsp_with_test_input, THRD_STATE_expired_children)
+TEST_F(sinsp_with_test_input, THRD_STATE_check_children_default_tree)
 {
 	DEFAULT_TREE
 
-	auto init_tinfo = m_inspector.get_thread_ref(INIT_TID, false, true).get();
-	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5);
-
-	/* Do nothing */
-	init_tinfo->clean_expired_children();
-
-	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5);
-
-	/* set the expired children threshold */
-	sinsp_threadinfo::set_expired_children_threshold(2);
-	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), 2);
-
-	/* Do nothing */
-	init_tinfo->clean_expired_children();
-
-	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 5);
-
-	/* remove p1_t2. It has no children so the cleanup logic on INIT process
-	 * is not called
-	 */
-	remove_thread(p1_t2_tid);
-
-	/* Now one thread is expired */
-	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 4);
-
-	/* Same for these threads, they have no children */
-	remove_thread(p1_t1_tid);
-	remove_thread(p2_t2_tid);
-	remove_thread(p2_t3_tid);
-	ASSERT_THREAD_CHILDREN(INIT_TID, 5, 1);
-
-	/* p2_t1 has a child so we move it to the new reaper -> INIT.
-	 * Since INIT has more than 2 (2 is the threshold) children
-	 * in the list (expired or not). We will perform the cleanup.
-	 *
-	 * Please note that the cleanup is performed when p2_t1 is still alive.
-	 * After remove_thread `p2_t1` is correctly removed so we will have a list of 2 elements where:
-	 * - p2_t1 is expired
-	 * - p3_t1 is alive
-	 */
-	remove_thread(p2_t1_tid);
-	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p3_t1_tid);
-
-	/* restore the threshold */
-	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_CHILDREN_THRESHOLD);
-	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), DEFAULT_CHILDREN_THRESHOLD);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, 5);
+	ASSERT_ALIVE_CHILDREN(p1_t1_tid, 0);
+	ASSERT_ALIVE_CHILDREN(p1_t2_tid, 0);
+	ASSERT_ALIVE_CHILDREN(p2_t1_tid, 1);
+	ASSERT_ALIVE_CHILDREN(p2_t2_tid, 0);
+	ASSERT_ALIVE_CHILDREN(p2_t3_tid, 0);
+	ASSERT_ALIVE_CHILDREN(p3_t1_tid, 2);
+	ASSERT_ALIVE_CHILDREN(p4_t1_tid, 0);
+	ASSERT_ALIVE_CHILDREN(p4_t2_tid, 2);
+	ASSERT_ALIVE_CHILDREN(p5_t1_tid, 0);
+	ASSERT_ALIVE_CHILDREN(p5_t2_tid, 1);
+	ASSERT_ALIVE_CHILDREN(p6_t1_tid, 0);
 }
 
-TEST_F(sinsp_with_test_input, THRD_STATE_expired_threads)
-{
-	DEFAULT_TREE
+/*=============================== EXPIRED_THREADS ===========================*/
 
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 3, false, 3, 3);
-
-	thread_group_info::set_expired_threads_threshold(1);
-	ASSERT_EQ(thread_group_info::get_expired_threads_threshold(), 1);
-
-	remove_thread(p2_t1_tid);
-
-	/* we remove the main thread but it is still alive */
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3);
-
-	/* we remove a secondary thread, it will become expired */
-	remove_thread(p2_t2_tid);
-
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 3, 2);
-
-	/* we set our threshold to 1, so p2_t2 should be remove since it is expired */
-	int64_t p2_t4_tid = 26;
-	generate_clone_x_event(p2_t4_tid, p2_t3_tid, p2_t3_pid, p2_t3_ptid, PPM_CL_CLONE_THREAD);
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 2, false, 3, 3);
-
-	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_THREADS_THRESHOLD);
-	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), DEFAULT_THREADS_THRESHOLD);
-}
+/*=============================== MISSING INIT ===========================*/
 
 TEST_F(sinsp_with_test_input, THRD_STATE_missing_init)
 {
@@ -2431,4 +2373,396 @@ TEST_F(sinsp_with_test_input, THRD_STATE_missing_init)
 	ASSERT_STREQ(init_tinfo->m_comm.c_str(), "<NA>");
 }
 
-/*=============================== EXPIRED_THREADS ===========================*/
+/*=============================== MISSING INIT ===========================*/
+
+/* The actual thread table max size is 131072 */
+#define HUGE_THREAD_NUMBER 150
+
+TEST_F(sinsp_with_test_input, THRD_STATE_max_table_size)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* generate a new thread group with pid=20 */
+	generate_clone_x_event(0, 20, 20, 1);
+
+	/* put HUGE_THREAD_NUMBER threads into the group */
+	for(auto i = 1; i < 150000; i++)
+	{
+		/* we change only the tid */
+		generate_clone_x_event(0, 20 + i, 20, 1);
+	}
+
+	/* We cannot create more than `m_max_thread_table_size`.
+	 * We already have `init` so the final size of the group will be
+	 * `m_max_thread_table_size -1`
+	 */
+	int64_t thread_group_size = m_inspector.m_thread_manager->m_max_thread_table_size - 1;
+	ASSERT_THREAD_GROUP_INFO(20, thread_group_size, false, thread_group_size, thread_group_size);
+}
+
+//// THREAD GROUPS
+
+TEST_F(sinsp_with_test_input, THRD_STATE_many_threads_in_a_group_purging)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* generate a new thread group with pid=20 */
+	generate_clone_x_event(0, 20, 20, 1);
+
+	/* put HUGE_THREAD_NUMBER threads into the group */
+	for(auto i = 1; i < HUGE_THREAD_NUMBER; i++)
+	{
+		/* we change only the tid */
+		generate_clone_x_event(0, 20 + i, 20, 1);
+	}
+
+	/* We cannot create more than `m_max_thread_table_size`.
+	 * We already have `init` so the final size of the group will be
+	 * `m_max_thread_table_size -1`
+	 */
+	int64_t thread_group_size = HUGE_THREAD_NUMBER;
+	ASSERT_THREAD_GROUP_INFO(20, thread_group_size, false, thread_group_size, thread_group_size);
+
+	/* if we remove more than threshold threads we should cleanup the expired ones */
+	int threshold = thread_group_info::get_expired_threads_threshold();
+
+	/* here we remove threshold+1 threads but the cleanup logic is called before
+	 * decrementing the alice_count for this reason we need another remove to trigger it
+	 */
+	for(int i = 0; i <= threshold; i++)
+	{
+		remove_thread(21 + i);
+	}
+
+	int64_t alive_threads = thread_group_size - (threshold + 1);
+	int64_t total_threads_in_the_group = thread_group_size;
+	/* the cleanup logic should be triggered at the next iteration so right now we still have all threads in the
+	 * list of the group
+	 */
+	ASSERT_THREAD_GROUP_INFO(20, alive_threads, false, total_threads_in_the_group, alive_threads);
+
+	/* remove random thread*/
+	remove_thread(145);
+
+	/* when we decremet again the number of alive threads we should cleanup the expired ones
+	 * Please note that the current one is not expired!
+	 */
+	total_threads_in_the_group = alive_threads;
+	alive_threads--;
+	ASSERT_THREAD_GROUP_INFO(20, alive_threads, false, total_threads_in_the_group, alive_threads);
+
+	/* Now if we remove another thread the logic shouldn't be called. `total_threads_in_the_group` should be equal
+	 */
+	remove_thread(146);
+
+	alive_threads--;
+	ASSERT_THREAD_GROUP_INFO(20, alive_threads, false, total_threads_in_the_group, alive_threads);
+
+	/* remove all threads in the group */
+	for(int i = 0; i <= HUGE_THREAD_NUMBER; i++)
+	{
+		remove_thread(20 + i);
+	}
+
+	/* The thread group info should be removed */
+	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(20));
+	/* We should have only init */
+	ASSERT_EQ(m_inspector.m_thread_manager->get_thread_count(), 1);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_many_threads_in_a_group_not_purging)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* generate a new thread group with pid=20 */
+	generate_clone_x_event(0, 20, 20, 1);
+
+	/* put HUGE_THREAD_NUMBER threads into the group */
+	for(auto i = 1; i < HUGE_THREAD_NUMBER; i++)
+	{
+		/* we change only the tid */
+		generate_clone_x_event(0, 20 + i, 20, 1);
+	}
+
+	int64_t thread_group_size = HUGE_THREAD_NUMBER;
+	ASSERT_THREAD_GROUP_INFO(20, thread_group_size, false, thread_group_size, thread_group_size);
+
+	/* get the revious expired threshold to check that if we try to remove more than
+	 * threshold threads nothing happens
+	 */
+	int threshold = thread_group_info::get_expired_threads_threshold();
+
+	/* we don't remove threads when we receive PROC_EXIT.
+	 * we will remove them by calling `remove_inactive_threads`
+	 * explicitly. This should set the 2 cleanup logics to high values
+	 */
+	m_inspector.disable_automatic_threadtable_purging();
+	ASSERT_EQ(sinsp_threadinfo::get_expired_children_threshold(), 100000000);
+	ASSERT_EQ(thread_group_info::get_expired_threads_threshold(), 100000000);
+
+	/* here we remove threshold+20 threads but the cleanup logic is not called
+	 * because disabling the purging logic we bumped the threshold to huge values
+	 */
+	for(int i = 0; i <= threshold + 20; i++)
+	{
+		remove_thread(21 + i);
+	}
+
+	int64_t alive_threads = thread_group_size - (threshold + 21);
+
+	/* We are not removing threads we have just marked them as dead */
+	int64_t total_threads_in_the_group = thread_group_size;
+	ASSERT_THREAD_GROUP_INFO(20, alive_threads, false, total_threads_in_the_group, total_threads_in_the_group);
+
+	/* Remove inactive threads should remove dead threads from the group
+	 * We set both parameters to 80 so in this way we will remove only dead threads
+	 */
+	remove_inactive_threads(80, 80);
+	ASSERT_THREAD_GROUP_INFO(20, alive_threads, false, alive_threads, alive_threads);
+
+	/* remove all threads in the group */
+	for(int i = 0; i <= HUGE_THREAD_NUMBER; i++)
+	{
+		remove_thread(20 + i);
+	}
+
+	/* Threads are all dead we are just waiting for the final removing logic */
+	ASSERT_THREAD_GROUP_INFO(20, 0, false, alive_threads, alive_threads);
+
+	/* we should cleanup the entire group */
+	remove_inactive_threads(80, 80);
+
+	/* The thread group info should be removed */
+	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(20));
+	/* We should have only init */
+	ASSERT_EQ(m_inspector.m_thread_manager->get_thread_count(), 1);
+
+	/* Restore threshold values */
+	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_CHILDREN_THRESHOLD);
+	thread_group_info::set_expired_threads_threshold(DEFAULT_THREADS_THRESHOLD);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_add_and_remove_threads_in_a_group_purging)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* generate a new thread group with pid=20 */
+	generate_clone_x_event(0, 20, 20, 1);
+
+	/* put HUGE_THREAD_NUMBER threads into the group and remove them immediately after */
+	for(auto i = 1; i < HUGE_THREAD_NUMBER; i++)
+	{
+		generate_clone_x_event(0, 20 + i, 20, 1);
+		remove_thread(20 + i);
+	}
+
+	int threshold = thread_group_info::get_expired_threads_threshold();
+
+	/* how many times the logic will be called.
+	 * (HUGE_THREAD_NUMBER-1) because the main thread is always alive
+	 */
+	int called_logic = (HUGE_THREAD_NUMBER - 1) / (threshold + 1);
+	int remaining_threads = HUGE_THREAD_NUMBER - (called_logic * (threshold + 1));
+
+	/* we should have only the main thread alive */
+	ASSERT_THREAD_GROUP_INFO(20, 1, false, remaining_threads, 1);
+
+	ASSERT_EQ(m_inspector.m_thread_manager->get_thread_count(), 2);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_add_and_remove_threads_in_a_group_not_purging)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* generate a new thread group with pid=20 */
+	generate_clone_x_event(0, 20, 20, 1);
+
+	m_inspector.disable_automatic_threadtable_purging();
+
+	/* put HUGE_THREAD_NUMBER threads into the group and remove them immediately after */
+	for(auto i = 1; i < HUGE_THREAD_NUMBER; i++)
+	{
+		generate_clone_x_event(0, 20 + i, 20, 1);
+		remove_thread(20 + i);
+	}
+
+	/* we should have only the main thread alive */
+	ASSERT_THREAD_GROUP_INFO(20, 1, false, HUGE_THREAD_NUMBER, HUGE_THREAD_NUMBER);
+
+	/* we should cleanup the entire group apart from the main thread */
+	remove_inactive_threads(80, 80);
+
+	ASSERT_THREAD_GROUP_INFO(20, 1, false, 1, 1);
+
+	ASSERT_EQ(m_inspector.m_thread_manager->get_thread_count(), 2);
+
+	/* Restore threshold values */
+	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_CHILDREN_THRESHOLD);
+	thread_group_info::set_expired_threads_threshold(DEFAULT_THREADS_THRESHOLD);
+}
+
+//// CHILDREN
+
+TEST_F(sinsp_with_test_input, THRD_STATE_many_children_purging)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	for(auto i = 0; i < HUGE_THREAD_NUMBER; i++)
+	{
+		generate_clone_x_event(0, 20 + i, 20 + i, 1);
+	}
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, HUGE_THREAD_NUMBER, HUGE_THREAD_NUMBER);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, HUGE_THREAD_NUMBER);
+
+	/* if we remove more than threshold threads we should cleanup the expired ones */
+	int threshold = sinsp_threadinfo::get_expired_children_threshold();
+
+	/* here we remove threshold+1 threads but the cleanup logic is called before
+	 * decrementing the alice_count for this reason we need another remove to trigger it
+	 */
+	for(int i = 0; i <= threshold; i++)
+	{
+		remove_thread(20 + i);
+	}
+
+	int64_t alive_children = HUGE_THREAD_NUMBER - (threshold + 1);
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, HUGE_THREAD_NUMBER, alive_children);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, alive_children);
+
+	/* remove random thread*/
+	remove_thread(145);
+	alive_children--;
+
+	/* cleanup logic should have cleaned threads, when we clean up the current thread is not taken into account
+	 * That's the reason why we need the +1
+	 */
+	ASSERT_THREAD_CHILDREN(INIT_TID, alive_children + 1, alive_children);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, alive_children);
+
+	/* remove all threads */
+	for(int i = 0; i <= HUGE_THREAD_NUMBER; i++)
+	{
+		remove_thread(20 + i);
+	}
+
+	int called_logic = HUGE_THREAD_NUMBER / (threshold + 1);
+	int remaining_threads = HUGE_THREAD_NUMBER - (called_logic * (threshold + 1));
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, remaining_threads, 0);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, 0);
+	ASSERT_EQ(m_inspector.m_thread_manager->get_thread_count(), 1);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_many_children_not_purging)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	for(auto i = 0; i < HUGE_THREAD_NUMBER; i++)
+	{
+		generate_clone_x_event(0, 20 + i, 20 + i, 1);
+	}
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, HUGE_THREAD_NUMBER, HUGE_THREAD_NUMBER);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, HUGE_THREAD_NUMBER);
+
+	int threshold = sinsp_threadinfo::get_expired_children_threshold();
+
+	m_inspector.disable_automatic_threadtable_purging();
+
+	/* here we remove threshold+20 threads but the cleanup logic is not called
+	 * because disabling the purging logic we bumped the threshold to huge values
+	 */
+	for(int i = 0; i <= threshold + 20; i++)
+	{
+		remove_thread(20 + i);
+	}
+
+	int64_t alive_children = HUGE_THREAD_NUMBER - (threshold + 21);
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, HUGE_THREAD_NUMBER, HUGE_THREAD_NUMBER);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, HUGE_THREAD_NUMBER);
+
+	/* we should cleanup the dead children */
+	remove_inactive_threads(80, 80);
+	ASSERT_THREAD_CHILDREN(INIT_TID, alive_children, alive_children);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, alive_children);
+
+	/* remove all children */
+	for(int i = 0; i <= HUGE_THREAD_NUMBER; i++)
+	{
+		remove_thread(20 + i);
+	}
+
+	/* Nothing happens */
+	ASSERT_THREAD_CHILDREN(INIT_TID, alive_children, alive_children);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, alive_children);
+
+	remove_inactive_threads(80, 80);
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, 0, 0);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, 0);
+
+	ASSERT_EQ(m_inspector.m_thread_manager->get_thread_count(), 1);
+
+	/* Restore threshold values */
+	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_CHILDREN_THRESHOLD);
+	thread_group_info::set_expired_threads_threshold(DEFAULT_THREADS_THRESHOLD);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_add_and_remove_children_purging)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	for(auto i = 0; i < HUGE_THREAD_NUMBER; i++)
+	{
+		generate_clone_x_event(0, 20 + i, 20 + i, 1);
+		remove_thread(20 + i);
+	}
+
+	int threshold = sinsp_threadinfo::get_expired_children_threshold();
+
+	/* how many times the logic will be called. */
+	int called_logic = HUGE_THREAD_NUMBER / (threshold + 1);
+	int remaining_threads = HUGE_THREAD_NUMBER - (called_logic * (threshold + 1));
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, remaining_threads, 0);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, 0);
+	ASSERT_EQ(m_inspector.m_thread_manager->get_thread_count(), 1);
+}
+
+TEST_F(sinsp_with_test_input, THRD_STATE_add_and_remove_children_not_purging)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	m_inspector.disable_automatic_threadtable_purging();
+
+	for(auto i = 0; i < HUGE_THREAD_NUMBER; i++)
+	{
+		generate_clone_x_event(0, 20 + i, 20 + i, 1);
+		remove_thread(20 + i);
+	}
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, HUGE_THREAD_NUMBER, HUGE_THREAD_NUMBER);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, HUGE_THREAD_NUMBER);
+
+	/* we should cleanup the entire group apart from the main thread */
+	remove_inactive_threads(80, 80);
+
+	ASSERT_THREAD_CHILDREN(INIT_TID, 0, 0);
+	ASSERT_ALIVE_CHILDREN(INIT_TID, 0);
+
+	/* Restore threshold values */
+	sinsp_threadinfo::set_expired_children_threshold(DEFAULT_CHILDREN_THRESHOLD);
+	thread_group_info::set_expired_threads_threshold(DEFAULT_THREADS_THRESHOLD);
+}

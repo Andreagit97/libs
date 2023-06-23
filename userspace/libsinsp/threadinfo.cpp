@@ -113,6 +113,7 @@ void sinsp_threadinfo::init()
 	m_ptid = (uint64_t) - 1LL;
 	m_vpgid = (uint64_t) - 1LL;
 	set_lastevent_data_validity(false);
+	m_alive_children = 0;
 	m_lastevent_type = -1;
 	m_lastevent_ts = 0;
 	m_prevevent_ts = 0;
@@ -454,6 +455,8 @@ void sinsp_threadinfo::init(scap_threadinfo* pi)
 	m_exe_upper_layer = pi->exe_upper_layer;
 	m_exe_from_memfd = pi->exe_from_memfd;
 	
+	m_alive_children = 0;
+
 	set_args(pi->args, pi->args_len);
 	if(is_main_thread())
 	{
@@ -1163,7 +1166,7 @@ void sinsp_threadinfo::assign_children_to_reaper(sinsp_threadinfo* reaper)
 		 */
 		child = m_children.erase(child);
 	}
-	/* At the end of this loop, m_children.size() should be always 0 */
+	m_alive_children = 0;
 }
 
 void sinsp_threadinfo::populate_cmdline(std::string &cmdline, const sinsp_threadinfo *tinfo)
@@ -1736,6 +1739,7 @@ void sinsp_thread_manager::remove_thread(int64_t tid)
 	/* All threads should have a m_tginfo apart from the invalid ones which don't have a group or children. */
 	if(thread_to_remove->is_invalid() || thread_to_remove->m_tginfo == nullptr)
 	{
+		thread_to_remove->remove_child_from_parent();
 		m_threadtable.erase(tid);
 		m_last_tid = -1;
 		return;
@@ -1764,12 +1768,15 @@ void sinsp_thread_manager::remove_thread(int64_t tid)
 		remove_main_thread_fdtable(thread_to_remove->get_main_thread());
 
 		/* we remove the main thread and the thread group */
+		/* The main thread would have the same parent so it's ok to remove it from another thread */
+		thread_to_remove->remove_child_from_parent();
 		m_thread_groups.erase(thread_to_remove->m_pid);
 		m_threadtable.erase(thread_to_remove->m_pid);
 	}
 
 	if(!thread_to_remove->is_main_thread())
 	{
+		thread_to_remove->remove_child_from_parent();
 		m_threadtable.erase(tid);
 	}
 
@@ -1802,6 +1809,14 @@ void sinsp_thread_manager::clear_thread_pointers(sinsp_threadinfo& tinfo)
 void sinsp_thread_manager::reset_child_dependencies()
 {
 	m_threadtable.loop([&] (sinsp_threadinfo& tinfo) {
+		tinfo.clean_expired_children();
+		/* as an optimization we clean up the thread info only in the main thread 
+		 * so unless corner cases we should be always able to clean them.
+		 */
+		if(tinfo.is_main_thread() && tinfo.m_tginfo != nullptr)
+		{
+			tinfo.m_tginfo->clean_expired_threads();
+		}
 		clear_thread_pointers(tinfo);
 		return true;
 	});
@@ -2096,6 +2111,7 @@ threadinfo_map_t::ptr_t sinsp_thread_manager::get_thread_ref(int64_t tid, bool q
             newti->m_tid = tid;
             newti->m_pid = tid;
             newti->m_ptid = -1;
+            newti->m_alive_children = 0;
             newti->m_comm = "<NA>";
             newti->m_exe = "<NA>";
             newti->m_user.uid = 0xffffffff;

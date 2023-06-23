@@ -23,7 +23,8 @@ limitations under the License.
 /* Forward declaration */
 class sinsp_threadinfo;
 
-#define DEFAULT_THREADS_THRESHOLD 40
+/* Here we have just one main thread in the group so all the other threads marked as dead should be expired */
+#define DEFAULT_THREADS_THRESHOLD 10
 
 /* New struct that keep information regarding the thread group */
 typedef struct thread_group_info
@@ -51,7 +52,26 @@ public:
 
 	inline void increment_thread_count() { m_alive_count++; }
 
-	inline void decrement_thread_count() { m_alive_count--; }
+	inline void decrement_thread_count()
+	{
+		/* Clean expired threads if necessary.
+		 * Please note that this is an approximation, `m_threads.size() - m_alive_count` are not the
+		 * real expired threads, they are just the ones marked as dead. For example the main thread
+		 * of the group is marked as dead but it will be never expired until the thread group exists.
+		 *
+		 * We try to clean expired threads when more than get_expired_threads_threshold of the total threads are
+		 * marked as dead.
+		 */
+		if((m_threads.size() - m_alive_count) > thread_group_info::get_expired_threads_threshold())
+		{
+			clean_expired_threads();
+		}
+
+		/* When we call `decrement_thread_count` the calling thread is not yet expired so we don't want
+		 * to count it between the potentially expired threads.
+		 */
+		m_alive_count--;
+	}
 
 	inline uint64_t get_thread_count() const { return m_alive_count; }
 
@@ -77,13 +97,7 @@ public:
 			m_threads.push_back(thread);
 		}
 		/* we are adding a thread so we increment the count */
-		m_alive_count++;
-
-		/* Clean expired threads if necessary */
-		if(m_threads.size() > thread_group_info::get_expired_threads_threshold())
-		{
-			clean_expired_threads();
-		}
+		increment_thread_count();
 	}
 
 	inline void clean_expired_threads()

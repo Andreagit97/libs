@@ -2656,6 +2656,14 @@ void sinsp::update_mesos_state()
 void sinsp::disable_automatic_threadtable_purging()
 {
 	m_automatic_threadtable_purging = false;
+
+	/* When the automatic purging logic is disabled we will clean the table every 1 minute.
+	 * During this minute we don't want to use cleanup logic since we are not removing threads, for 
+	 * this reason, we set this huge value to disable them. 
+	 */
+	uint64_t huge_thread_numbers = 100000000;
+	sinsp_threadinfo::set_expired_children_threshold(huge_thread_numbers);
+	thread_group_info::set_expired_threads_threshold(huge_thread_numbers);
 }
 
 void sinsp::set_thread_purge_interval_s(uint32_t val)
@@ -2724,9 +2732,6 @@ bool sinsp_thread_manager::remove_inactive_threads()
 				((m_inspector->m_lastevent_ts > tinfo.m_lastaccess_ts + m_inspector->m_thread_timeout_ns) &&
 					!scap_is_thread_alive(m_inspector->m_h, tinfo.m_pid, tinfo.m_tid, tinfo.m_comm.c_str())))
 			{
-#ifdef GATHER_INTERNAL_STATS
-				m_removed_threads->increment();
-#endif
 				to_delete.insert(tinfo.m_tid);
 			}
 			return true;

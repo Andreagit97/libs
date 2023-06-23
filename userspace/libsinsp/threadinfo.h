@@ -17,7 +17,10 @@ limitations under the License.
 
 #pragma once
 
-#define DEFAULT_CHILDREN_THRESHOLD 40
+/* Here we need a quite high number because it could be that many children are just dead main threads
+ + which are not expired. So a loop to clear them do nothing we just lose some cycles.
+ */
+#define DEFAULT_CHILDREN_THRESHOLD 60
 
 #ifndef VISIBILITY_PRIVATE
 #define VISIBILITY_PRIVATE private:
@@ -337,12 +340,36 @@ public:
 		m_children.push_front(child);
 		/* Set current thread as parent */
 		child->m_ptid = m_tid;
+		/* Increment the number of alive children */
+		m_alive_children++;		
+	}
 
-		/* Clean expired children if necessary */
-		if(m_children.size() > sinsp_threadinfo::get_expired_children_threshold())
+	inline void remove_child_from_parent()
+	{
+		auto parent = get_parent_thread();
+		if(parent == nullptr)
 		{
-			clean_expired_children();
-		}		
+			return;
+		}
+
+		/* Clean expired children if necessary.
+		 * Please note that this is an approximation, `parent->m_children.size() - parent->m_alive_children`
+		 * are not the real expired children, they are just the ones marked as dead.
+		 *
+		 * We try to clean expired children when more than DEFAULT_CHILDREN_THRESHOLD of the total children are marked as dead.
+		 */
+		if((parent->m_children.size() - parent->m_alive_children) > sinsp_threadinfo::get_expired_children_threshold())
+		{
+			parent->clean_expired_children();
+		}
+
+		/* When we call `remove_child_from_parent` the calling child is not yet expired so we don't want
+		 * to count it between the potentially expired children.
+		 */
+		if(parent->m_alive_children > 0)
+		{
+			parent->m_alive_children--;
+		}
 	}
 
 	inline void clean_expired_children()
@@ -428,6 +455,7 @@ public:
 	int32_t m_tty; ///< Number of controlling terminal
 	std::shared_ptr<thread_group_info> m_tginfo;
 	std::list<std::weak_ptr<sinsp_threadinfo>> m_children;
+	uint64_t m_alive_children;
 
 
 	// In some cases, a threadinfo has a category that identifies
