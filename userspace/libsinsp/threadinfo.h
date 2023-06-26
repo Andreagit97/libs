@@ -148,7 +148,7 @@ public:
 	  become again alive. For example, when an execve is performed by a secondary
 	  thread and the main thread is already dead
 	*/
-	inline void ressurect_thread()
+	inline void resurrect_thread()
 	{
 		/* If the thread is not dead we do nothing.
 		 * It should never happen

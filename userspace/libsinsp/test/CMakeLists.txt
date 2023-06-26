@@ -21,12 +21,20 @@ if(NOT MINIMAL_BUILD)
 endif() # MINIMAL_BUILD
 
 include_directories("..")
-include_directories(${LIBSCAP_INCLUDE_DIR} ${LIBSCAP_DIR}/driver)
+include_directories(${LIBSCAP_INCLUDE_DIR} ${LIBSCAP_DIR}/driver "${CMAKE_CURRENT_BINARY_DIR}")
+
+# Create a libsinsp_test_var.h file with some variables used by our tests
+configure_file (
+    "${CMAKE_CURRENT_SOURCE_DIR}/libsinsp_test_var.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/libsinsp_test_var.h"
+)
 
 ## Public libsinsp API
 file(GLOB_RECURSE PUBLIC_SINSP_API_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/public_sinsp_API/*.cpp)
 
 file(GLOB_RECURSE TEST_PLUGINS ${CMAKE_CURRENT_SOURCE_DIR}/plugins/*.cpp)
+
+file(GLOB_RECURSE SINSP_PARSERS_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/parsers/*.cpp)
 
 set(LIBSINSP_UNIT_TESTS_SOURCES
 	test_utils.cpp
@@ -56,7 +64,10 @@ set(LIBSINSP_UNIT_TESTS_SOURCES
 	eventformatter.ut.cpp
 	"${PUBLIC_SINSP_API_SUITE}"
 	"${TEST_PLUGINS}"
+	"${SINSP_PARSERS_SUITE}"
 )
+
+add_definitions(-DVISIBILITY_PRIVATE=)
 
 if(NOT MINIMAL_BUILD)
 	list(APPEND LIBSINSP_UNIT_TESTS_SOURCES procfs_utils.ut.cpp)
