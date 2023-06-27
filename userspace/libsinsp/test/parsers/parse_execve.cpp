@@ -113,4 +113,31 @@ TEST_F(sinsp_with_test_input, EXECVE_resurrect_thread)
 	ASSERT_MISSING_THREAD_INFO(p2_t3_tid, true);
 }
 
+TEST_F(sinsp_with_test_input, EXECVE_missing_process_execve_repair)
+{
+	add_default_init_thread();
+	open_inspector();
+
+	/* A process that we don't have in the table calls a random event */
+	int64_t p1_t1_tid = 24;
+	int64_t p1_t1_pid = 24;
+	int64_t p1_t1_ptid = INIT_TID;
+
+	/* This event should create invalid thread info for p1_t1 */
+	generate_random_event(p1_t1_tid);
+
+	/* Now we call an execve on p1_t1 */
+	generate_execve_enter_and_exit_event(0, p1_t1_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
+
+	/* we should have a valid thread group info and init should have a child now
+	 * we are not in a container but we want to assert also vtid, vpid.
+	 */
+	ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(p1_t1_tid, p1_t1_pid, p1_t1_ptid, -1, -1);
+	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 1, false, 1, 1, p1_t1_tid);
+	ASSERT_THREAD_CHILDREN(INIT_TID, 1, 1, p1_t1_tid);
+
+	GTEST_SKIP() << "When we create a new thread info for the invalid thread we don't set vtid and vpid, we can "
+			"fix this\n";
+}
+
 /*=============================== EXECVE ===========================*/
