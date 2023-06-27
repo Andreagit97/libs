@@ -18,6 +18,8 @@ limitations under the License.
 #include <gtest/gtest.h>
 #include <test/sinsp_with_test_input.h>
 
+#define HUGE_THREAD_NUMBER 150
+
 #define ASSERT_THREAD_INFO_PIDS_IN_CONTAINER(tid, pid, ptid, vtid, vpid)                                               \
 	{                                                                                                              \
 		sinsp_threadinfo* tinfo = m_inspector.get_thread_ref(tid, false, true).get();                          \
@@ -61,7 +63,7 @@ limitations under the License.
 			}                                                                                              \
 			ASSERT_TRUE(found);                                                                            \
 		}                                                                                                      \
-		uint16_t not_expired_count = 0;                                                                        \
+		uint64_t not_expired_count = 0;                                                                        \
 		for(const auto& thread : tginfo->get_thread_list())                                                    \
 		{                                                                                                      \
 			if(!thread.expired())                                                                          \

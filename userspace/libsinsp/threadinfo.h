@@ -330,7 +330,7 @@ public:
 		parent->m_not_expired_children--;
 
 		/* Clean expired children if necessary. */
-		if((parent->m_children.size() - parent->m_not_expired_children) > DEFAULT_EXPIRED_CHILDREN_THRESHOLD)
+		if((parent->m_children.size() - parent->m_not_expired_children) >= DEFAULT_EXPIRED_CHILDREN_THRESHOLD)
 		{
 			parent->clean_expired_children();
 		}

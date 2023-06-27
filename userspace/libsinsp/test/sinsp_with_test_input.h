@@ -188,15 +188,24 @@ protected:
 
 	void remove_thread(int64_t tid_to_remove, int64_t reaper_tid)
 	{
+		generate_proc_exit_event(tid_to_remove, reaper_tid);
+		/* Generate a random event on init to trigger the removal after proc exit */
+		generate_random_event();
+	}
+
+	sinsp_evt* generate_proc_exit_event(int64_t tid_to_remove, int64_t reaper_tid)
+	{
 		/* Scaffolding needed to call the PPME_PROCEXIT_1_E */
 		int64_t not_relevant_64 = 0;
 		uint8_t not_relevant_8 = 0;
 
-		add_event_advance_ts(increasing_ts(), tid_to_remove, PPME_PROCEXIT_1_E, 5, not_relevant_64, not_relevant_64, not_relevant_8, not_relevant_8, reaper_tid);
-		/* Since the removal is performed with the next event, we send a useless event
-		 * through init.
-		 */
-		add_event_advance_ts(increasing_ts(), INIT_TID, PPME_SYSCALL_GETCWD_E, 0);
+		return add_event_advance_ts(increasing_ts(), tid_to_remove, PPME_PROCEXIT_1_E, 5, not_relevant_64, not_relevant_64, not_relevant_8, not_relevant_8, reaper_tid);
+	}
+
+	sinsp_evt* generate_random_event(int64_t tid_caller = INIT_TID)
+	{
+		/* Generate a random event on init to trigger the removal after proc exit */
+		return add_event_advance_ts(increasing_ts(), tid_caller, PPME_SYSCALL_GETCWD_E, 0);
 	}
 
 	/*=============================== PROCESS GENERATION ===========================*/

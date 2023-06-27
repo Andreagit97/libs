@@ -25,9 +25,9 @@ class sinsp_threadinfo;
 
 /* Apart from the main thread all other threads when marked as dead should be removed
  * from the thread_table at the next event loop and so become expired. For this reason when we have
- * at least 10 dead threads we can try to clean up expired ones.
+ * at least `n` dead threads we can try to clean up expired ones.
  */
-#define DEFAULT_DEAD_THREADS_THRESHOLD 10
+#define DEFAULT_DEAD_THREADS_THRESHOLD 11
 
 /* New struct that keep information regarding the thread group */
 typedef struct thread_group_info

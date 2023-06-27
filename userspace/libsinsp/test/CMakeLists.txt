@@ -36,6 +36,10 @@ file(GLOB_RECURSE TEST_PLUGINS ${CMAKE_CURRENT_SOURCE_DIR}/plugins/*.cpp)
 
 file(GLOB_RECURSE SINSP_PARSERS_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/parsers/*.cpp)
 
+file(GLOB_RECURSE SINSP_CLASSES_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/classes/*.cpp)
+
+file(GLOB_RECURSE SINSP_FILTERCHECKS_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/filterchecks/*.cpp)
+
 set(LIBSINSP_UNIT_TESTS_SOURCES
 	test_utils.cpp
 	async_key_value_source.ut.cpp
@@ -62,9 +66,12 @@ set(LIBSINSP_UNIT_TESTS_SOURCES
 	sinsp_utils.ut.cpp
 	state.ut.cpp
 	eventformatter.ut.cpp
+	thread_table.ut.cpp
 	"${PUBLIC_SINSP_API_SUITE}"
 	"${TEST_PLUGINS}"
 	"${SINSP_PARSERS_SUITE}"
+	"${SINSP_CLASSES_SUITE}"
+	"${SINSP_FILTERCHECKS_SUITE}"
 )
 
 add_definitions(-DVISIBILITY_PRIVATE=)

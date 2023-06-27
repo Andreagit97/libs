@@ -145,40 +145,6 @@ TEST_F(sinsp_with_test_input, CLONE_CALLER_new_main_thread)
 	ASSERT_THREAD_INFO_PIDS(p1_t1_tid, p1_t1_pid, p1_t1_ptid)
 	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 1, false, 1, 1, p1_t1_tid)
 	ASSERT_THREAD_CHILDREN(INIT_TID, 1, 1, p1_t1_tid)
-
-	/// todo(@Andreagit97): we could also remove this last part of the test
-
-	/* The process p1 creates a second process p2 */
-	int64_t p2_t1_tid = 30;
-	int64_t p2_t1_pid = 30;
-	int64_t p2_t1_ptid = p1_t1_tid;
-
-	/* Parent clone exit event */
-	generate_clone_x_event(p2_t1_tid, p1_t1_tid, p1_t1_pid, p1_t1_ptid);
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 1, 1, p2_t1_tid)
-	ASSERT_THREAD_CHILDREN(p1_t1_tid, 1, 1, p2_t1_tid)
-
-	/* Init should always have just one child */
-	ASSERT_THREAD_CHILDREN(INIT_TID, 1, 1, p1_t1_tid)
-
-	/* Now the schema is:
-	 * - init
-	 *  - p1_t1
-	 *   - p2_t2
-	 *
-	 * if we remove p1_t1, we should see:
-	 * - thread group info is deleted from the thread_manager.
-	 * - ptid of `p2_t1` is updated to `INIT_TID`
-	 * - init has 2 children but the only one not expired is `p2_t1`
-	 * - there is no more a thread info for `p1_t1`
-	 */
-	remove_thread(p1_t1_tid, INIT_TID);
-
-	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p1_t1_pid));
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, INIT_TID)
-	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p2_t1_tid)
-	ASSERT_MISSING_THREAD_INFO(p1_t1_tid, true)
 }
 
 TEST_F(sinsp_with_test_input, CLONE_CALLER_flag_CLONE_PARENT)
@@ -213,27 +179,10 @@ TEST_F(sinsp_with_test_input, CLONE_CALLER_flag_CLONE_PARENT)
 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 1, 1, p2_t1_tid)
 
+	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLONE_PARENT, true);
+
 	/* Assert that init has 2 children */
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p2_t1_tid)
-
-	/// todo(@Andreagit97): we could also remove this last part of the test
-
-	/* Now the schema is:
-	 * - init
-	 *  - p1_t1
-	 *   - p2_t1 (where the parent is init)
-	 *
-	 * if we remove p2_t1, we should see:
-	 * - thread group info is deleted from the thread_manager.
-	 * - init has 2 children but the only one not expired is `p1_t1`
-	 * - there is no more thread info for `p2_t1`
-	 */
-	/* p2_t1 has no children so the reaper should be 0 */
-	remove_thread(p2_t1_tid, 0);
-
-	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p2_t1_pid));
-	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p1_t1_tid)
-	ASSERT_MISSING_THREAD_INFO(p2_t1_tid, true)
 }
 
 TEST_F(sinsp_with_test_input, CLONE_CALLER_flag_CLONE_THREAD)
@@ -268,6 +217,9 @@ TEST_F(sinsp_with_test_input, CLONE_CALLER_flag_CLONE_THREAD)
 	ASSERT_THREAD_INFO_PIDS(p1_t2_tid, p1_t2_pid, p1_t2_ptid);
 	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, 2, p1_t1_tid, p1_t2_tid);
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p1_t2_tid);
+
+	ASSERT_THREAD_INFO_FLAG(p1_t2_tid, PPM_CL_CLONE_THREAD, true);
+	ASSERT_THREAD_INFO_FLAG(p1_t2_tid, PPM_CL_CLONE_FILES, true);
 }
 
 TEST_F(sinsp_with_test_input, CLONE_CALLER_check_event_tinfo)
@@ -535,43 +487,6 @@ TEST_F(sinsp_with_test_input, CLONE_CHILD_new_main_thread)
 	ASSERT_TRUE(evt && evt->get_thread_info());
 	ASSERT_TRUE(p1_t1_tinfo);
 	ASSERT_EQ(p1_t1_tinfo, evt->get_thread_info());
-
-	/// todo(@Andreagit97): we could also remove this last part of the test
-
-	/* process p1 creates a new process p2 */
-	int64_t p2_t1_tid = 30;
-	int64_t p2_t1_pid = 30;
-	int64_t p2_t1_ptid = p1_t1_pid;
-
-	/* Child clone exit event */
-	evt = generate_clone_x_event(0, p2_t1_tid, p2_t1_pid, p2_t1_ptid);
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
-	ASSERT_THREAD_GROUP_INFO(p2_t1_pid, 1, false, 1, 1, p2_t1_tid)
-	ASSERT_THREAD_CHILDREN(p1_t1_tid, 1, 1, p2_t1_tid)
-
-	/* Check if the thread-info in the thread table is correctly assigned to our event */
-	sinsp_threadinfo* p2_t1_tinfo = m_inspector.get_thread_ref(p2_t1_tid, false, true).get();
-	ASSERT_TRUE(evt && evt->get_thread_info());
-	ASSERT_TRUE(p2_t1_tinfo);
-	ASSERT_EQ(p2_t1_tinfo, evt->get_thread_info());
-
-	/* Now the schema is:
-	 * - init
-	 *  - p1_t1
-	 *   - p2_t2
-	 *
-	 * if we remove p1_t1, we should see:
-	 * - thread group info is deleted from the thread_manager.
-	 * - ptid of `p2_t1` is updated to `INIT_TID`
-	 * - init has 2 children but the only one not expired is `p1_t1`
-	 * - there is no more a thread info for `p1_t1`
-	 */
-	remove_thread(p1_t1_tid, INIT_TID);
-
-	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p1_t1_pid));
-	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, INIT_TID)
-	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p2_t1_tid)
-	ASSERT_MISSING_THREAD_INFO(p1_t1_tid, true)
 }
 
 TEST_F(sinsp_with_test_input, CLONE_CHILD_flag_CLONE_PARENT)
@@ -604,23 +519,7 @@ TEST_F(sinsp_with_test_input, CLONE_CHILD_flag_CLONE_PARENT)
 	ASSERT_THREAD_INFO_PIDS(p2_t1_tid, p2_t1_pid, p2_t1_ptid)
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p2_t1_tid)
 
-	/// todo(@Andreagit97): we could also remove this last part of the test
-
-	/* Now the schema is:
-	 * - init
-	 *  - p1_t1
-	 *   - p2_t2 (where the parent is init)
-	 *
-	 * if we remove p2_t2, we should see:
-	 * - thread group info is deleted from the thread_manager.
-	 * - init has 2 children but the only one not expired is `p1_t1`
-	 * - there is no more a thread info for `p2_t1`
-	 */
-	remove_thread(p2_t1_tid, 0);
-
-	ASSERT_FALSE(m_inspector.m_thread_manager->get_thread_group_info(p2_t1_pid));
-	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 1, p1_t1_tid)
-	ASSERT_MISSING_THREAD_INFO(p2_t1_tid, true)
+	ASSERT_THREAD_INFO_FLAG(p2_t1_tid, PPM_CL_CLONE_PARENT, false);
 }
 
 TEST_F(sinsp_with_test_input, CLONE_CHILD_flag_CLONE_THREAD)
@@ -648,6 +547,9 @@ TEST_F(sinsp_with_test_input, CLONE_CHILD_flag_CLONE_THREAD)
 
 	ASSERT_THREAD_GROUP_INFO(p1_t1_pid, 2, false, 2, 2, p1_t1_tid, p1_t2_tid)
 	ASSERT_THREAD_CHILDREN(INIT_TID, 2, 2, p1_t1_tid, p1_t2_tid)
+
+	ASSERT_THREAD_INFO_FLAG(p1_t2_tid, PPM_CL_CLONE_THREAD, true);
+	ASSERT_THREAD_INFO_FLAG(p1_t2_tid, PPM_CL_CLONE_FILES, true);
 }
 
 TEST_F(sinsp_with_test_input, CLONE_CHILD_check_event_tinfo)
