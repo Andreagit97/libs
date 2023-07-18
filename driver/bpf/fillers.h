@@ -2848,7 +2848,11 @@ FILLER(execve_family_flags, true)
 
 	/* Parameter 27: uid */
 	euid = _READ(cred->euid);
-	return bpf_push_u32_to_ring(data, euid.val);
+	res = bpf_push_u32_to_ring(data, euid.val);
+	CHECK_RES(res);
+
+	/* Parameter 28: exe_path (type: PT_FSPATH) */
+	return bpf_push_empty_param(data);
 }
 
 FILLER(sys_accept4_e, true)
@@ -6643,7 +6647,11 @@ FILLER(sched_prog_exec_4, false)
 
 	/* Parameter 27: uid */
 	euid = _READ(cred->euid);
-	return bpf_push_u32_to_ring(data, euid.val);
+	res = bpf_push_u32_to_ring(data, euid.val);
+	CHECK_RES(res);
+
+	/* Parameter 28: exe_path (type: PT_FSPATH) */
+	return bpf_push_empty_param(data);
 }
 #endif
 
