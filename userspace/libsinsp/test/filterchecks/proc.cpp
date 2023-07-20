@@ -63,3 +63,15 @@ TEST_F(sinsp_with_test_input, PROC_FILTER_nchilds)
 	evt = generate_random_event(p2_t2_tid);
 	ASSERT_EQ(get_field_as_string(evt, "proc.nchilds"), "0");
 }
+
+TEST_F(sinsp_with_test_input, PROC_FILTER_resolved_exe_path)
+{
+	DEFAULT_TREE
+
+	/* Now we call an execve on p6_t1 */
+	auto evt = generate_execve_enter_and_exit_event(0, p6_t1_tid, p6_t1_tid, p6_t1_pid, p6_t1_ptid, "/good-exe", "good-exe", "/usr/bin/bad-exe");
+
+	ASSERT_EQ(get_field_as_string(evt, "proc.exepath"), "/good-exe");
+	ASSERT_EQ(get_field_as_string(evt, "proc.name"), "good-exe");
+	ASSERT_EQ(get_field_as_string(evt, "proc.kernel_resolved_path"), "/usr/bin/bad-exe");
+}

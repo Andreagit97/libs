@@ -137,4 +137,19 @@ TEST_F(sinsp_with_test_input, EXECVE_missing_process_execve_repair)
 	ASSERT_THREAD_CHILDREN(INIT_TID, 1, 1, p1_t1_tid);
 }
 
+TEST_F(sinsp_with_test_input, EXECVE_check_resolved_symlink)
+{
+	DEFAULT_TREE
+
+	/* Now we call an execve on p6_t1 */
+	generate_execve_enter_and_exit_event(0, p6_t1_tid, p6_t1_tid, p6_t1_pid, p6_t1_ptid, "/good-exe", "good-exe", "/usr/bin/bad-exe");
+
+	auto p6_t1_tinfo = m_inspector.get_thread_ref(p6_t1_tid, false).get();
+	ASSERT_TRUE(p6_t1_tinfo);
+
+	ASSERT_EQ(p6_t1_tinfo->get_exepath(), "/good-exe");
+	ASSERT_EQ(p6_t1_tinfo->get_comm(), "good-exe");
+	ASSERT_EQ(p6_t1_tinfo->get_kernel_resolved_exepath(), "/usr/bin/bad-exe");
+}
+
 /*=============================== EXECVE ===========================*/

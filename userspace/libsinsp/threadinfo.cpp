@@ -650,6 +650,11 @@ std::string sinsp_threadinfo::get_exepath() const
 	return m_exepath;
 }
 
+std::string sinsp_threadinfo::get_kernel_resolved_exepath() const
+{
+	return m_kernel_resolved_exepath;
+}
+
 void sinsp_threadinfo::set_args(const char* args, size_t len)
 {
 	m_args.clear();
