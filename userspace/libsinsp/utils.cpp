@@ -739,7 +739,8 @@ void copy_and_sanitize_path(char* target, char* targetbase, const char* path, ch
 }
 
 //
-// Return false if path2 is an absolute path
+// Return false if path2 is an absolute path or
+// if the resulting path will exceed `targetlen`
 //
 bool sinsp_utils::concatenate_paths(char* target,
 									uint32_t targetlen,
@@ -756,12 +757,14 @@ bool sinsp_utils::concatenate_paths(char* target,
 
 	if(len2 != 0 && path2[0] != '/')
 	{
+		/* path2 is relative */
 		memcpy(target, path1, len1);
 		copy_and_sanitize_path(target + len1, target, path2, '/');
 		return true;
 	}
 	else
 	{
+		/* path2 is absolute */
 		target[0] = 0;
 		copy_and_sanitize_path(target, target, path2, '/');
 		return false;
