@@ -449,7 +449,12 @@ void sinsp_threadinfo::init(scap_threadinfo* pi)
 
 	m_comm = pi->comm;
 	m_exe = pi->exe;
+	/* The exepath extracted from `/proc/pid/exe` is already the exact one so we can use
+	 * it for both `m_exepath` and `m_kernel_resolved_exepath`. During the runtime capture
+	 * `m_exepath` will be populate with userspace info.
+	 */
 	m_exepath = pi->exepath;
+	m_kernel_resolved_exepath = pi->exepath;
 	m_exe_writable = pi->exe_writable;
 	m_exe_upper_layer = pi->exe_upper_layer;
 	m_exe_from_memfd = pi->exe_from_memfd;
