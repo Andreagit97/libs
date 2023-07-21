@@ -96,7 +96,7 @@ public:
 	/*!
 	  \brief Return the full executable path resolved by the kernel.
 	*/
-	std::string get_kernel_resolved_exepath() const;
+	std::string get_trusted_exepath() const;
 
 	/*!
 	  \brief Return the working directory of the process containing this thread.
@@ -415,7 +415,7 @@ public:
 	std::string m_comm; ///< Command name (e.g. "top")
 	std::string m_exe; ///< argv[0] (e.g. "sshd: user@pts/4")
 	std::string m_exepath; ///< full executable path obtained with userspace reconstruction
-	std::string m_kernel_resolved_exepath; ///< full resolved executable path derived directly from the drivers. Please note with BPF drivers this path could be truncated due to verifier complexity limits.
+	std::string m_trusted_exepath; ///< full resolved executable path derived directly from the drivers. Please note with BPF drivers this path could be truncated due to verifier complexity limits.
 	bool m_exe_writable;
 	bool m_exe_upper_layer; ///< True if the executable file belongs to upper layer in overlayfs
 	bool m_exe_from_memfd;	///< True if the executable is stored in fileless memory referenced by memfd

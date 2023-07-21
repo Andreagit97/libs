@@ -73,5 +73,5 @@ TEST_F(sinsp_with_test_input, PROC_FILTER_resolved_exe_path)
 
 	ASSERT_EQ(get_field_as_string(evt, "proc.exepath"), "/good-exe");
 	ASSERT_EQ(get_field_as_string(evt, "proc.name"), "good-exe");
-	ASSERT_EQ(get_field_as_string(evt, "proc.kernel_resolved_path"), "/usr/bin/bad-exe");
+	ASSERT_EQ(get_field_as_string(evt, "proc.trusted_exepath"), "/usr/bin/bad-exe");
 }

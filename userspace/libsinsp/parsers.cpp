@@ -1545,7 +1545,7 @@ void sinsp_parser::parse_clone_exit_caller(sinsp_evt *evt, int64_t child_tid)
 		/* We should trust the info we obtain from the caller, if it is valid */
 		child_tinfo->m_exepath = caller_tinfo->m_exepath;
 
-		child_tinfo->m_kernel_resolved_exepath = caller_tinfo->m_kernel_resolved_exepath;
+		child_tinfo->m_trusted_exepath = caller_tinfo->m_trusted_exepath;
 
 		child_tinfo->m_exe_writable = caller_tinfo->m_exe_writable;
 
@@ -1893,7 +1893,7 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt)
 
 		child_tinfo->m_exepath = lookup_tinfo->m_exepath;
 
-		child_tinfo->m_kernel_resolved_exepath = lookup_tinfo->m_kernel_resolved_exepath;
+		child_tinfo->m_trusted_exepath = lookup_tinfo->m_trusted_exepath;
 
 		child_tinfo->m_exe_writable = lookup_tinfo->m_exe_writable;
 
@@ -2687,7 +2687,7 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 	if(evt->get_num_params() > 27)
 	{
 		parinfo = evt->get_param(27);
-		evt->m_tinfo->m_kernel_resolved_exepath = parinfo->m_val;
+		evt->m_tinfo->m_trusted_exepath = parinfo->m_val;
 	}
 
 	//
