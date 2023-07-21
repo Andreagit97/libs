@@ -305,7 +305,7 @@ int BPF_PROG(t1_execveat_x,
 	extract__euid(task, &uid);
 	auxmap__store_u32_param(auxmap, uid);
 
-	/* Parameter 28: exe_path (type: PT_FSPATH) */
+	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
 	auxmap__store_empty_param(auxmap);
 
 	/*=============================== COLLECT PARAMETERS  ===========================*/

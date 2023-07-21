@@ -13,7 +13,6 @@ or GPL2.txt for full copies of the license.
 #include "../ppm_flag_helpers.h"
 #include "../ppm_version.h"
 #include "bpf_helpers.h"
-#include "missing_definitions.h"
 
 #include <linux/tty.h>
 #include <linux/audit.h>
@@ -2742,8 +2741,8 @@ FILLER(proc_startupdate_3, true)
 		res = bpf_push_s32_to_ring(data, loginuid.val);
 		CHECK_RES(res);
 
-		bpf_tail_call(data->ctx, &tail_map, PPM_FILLER_execve_family_flags);
-		bpf_printk("Can't tail call execve_family_flags filler\n");
+		bpf_tail_call(data->ctx, &tail_map, PPM_FILLER_execve_extra_tail_1);
+		bpf_printk("Can't tail call execve_extra_tail_1 filler\n");
 		return PPM_FAILURE_BUG;	
 	}
 
@@ -2751,7 +2750,7 @@ FILLER(proc_startupdate_3, true)
 }
 
 /* This filler avoids a bpf stack overflow on old kernels (like 4.14). */
-FILLER(execve_family_flags, true)
+FILLER(execve_extra_tail_1, true)
 {
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	struct cred *cred = (struct cred *)_READ(task->cred);
@@ -2854,8 +2853,29 @@ FILLER(execve_family_flags, true)
 	res = bpf_push_u32_to_ring(data, euid.val);
 	CHECK_RES(res);
 
-	/* Parameter 28: exe_path (type: PT_FSPATH) */
-	return bpf_push_empty_param(data);
+	bpf_tail_call(data->ctx, &tail_map, PPM_FILLER_execve_extra_tail_2);
+	bpf_printk("Can't tail call execve_extra_tail_2 filler\n");
+	return PPM_FAILURE_BUG;	
+}
+
+FILLER(execve_extra_tail_2, true)
+{
+	int res = 0;
+
+	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
+	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+	struct file *exe_file = get_exe_file(task);
+	if(exe_file != NULL)
+	{
+		char* filepath = bpf_d_path_approx(data, &(exe_file->f_path));
+		res = bpf_val_to_ring_mem(data,(unsigned long)filepath, KERNEL);
+	}
+	else
+	{
+		res = bpf_push_empty_param(data);
+	}
+
+	return res;
 }
 
 FILLER(sys_accept4_e, true)
@@ -6649,9 +6669,31 @@ FILLER(sched_prog_exec_4, false)
 	res = bpf_push_u32_to_ring(data, euid.val);
 	CHECK_RES(res);
 
-	/* Parameter 28: exe_path (type: PT_FSPATH) */
-	return bpf_push_empty_param(data);
+	bpf_tail_call(data->ctx, &tail_map, PPM_FILLER_sched_prog_exec_5);
+	bpf_printk("Can't tail call 'sched_prog_exec_5' filler\n");
+	return PPM_FAILURE_BUG;
 }
+
+FILLER(sched_prog_exec_5, false)
+{
+	int res = 0;
+
+	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
+	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+	struct file *exe_file = get_exe_file(task);
+	if(exe_file != NULL)
+	{
+		char* filepath = bpf_d_path_approx(data, &(exe_file->f_path));
+		res = bpf_val_to_ring_mem(data,(unsigned long)filepath, KERNEL);
+	}
+	else
+	{
+		res = bpf_push_empty_param(data);
+	}
+
+	return res;
+}
+
 #endif
 
 #ifdef CAPTURE_SCHED_PROC_FORK
