@@ -2348,7 +2348,7 @@ const filtercheck_field_info sinsp_filter_check_thread_fields[] =
 	{PT_CHARBUF, EPF_NONE, PF_NA, "proc.exepath", "Process Executable Path", "The full executable path of the process (truncated after 1024 bytes). This field is collected only if the executable lives on the filesystem. This field is collected from the syscalls args or, as a fallback, extracted resolving the path of /proc/<pid>/exe."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "proc.pexepath", "Parent Process Executable Path", "The proc.exepath (full executable path) of the parent process."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "proc.aexepath", "Ancestor Executable Path", "The proc.exepath (full executable path) for a specific process ancestor. You can access different levels of ancestors by using indices. For example, proc.aexepath[1] retrieves the proc.exepath of the parent process, proc.aexepath[2] retrieves the proc.exepath of the grandparent process, and so on. The current process's proc.exepath line can be obtained using proc.aexepath[0]. When used without any arguments, proc.aexepath is applicable only in filters and matches any of the process ancestors. For instance, you can use `proc.aexepath endswith java` to match any process ancestor whose path ends with the term `java`."},
-	{PT_FSPATH, EPF_NONE, PF_NA, "proc.kernel_resolved_path", "Process Executable Path resolved by the kernel", "The full executable path of the process (truncated after ... bytes). This field is collected directly from the kernel."},
+	{PT_FSPATH, EPF_NONE, PF_NA, "proc.trusted_exepath", "Process Executable Path resolved by the kernel", "The full executable path of the process (truncated after ... bytes). This field is collected directly from the kernel."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "proc.name", "Name", "The process name (truncated after 16 characters) generating the event (task->comm). This field is collected from the syscalls args or, as a fallback, extracted from /proc/<pid>/status. The name of the process and the name of the executable file on disk (if applicable) can be different if a process is given a custom name which is often the case for example for java applications."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "proc.pname", "Parent Name", "The proc.name truncated after 16 characters) of the process generating the event."},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "proc.aname", "Ancestor Name", "The proc.name (truncated after 16 characters) for a specific process ancestor. You can access different levels of ancestors by using indices. For example, proc.aname[1] retrieves the proc.name of the parent process, proc.aname[2] retrieves the proc.name of the grandparent process, and so on. The current process's proc.name line can be obtained using proc.aname[0]. When used without any arguments, proc.aname is applicable only in filters and matches any of the process ancestors. For instance, you can use `proc.aname=bash` to match any process ancestor whose name is `bash`."},
@@ -3393,8 +3393,8 @@ uint8_t* sinsp_filter_check_thread::extract(sinsp_evt *evt, OUT uint32_t* len, b
 			m_tstr = mt->get_exepath();
 			RETURN_EXTRACT_STRING(m_tstr);
 		}
-	case TYPE_RESOLVEDEXEPATH:
-		m_tstr = tinfo->get_kernel_resolved_exepath();
+	case TYPE_TRUSTED_EXEPATH:
+		m_tstr = tinfo->get_trusted_exepath();
 		RETURN_EXTRACT_STRING(m_tstr);
 	case TYPE_LOGINSHELLID:
 		{
@@ -3665,7 +3665,7 @@ uint8_t* sinsp_filter_check_thread::extract(sinsp_evt *evt, OUT uint32_t* len, b
 		m_tbool = tinfo->m_exe_from_memfd;
 		RETURN_EXTRACT_VAR(m_tbool);
 	case TYPE_IS_EXE_SYMLINK:
-		m_tbool = tinfo->get_exepath().compare((tinfo->get_kernel_resolved_exepath())) != 0;
+		m_tbool = tinfo->get_exepath().compare((tinfo->get_trusted_exepath())) != 0;
 		RETURN_EXTRACT_VAR(m_tbool);
 	case TYPE_IS_SID_LEADER:
 		m_tbool = tinfo->m_sid == tinfo->m_vpid;

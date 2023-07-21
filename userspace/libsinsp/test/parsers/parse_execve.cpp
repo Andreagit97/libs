@@ -149,7 +149,7 @@ TEST_F(sinsp_with_test_input, EXECVE_check_resolved_symlink)
 
 	ASSERT_EQ(p6_t1_tinfo->get_exepath(), "/good-exe");
 	ASSERT_EQ(p6_t1_tinfo->get_comm(), "good-exe");
-	ASSERT_EQ(p6_t1_tinfo->get_kernel_resolved_exepath(), "/usr/bin/bad-exe");
+	ASSERT_EQ(p6_t1_tinfo->get_trusted_exepath(), "/usr/bin/bad-exe");
 }
 
 /*=============================== EXECVE ===========================*/

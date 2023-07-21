@@ -122,7 +122,7 @@ static int32_t scap_read_proclist(scap_reader_t* r, uint32_t block_length, uint3
 		tinfo.exe_ino_ctime = 0;
 		tinfo.exe_ino_mtime = 0;
 		tinfo.exe_from_memfd = false;
-		tinfo.kernel_resolved_exepath[0] = 0;
+		tinfo.trusted_exepath[0] = 0;
 
 		//
 		// len
@@ -709,7 +709,7 @@ static int32_t scap_read_proclist(scap_reader_t* r, uint32_t block_length, uint3
 			tinfo.exe_from_memfd = (exe_from_memfd != 0);
 		}
 
-		// kernel_resolved_exepath
+		// trusted_exepath
 		if(sub_len && (subreadsize + sizeof(uint16_t)) <= sub_len)
 		{
 			// we need to read the len first
@@ -719,17 +719,17 @@ static int32_t scap_read_proclist(scap_reader_t* r, uint32_t block_length, uint3
 			
 			if(stlen > SCAP_MAX_PATH_SIZE)
 			{
-				snprintf(error, SCAP_LASTERR_SIZE, "invalid kernel_resolved_exepath len %d", stlen);
+				snprintf(error, SCAP_LASTERR_SIZE, "invalid trusted_exepath len %d", stlen);
 				return SCAP_FAILURE;
 			}
 
 			// We don't need another check since if there is the len
 			// there is also the payload
-			readsize = r->read(r, tinfo.kernel_resolved_exepath, stlen);
+			readsize = r->read(r, tinfo.trusted_exepath, stlen);
 			CHECK_READ_SIZE_ERR(readsize, stlen, error);
 
 			// the string is not null-terminated on file
-			tinfo.kernel_resolved_exepath[stlen] = 0;
+			tinfo.trusted_exepath[stlen] = 0;
 
 			subreadsize += readsize;
 		}

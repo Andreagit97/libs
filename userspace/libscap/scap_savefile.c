@@ -566,7 +566,7 @@ static int32_t scap_write_proclist_entry(scap_dumper_t *d, struct scap_threadinf
 					      tinfo->cwd,
 					      &cgroups, 1,
 					      tinfo->root,
-						  tinfo->kernel_resolved_exepath);
+						  tinfo->trusted_exepath);
 }
 
 static uint16_t iov_size(const struct iovec *iov, uint32_t iovcnt)
@@ -591,7 +591,7 @@ int32_t scap_write_proclist_entry_bufs(scap_dumper_t *d, struct scap_threadinfo 
 				       const char *cwd,
 				       const struct iovec *cgroups, int cgroupscnt,
 				       const char *root,
-					   const char *kernel_resolved_exepath)
+					   const char *trusted_exepath)
 {
 	uint16_t commlen;
 	uint16_t exelen;
@@ -601,14 +601,14 @@ int32_t scap_write_proclist_entry_bufs(scap_dumper_t *d, struct scap_threadinfo 
 	uint16_t argslen;
 	uint16_t envlen;
 	uint16_t cgroupslen;
-	uint16_t kernel_resolved_exepath_len;
+	uint16_t trusted_exepath_len;
 
 	commlen = (uint16_t)strnlen(comm, SCAP_MAX_PATH_SIZE);
 	exelen = (uint16_t)strnlen(exe, SCAP_MAX_PATH_SIZE);
 	exepathlen = (uint16_t)strnlen(exepath, SCAP_MAX_PATH_SIZE);
 	cwdlen = (uint16_t)strnlen(cwd, SCAP_MAX_PATH_SIZE);
 	rootlen = (uint16_t)strnlen(root, SCAP_MAX_PATH_SIZE);
-	kernel_resolved_exepath_len = (uint16_t)strnlen(kernel_resolved_exepath, SCAP_MAX_PATH_SIZE);
+	trusted_exepath_len = (uint16_t)strnlen(trusted_exepath, SCAP_MAX_PATH_SIZE);
 
 	argslen = iov_size(args, argscnt);
 	envlen = iov_size(envs, envscnt);
@@ -654,7 +654,7 @@ int32_t scap_write_proclist_entry_bufs(scap_dumper_t *d, struct scap_threadinfo 
 			  sizeof(uint64_t) + // exe_ino_ctime
 			  sizeof(uint64_t) + // exe_ino_mtime
 			  sizeof(uint8_t) + // exe_from_memfd
-			  2 + kernel_resolved_exepath_len); // kernel_resolved_exepath
+			  2 + trusted_exepath_len); // trusted_exepath
 
 	if(scap_dump_write(d, len, sizeof(uint32_t)) != sizeof(uint32_t) ||
 		    scap_dump_write(d, &(tinfo->tid), sizeof(uint64_t)) != sizeof(uint64_t) ||
@@ -701,8 +701,8 @@ int32_t scap_write_proclist_entry_bufs(scap_dumper_t *d, struct scap_threadinfo 
 			scap_dump_write(d, &(tinfo->exe_ino_ctime), sizeof(uint64_t)) != sizeof(uint64_t) ||
 			scap_dump_write(d, &(tinfo->exe_ino_mtime), sizeof(uint64_t)) != sizeof(uint64_t) ||
 			scap_dump_write(d, &(tinfo->exe_from_memfd), sizeof(uint8_t)) != sizeof(uint8_t) ||
-			scap_dump_write(d, &kernel_resolved_exepath_len, sizeof(uint16_t)) != sizeof(uint16_t) ||
-                    scap_dump_write(d, (char *) kernel_resolved_exepath, kernel_resolved_exepath_len) != kernel_resolved_exepath_len)
+			scap_dump_write(d, &trusted_exepath_len, sizeof(uint16_t)) != sizeof(uint16_t) ||
+                    scap_dump_write(d, (char *) trusted_exepath, trusted_exepath_len) != trusted_exepath_len)
 	{
 		snprintf(d->m_lasterr, SCAP_LASTERR_SIZE, "error writing to file (2)");
 		return SCAP_FAILURE;

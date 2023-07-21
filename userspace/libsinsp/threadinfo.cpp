@@ -450,11 +450,11 @@ void sinsp_threadinfo::init(scap_threadinfo* pi)
 	m_comm = pi->comm;
 	m_exe = pi->exe;
 	/* The exepath extracted from `/proc/pid/exe` is already the exact one so we can use
-	 * it for both `m_exepath` and `m_kernel_resolved_exepath`. During the runtime capture
+	 * it for both `m_exepath` and `m_trusted_exepath`. During the runtime capture
 	 * `m_exepath` will be populate with userspace info.
 	 */
 	m_exepath = pi->exepath;
-	m_kernel_resolved_exepath = pi->exepath;
+	m_trusted_exepath = pi->exepath;
 	m_exe_writable = pi->exe_writable;
 	m_exe_upper_layer = pi->exe_upper_layer;
 	m_exe_from_memfd = pi->exe_from_memfd;
@@ -655,9 +655,9 @@ std::string sinsp_threadinfo::get_exepath() const
 	return m_exepath;
 }
 
-std::string sinsp_threadinfo::get_kernel_resolved_exepath() const
+std::string sinsp_threadinfo::get_trusted_exepath() const
 {
-	return m_kernel_resolved_exepath;
+	return m_trusted_exepath;
 }
 
 void sinsp_threadinfo::set_args(const char* args, size_t len)
@@ -2004,7 +2004,7 @@ void sinsp_thread_manager::dump_threads_to_file(scap_dumper_t* dumper)
 						  (tinfo.m_cwd == "" ? "/" : tinfo.m_cwd.c_str()),
 						  cgroups_iov, cgroupscnt,
 						  tinfo.m_root.c_str(),
-						  tinfo.m_kernel_resolved_exepath.c_str()) != SCAP_SUCCESS)
+						  tinfo.m_trusted_exepath.c_str()) != SCAP_SUCCESS)
 		{
 			sinsp_exception exc(scap_dump_getlasterr(proclist_dumper));
 			scap_dump_close(proclist_dumper);
