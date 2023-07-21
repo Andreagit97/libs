@@ -64,7 +64,7 @@ TEST_F(sinsp_with_test_input, PROC_FILTER_nchilds)
 	ASSERT_EQ(get_field_as_string(evt, "proc.nchilds"), "0");
 }
 
-TEST_F(sinsp_with_test_input, PROC_FILTER_resolved_exe_path)
+TEST_F(sinsp_with_test_input, PROC_FILTER_trusted_exepath)
 {
 	DEFAULT_TREE
 

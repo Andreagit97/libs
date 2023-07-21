@@ -289,8 +289,36 @@ int BPF_PROG(t1_execve_x,
 	extract__euid(task, &uid);
 	auxmap__store_u32_param(auxmap, uid);
 
-	/* Parameter 28: exe_path (type: PT_FSPATH) */
-	auxmap__store_empty_param(auxmap);
+	/*=============================== COLLECT PARAMETERS  ===========================*/
+
+	bpf_tail_call(ctx, &extra_event_prog_tail_table, T2_EXECVE_X);
+	return 0;
+}
+
+SEC("tp_btf/sys_exit")
+int BPF_PROG(t2_execve_x, struct pt_regs *regs, long ret)
+{
+	struct auxiliary_map *auxmap = auxmap__get();
+	if(!auxmap)
+	{
+		return 0;
+	}
+
+	/*=============================== COLLECT PARAMETERS  ===========================*/
+
+	struct task_struct *task = get_current_task();
+	struct file *exe_file = extract__exe_file_from_task(task);
+
+	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
+	if(exe_file != NULL)
+	{
+		// auxmap__store_file_path_param(auxmap, &(exe_file->f_path));
+		auxmap__store_empty_param(auxmap);
+	}
+	else
+	{
+		auxmap__store_empty_param(auxmap);
+	}
 
 	/*=============================== COLLECT PARAMETERS  ===========================*/
 

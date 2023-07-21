@@ -20,7 +20,9 @@ or GPL2.txt for full copies of the license.
 
 #include "../ppm_flag_helpers.h"
 #include "builtins.h"
+#include "missing_definitions.h"
 
+/// TODO: to remove these define
 // Old kernels (like 4.14) have too strict limits on the bpf program length to support 32 path components. For the moment we decrease the limit to 16.
 #define MAX_PATH_COMPONENTS 16
 #define MAX_PATH_LENGTH 4096
@@ -73,8 +75,136 @@ static __always_inline struct file *bpf_fget(int fd)
 	return fil;
 }
 
-// Kernel 5.10 introduced a new bpf_helper called `bpf_d_path` to extract a file path starting from a file descriptor.
-// Libscap loads our bpf programs as `BPF_PROG_TYPE_RAW_TRACEPOINT` programs. This type of program doesn't seem able to call this new helper because it is out of its scope. For more details see here https://github.com/torvalds/linux/blob/58e1100fdc5990b0cc0d4beaf2562a92e621ac7d/kernel/trace/bpf_trace.c#L1574
+
+/* We must always leave at least 4096 bytes free in our tmp scratch space
+ * to please the verifier since we set the max component len to 4096 bytes.
+ */
+#define MAX_COMPONENT_LEN 4096
+#define MAX_TMP_SCRATCH_LEN (SCRATCH_SIZE-4096)
+#define SAFE_TMP_SCRATCH_ACCESS(x) x &(MAX_TMP_SCRATCH_LEN-1)
+
+/* Please note: Kernel 5.10 introduced a new bpf_helper called `bpf_d_path`
+ * to extract a file path starting from a struct* file but it can be used only
+ * with specific hooks:
+ *
+ * https://github.com/torvalds/linux/blob/e0dccc3b76fb35bb257b4118367a883073d7390e/kernel/trace/bpf_trace.c#L915-L929.
+ *
+ * So we need to do it by hand emulating its behavior.
+ * This brings some limitations:
+ * 1. limitations in the path length and in the number of components that compose the full path.
+ * 2. we cannot use locks so we can face race conditions during the path reconstruction.
+ * 3. reconstructed path could be slightly different from the one returned by `d_path`.
+ *    See pseudo_filesystem prefixes or the " (deleted)" suffix.
+ */
+static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct path *path)
+{
+    struct path f_path = {};
+    bpf_probe_read_kernel(&f_path, sizeof(struct path), path);
+    struct dentry *dentry = f_path.dentry;
+    struct vfsmount *vfsmnt = f_path.mnt;
+    struct mount *mnt_p = container_of(vfsmnt, struct mount, mnt);
+    struct mount *mnt_parent_p = NULL;
+    bpf_probe_read_kernel(&mnt_parent_p, sizeof(struct mount *), &(mnt_p->mnt_parent));
+    struct dentry *mnt_root_p = NULL;
+	bpf_probe_read_kernel(&mnt_root_p, sizeof(struct dentry *), &(vfsmnt->mnt_root));
+
+	/* This is the max length of the buffer in which we will write the full path.
+	 * We leave the last 4096 bytes free to please the verifier.
+	 */
+    u32 max_buf_len = MAX_TMP_SCRATCH_LEN;
+
+	/* Populated inside the loop */
+    struct dentry *d_parent = NULL;
+    struct qstr d_name = {};
+    u32 name_len = 0; /* This is the len we read inside `struct qstr`. */
+	u32 current_off = 0;
+    int effective_name_len = 0; /* This is the len we read with `bpf_probe_read_kernel_str`. */
+    char slash = '/';
+    int zero = 0;
+
+#pragma unroll
+    for(int i = 0; i < 48; i++)
+	{	
+		bpf_probe_read_kernel(&d_parent, sizeof(struct dentry *), &(dentry->d_parent));
+        if(dentry == mnt_root_p || dentry == d_parent)
+		{
+            if(unlikely(dentry != mnt_root_p))
+			{
+                /* We reached the root (dentry == d_parent) 
+				 * but not the mount root...there is something wrong stop here.
+				 */
+                break;
+            }
+
+            if(mnt_p != mnt_parent_p)
+			{
+                /* We reached root, but not global root - continue with mount point path */
+                bpf_probe_read_kernel(&dentry, sizeof(struct dentry *), &mnt_p->mnt_mountpoint);
+                bpf_probe_read_kernel(&mnt_p, sizeof(struct mount *), &mnt_p->mnt_parent);
+                bpf_probe_read_kernel(&mnt_parent_p, sizeof(struct mount *), &mnt_p->mnt_parent);
+                vfsmnt = &mnt_p->mnt;
+				bpf_probe_read_kernel(&mnt_root_p, sizeof(struct dentry *), &(vfsmnt->mnt_root));
+                continue;
+            }
+            
+			/* We have the full path */
+            break;
+        }
+
+		/* Get the dentry name */
+		bpf_probe_read_kernel(&d_name, sizeof(struct qstr), &(dentry->d_name));
+
+		/* +1 for the terminator that is not considered in d_name.len (CHECK IT!) */
+		/* Reserve space for the name trusting the len written in `qstr` struct */
+        current_off = max_buf_len - (d_name.len + 1);
+
+		/* We face an overflow this is almost impossible. We could remove it to simplify the flaw */
+        // if(current_off > max_buf_len)
+		// {
+		// 	break;
+		// }
+
+        effective_name_len = bpf_probe_read_kernel_str(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(current_off)]),
+						MAX_PATH_LENGTH,
+						(void *)d_name.name);
+		if(effective_name_len <= 1)
+		{
+			/* If effective_name_len is 0 or 1 we have an error
+			 * (path can't be null nor an empty string)
+			 */
+			break;
+		}
+
+		/* `max_buf_len -= 1` point to the `\0` of the just written name.
+		 * We will replace the terminating `/` at the end of the string with `\0` after the for loop.
+		 * Then we set `max_buf_len` to the last written char. 
+		 */
+		max_buf_len -= 1;
+		data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)] = '/';
+		max_buf_len -= (effective_name_len - 1);
+
+        dentry = d_parent;
+    }
+
+    if(max_buf_len == MAX_TMP_SCRATCH_LEN) 
+	{
+		/* We never decremented it */
+        /* memfd files have no path in the filesystem -> extract their name */
+		bpf_probe_read_kernel(&d_name, sizeof(struct qstr), &(dentry->d_name));
+        bpf_probe_read_kernel_str(&(data->tmp_scratch[0]), MAX_PATH_LENGTH, (void *) d_name.name);
+		return data->tmp_scratch;
+    } 
+
+    /* Add leading slash */
+    max_buf_len -= 1;
+	data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)] = '/';
+
+	/* Null terminate the path string */
+	data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(MAX_TMP_SCRATCH_LEN-1)] = '\0';
+
+    return &(data->tmp_scratch[max_buf_len]);
+}
+
 static __always_inline char *bpf_get_path(struct filler_data *data, int fd)
 {
 	struct file *f = bpf_fget(fd);

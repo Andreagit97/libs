@@ -1438,7 +1438,8 @@ enum extra_event_prog_code
 	T1_DROP_E = 13,
 	T1_DROP_X = 14,
 	T1_HOTPLUG_E = 15,
-	TAIL_EXTRA_EVENT_PROG_MAX = 16
+	T2_EXECVE_X = 16,
+	TAIL_EXTRA_EVENT_PROG_MAX = 17
 };
 
 /*
