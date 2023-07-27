@@ -594,6 +594,7 @@ TEST(SyscallExit, execveX_success_memfd)
 }
 #endif
 
+#if defined(__NR_symlinkat) && defined(__NR_unlinkat)
 TEST(SyscallExit, execveX_symlink)
 {
 	auto evt_test = get_syscall_event_test(__NR_execve, EXIT_EVENT);
@@ -604,10 +605,10 @@ TEST(SyscallExit, execveX_symlink)
 
 	/* Prepare the execve args */
 	const char *pathname = "/usr/bin/echo";
-	const char *linkpath = "./target3";
+	const char *linkpath = "target3";
 
 	/* Create symlink */
-	assert_syscall_state(SYSCALL_SUCCESS, "symlink", syscall(__NR_symlink, pathname, linkpath), NOT_EQUAL, -1);
+	assert_syscall_state(SYSCALL_SUCCESS, "symlinkat", syscall(__NR_symlinkat, pathname, AT_FDCWD, linkpath), NOT_EQUAL, -1);
 
 	const char *comm = "target3";
 	const char *argv[] = {linkpath, "[OUTPUT] SyscallExit.execveX_success test", NULL};
@@ -638,7 +639,7 @@ TEST(SyscallExit, execveX_symlink)
 		FAIL() << "The child execve failed." << std::endl;
 	}
 
-	assert_syscall_state(SYSCALL_SUCCESS, "unlink", syscall(__NR_unlink, linkpath), NOT_EQUAL, -1);
+	assert_syscall_state(SYSCALL_SUCCESS, "unlinkat", syscall(__NR_unlinkat, AT_FDCWD, linkpath, 0), NOT_EQUAL, -1);
 
 	/*=============================== TRIGGER SYSCALL ===========================*/
 
@@ -676,4 +677,5 @@ TEST(SyscallExit, execveX_symlink)
 
 	evt_test->assert_num_params_pushed(28);
 }
+#endif
 #endif
