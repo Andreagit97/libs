@@ -225,8 +225,35 @@ int BPF_PROG(t1_sched_p_exec,
 	extract__euid(task, &uid);
 	auxmap__store_u32_param(auxmap, uid);
 
+	/*=============================== COLLECT PARAMETERS  ===========================*/
+
+	bpf_tail_call(ctx, &extra_event_prog_tail_table, T2_SCHED_PROC_EXEC);
+	return 0;
+}
+
+SEC("tp_btf/sys_exit")
+int BPF_PROG(t2_sched_p_exec, struct pt_regs *regs, long ret)
+{
+	struct auxiliary_map *auxmap = auxmap__get();
+	if(!auxmap)
+	{
+		return 0;
+	}
+
+	/*=============================== COLLECT PARAMETERS  ===========================*/
+
+	struct task_struct *task = get_current_task();
+	struct file *exe_file = extract__exe_file_from_task(task);
+
 	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
-	auxmap__store_empty_param(auxmap);
+	if(exe_file != NULL)
+	{
+		auxmap__store_d_path_approx(auxmap, &(exe_file->f_path));
+	}
+	else
+	{
+		auxmap__store_empty_param(auxmap);
+	}
 
 	/*=============================== COLLECT PARAMETERS  ===========================*/
 
@@ -235,4 +262,5 @@ int BPF_PROG(t1_sched_p_exec,
 	auxmap__submit_event(auxmap, ctx);
 	return 0;
 }
+
 #endif /* CAPTURE_SCHED_PROC_EXEC */
