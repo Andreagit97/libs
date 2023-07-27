@@ -3298,12 +3298,24 @@ FILLER(sys_open_by_handle_at_x, true)
 	CHECK_RES(res);
 	
 	/* Parameter 4: path (type: PT_FSPATH) */
-	char* filepath = NULL;
 	if(retval > 0)
 	{
-		filepath = bpf_get_path(data, retval);
-	} 
-	return bpf_val_to_ring_mem(data,(unsigned long)filepath, KERNEL);
+		struct file *f = bpf_fget(retval);
+		if(f != NULL)
+		{
+			char* filepath = bpf_d_path_approx(data, &(f->f_path));
+			res = bpf_val_to_ring_mem(data,(unsigned long)filepath, KERNEL);
+		}
+		else
+		{
+			res = bpf_push_empty_param(data);
+		}
+	}
+	else
+	{
+		res = bpf_push_empty_param(data);
+	}
+	return res;
 }
 
 FILLER(sys_io_uring_setup_x, true)
