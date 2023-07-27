@@ -75,9 +75,9 @@ static __always_inline struct file *bpf_fget(int fd)
  * In newer kernel versions we can use at least 96 
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0))
-#define MAX_NUM_COMPONENTS 96
+#define MAX_NUM_COMPONENTS 32
 #else
-#define MAX_NUM_COMPONENTS 48
+#define MAX_NUM_COMPONENTS 16
 #endif
 
 /* We must always leave at least 4096 bytes free in our tmp scratch space
