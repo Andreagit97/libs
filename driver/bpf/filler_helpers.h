@@ -22,11 +22,6 @@ or GPL2.txt for full copies of the license.
 #include "builtins.h"
 #include "missing_definitions.h"
 
-/// TODO: to remove these define
-// Old kernels (like 4.14) have too strict limits on the bpf program length to support 32 path components. For the moment we decrease the limit to 16.
-#define MAX_PATH_COMPONENTS 16
-#define MAX_PATH_LENGTH 4096
-
 /* Helper used to please the verifier with operations on the number of arguments */
 #define SAFE_ARG_NUMBER(x) x & (PPM_MAX_EVENT_PARAMS - 1)
 
@@ -80,6 +75,7 @@ static __always_inline struct file *bpf_fget(int fd)
  * to please the verifier since we set the max component len to 4096 bytes.
  */
 #define MAX_COMPONENT_LEN 4096
+#define MAX_NUM_COMPONENTS 48
 #define MAX_TMP_SCRATCH_LEN (SCRATCH_SIZE-4096)
 #define SAFE_TMP_SCRATCH_ACCESS(x) x &(MAX_TMP_SCRATCH_LEN-1)
 
@@ -123,7 +119,7 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
     int zero = 0;
 
 #pragma unroll
-    for(int i = 0; i < 48; i++)
+    for(int i = 0; i < MAX_NUM_COMPONENTS; i++)
 	{	
 		bpf_probe_read_kernel(&d_parent, sizeof(struct dentry *), &(dentry->d_parent));
         if(dentry == mnt_root_p || dentry == d_parent)
@@ -165,7 +161,7 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 		// }
 
         effective_name_len = bpf_probe_read_kernel_str(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(current_off)]),
-						MAX_PATH_LENGTH,
+						MAX_COMPONENT_LEN,
 						(void *)d_name.name);
 		if(effective_name_len <= 1)
 		{
@@ -191,7 +187,7 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 		/* We never decremented it */
         /* memfd files have no path in the filesystem -> extract their name */
 		bpf_probe_read_kernel(&d_name, sizeof(struct qstr), &(dentry->d_name));
-        bpf_probe_read_kernel_str(&(data->tmp_scratch[0]), MAX_PATH_LENGTH, (void *) d_name.name);
+        bpf_probe_read_kernel_str(&(data->tmp_scratch[0]), MAX_COMPONENT_LEN, (void *) d_name.name);
 		return data->tmp_scratch;
     } 
 
@@ -203,55 +199,6 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 	data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(MAX_TMP_SCRATCH_LEN-1)] = '\0';
 
     return &(data->tmp_scratch[max_buf_len]);
-}
-
-static __always_inline char *bpf_get_path(struct filler_data *data, int fd)
-{
-	struct file *f = bpf_fget(fd);
-	const unsigned char** pointers_buf = (const unsigned char**)data->tmp_scratch;
-	char *filepath = (char *)&data->tmp_scratch[(MAX_PATH_COMPONENTS* sizeof(const unsigned char*)) & SCRATCH_SIZE_HALF];
-
-	struct dentry *de_p = _READ(f->f_path.dentry); 
-	if(!de_p)
-	{
-		return NULL;
-	}
-	struct dentry de = _READ(*de_p); 
-	uint16_t i = 0;
-	pointers_buf[i & (MAX_PATH_COMPONENTS-1)] = de.d_name.name;
-	uint16_t nreads = 1;
-
-	# pragma unroll MAX_PATH_COMPONENTS
-	for(i = 1; i < MAX_PATH_COMPONENTS && de.d_parent != de_p; i++)
-	{
-		de_p = de.d_parent;
-		de = _READ(*de.d_parent);
-		pointers_buf[i & (MAX_PATH_COMPONENTS-1)] = de.d_name.name;
-		nreads++;
-	}
-
-	uint32_t curoff_bounded = 0;
-	uint16_t path_level = 0;
-	int res = 0;
-
-	# pragma unroll MAX_PATH_COMPONENTS
-	for(i = 1; i < MAX_PATH_COMPONENTS && i <= nreads && res >= 0; i++)
-	{
-		path_level = (nreads-i) & (MAX_PATH_COMPONENTS-1);	
-		res = bpf_probe_read_kernel_str(&filepath[curoff_bounded], MAX_PATH_LENGTH,
-				(const void*)pointers_buf[path_level]);	
-		curoff_bounded = (curoff_bounded+res-1) & SCRATCH_SIZE_HALF;
-		if(i>1 && i<nreads && res>0)
-		{
-			filepath[curoff_bounded] = '/';
-			curoff_bounded = (curoff_bounded+1) & SCRATCH_SIZE_HALF;
-		}
-	}
-	if(res<0)
-	{
-		return NULL;
-	}
-	return filepath;
 }
 
 static __always_inline struct socket *bpf_sockfd_lookup(struct filler_data *data,
