@@ -123,8 +123,6 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
     u32 name_len = 0; /* This is the len we read inside `struct qstr`. */
 	u32 current_off = 0;
     int effective_name_len = 0; /* This is the len we read with `bpf_probe_read_kernel_str`. */
-    char slash = '/';
-    int zero = 0;
 
 #pragma unroll
     for(int i = 0; i < MAX_NUM_COMPONENTS; i++)
@@ -161,12 +159,6 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 		/* +1 for the terminator that is not considered in d_name.len (CHECK IT!) */
 		/* Reserve space for the name trusting the len written in `qstr` struct */
         current_off = max_buf_len - (d_name.len + 1);
-
-		/* We face an overflow this is almost impossible. We could remove it to simplify the flaw */
-        // if(current_off > max_buf_len)
-		// {
-		// 	break;
-		// }
 
         effective_name_len = bpf_probe_read_kernel_str(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(current_off)]),
 						MAX_COMPONENT_LEN,
