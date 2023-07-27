@@ -128,29 +128,27 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
     for(int i = 0; i < MAX_NUM_COMPONENTS; i++)
 	{	
 		bpf_probe_read_kernel(&d_parent, sizeof(struct dentry *), &(dentry->d_parent));
-        if(dentry == mnt_root_p || dentry == d_parent)
+        if(dentry == d_parent && dentry != mnt_root_p)
 		{
-            if(unlikely(dentry != mnt_root_p))
-			{
-                /* We reached the root (dentry == d_parent) 
-				 * but not the mount root...there is something wrong stop here.
-				 */
-                break;
-            }
+			break;
+		}
 
-            if(mnt_p != mnt_parent_p)
+		if(dentry == mnt_root_p)
+		{
+			if(mnt_p != mnt_parent_p)
 			{
-                /* We reached root, but not global root - continue with mount point path */
-                bpf_probe_read_kernel(&dentry, sizeof(struct dentry *), &mnt_p->mnt_mountpoint);
-                bpf_probe_read_kernel(&mnt_p, sizeof(struct mount *), &mnt_p->mnt_parent);
-                bpf_probe_read_kernel(&mnt_parent_p, sizeof(struct mount *), &mnt_p->mnt_parent);
-                vfsmnt = &mnt_p->mnt;
+				/* We reached root, but not global root - continue with mount point path */
+				bpf_probe_read_kernel(&dentry, sizeof(struct dentry *), &mnt_p->mnt_mountpoint);
+				bpf_probe_read_kernel(&mnt_p, sizeof(struct mount *), &mnt_p->mnt_parent);
+				bpf_probe_read_kernel(&mnt_parent_p, sizeof(struct mount *), &mnt_p->mnt_parent);
+				vfsmnt = &mnt_p->mnt;
 				bpf_probe_read_kernel(&mnt_root_p, sizeof(struct dentry *), &(vfsmnt->mnt_root));
-                continue;
-            }
-            
-			/* We have the full path */
-            break;
+				continue;
+			}
+			else
+			{
+				break;
+			}
         }
 
 		/* Get the dentry name */
@@ -163,6 +161,12 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
         effective_name_len = bpf_probe_read_kernel_str(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(current_off)]),
 						MAX_COMPONENT_LEN,
 						(void *)d_name.name);
+
+		/* This check shouldn't be necessary at all, right now we
+		 * keep it just to be extra safe. Unfortunately, it causes
+		 * verifier issues on s390x...
+		 */
+#ifndef CONFIG_S390		
 		if(effective_name_len <= 1)
 		{
 			/* If effective_name_len is 0 or 1 we have an error
@@ -170,7 +174,7 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 			 */
 			break;
 		}
-
+#endif
 		/* `max_buf_len -= 1` point to the `\0` of the just written name.
 		 * We will replace the terminating `/` at the end of the string with `\0` after the for loop.
 		 * Then we set `max_buf_len` to the last written char. 
