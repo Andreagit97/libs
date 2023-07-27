@@ -593,7 +593,6 @@ TEST(SyscallExit, execveX_success_memfd)
 	evt_test->assert_num_params_pushed(28);
 }
 #endif
-#endif
 
 TEST(SyscallExit, execveX_symlink)
 {
@@ -677,3 +676,4 @@ TEST(SyscallExit, execveX_symlink)
 
 	evt_test->assert_num_params_pushed(28);
 }
+#endif

@@ -70,12 +70,20 @@ static __always_inline struct file *bpf_fget(int fd)
 	return fil;
 }
 
+/* In this kernel version the instruction limit was bumped 131072 from to 1000000
+ * The limit of `MAX_NUM_COMPONENTS` is 50 on Amazonlinux2 4.14, so we set it to 48
+ * In newer kernel versions we can use at least 96 
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0))
+#define MAX_NUM_COMPONENTS 96
+#else
+#define MAX_NUM_COMPONENTS 48
+#endif
 
 /* We must always leave at least 4096 bytes free in our tmp scratch space
  * to please the verifier since we set the max component len to 4096 bytes.
  */
 #define MAX_COMPONENT_LEN 4096
-#define MAX_NUM_COMPONENTS 48
 #define MAX_TMP_SCRATCH_LEN (SCRATCH_SIZE-4096)
 #define SAFE_TMP_SCRATCH_ACCESS(x) x &(MAX_TMP_SCRATCH_LEN-1)
 

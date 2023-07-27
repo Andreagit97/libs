@@ -40,6 +40,8 @@ enum ovl_entry_flag {
 };
 #endif
 
+#include <linux/mount.h>
+/* This require the inlclude `linux/mount.h` for `vfsmount` definition */
 struct mount {
     struct hlist_node mnt_hash;
     struct mount *mnt_parent;

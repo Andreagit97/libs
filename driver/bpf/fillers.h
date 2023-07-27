@@ -3294,10 +3294,22 @@ FILLER(sys_open_by_handle_at_x, true)
 	CHECK_RES(res);
 
 	/* Parameter 3: flags (type: PT_FLAGS32) */
+	/* Here we need to use `bpf_val_to_ring` to
+	 * fix verifier issues on Amazolinux2 (Kernel 4.14.309-231.529.amzn2.x86_64)
+	 */
 	u32 flags = (u32)bpf_syscall_get_argument(data, 2);
-	res = bpf_push_u32_to_ring(data, open_flags_to_scap(flags));
+	res = bpf_val_to_ring(data, open_flags_to_scap(flags));
 	CHECK_RES(res);
 	
+	bpf_tail_call(data->ctx, &tail_map, PPM_FILLER_open_by_handle_at_x_extra_tail_1);
+	bpf_printk("Can't tail call open_by_handle_at_x_extra_tail_1 filler\n");
+	return PPM_FAILURE_BUG;	
+}
+
+FILLER(open_by_handle_at_x_extra_tail_1, true)
+{
+	long retval = bpf_syscall_get_retval(data->ctx);
+
 	/* Parameter 4: path (type: PT_FSPATH) */
 	if(retval > 0)
 	{
@@ -3305,18 +3317,10 @@ FILLER(sys_open_by_handle_at_x, true)
 		if(f != NULL)
 		{
 			char* filepath = bpf_d_path_approx(data, &(f->f_path));
-			res = bpf_val_to_ring_mem(data,(unsigned long)filepath, KERNEL);
-		}
-		else
-		{
-			res = bpf_push_empty_param(data);
+			return bpf_val_to_ring_mem(data,(unsigned long)filepath, KERNEL);
 		}
 	}
-	else
-	{
-		res = bpf_push_empty_param(data);
-	}
-	return res;
+	return bpf_push_empty_param(data);
 }
 
 FILLER(sys_io_uring_setup_x, true)
