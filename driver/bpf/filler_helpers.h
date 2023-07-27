@@ -75,9 +75,9 @@ static __always_inline struct file *bpf_fget(int fd)
  * In newer kernel versions we can use at least 96 
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0))
-#define MAX_NUM_COMPONENTS 32
+#define MAX_NUM_COMPONENTS 48
 #else
-#define MAX_NUM_COMPONENTS 16
+#define MAX_NUM_COMPONENTS 24
 #endif
 
 /* We must always leave at least 4096 bytes free in our tmp scratch space
@@ -202,7 +202,7 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 	/* Null terminate the path string */
 	data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(MAX_TMP_SCRATCH_LEN-1)] = '\0';
 
-    return &(data->tmp_scratch[max_buf_len]);
+    return &(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)]);
 }
 
 static __always_inline struct socket *bpf_sockfd_lookup(struct filler_data *data,
