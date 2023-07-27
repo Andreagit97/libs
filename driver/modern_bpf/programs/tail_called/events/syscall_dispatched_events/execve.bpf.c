@@ -312,8 +312,7 @@ int BPF_PROG(t2_execve_x, struct pt_regs *regs, long ret)
 	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
 	if(exe_file != NULL)
 	{
-		// auxmap__store_file_path_param(auxmap, &(exe_file->f_path));
-		auxmap__store_empty_param(auxmap);
+		auxmap__store_d_path_approx(auxmap, &(exe_file->f_path));
 	}
 	else
 	{
