@@ -1432,9 +1432,9 @@ static __always_inline void apply_dynamic_snaplen(struct pt_regs *regs, u16 *sna
  * to please the verifier since we set the max component len to 4096 bytes.
  */
 #define MAX_COMPONENT_LEN 4096
-#define MAX_NUM_COMPONENTS 96 // To see what to do
-#define MAX_TMP_SCRATCH_LEN (AUXILIARY_MAP_SIZE-4096)
-#define SAFE_TMP_SCRATCH_ACCESS(x) x &(MAX_TMP_SCRATCH_LEN-1)
+#define MAX_NUM_COMPONENTS 96
+#define MAX_TMP_SCRATCH_LEN (AUXILIARY_MAP_SIZE-8192)
+#define SAFE_TMP_SCRATCH_ACCESS(x) (x) &(MAX_TMP_SCRATCH_LEN-1)
 
 /* Please note: Kernel 5.10 introduced a new bpf_helper called `bpf_d_path`
  * to extract a file path starting from a struct* file but it can be used only
