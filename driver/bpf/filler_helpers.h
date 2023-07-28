@@ -84,8 +84,8 @@ static __always_inline struct file *bpf_fget(int fd)
  * to please the verifier since we set the max component len to 4096 bytes.
  */
 #define MAX_COMPONENT_LEN 4096
-#define MAX_TMP_SCRATCH_LEN (SCRATCH_SIZE-4096)
-#define SAFE_TMP_SCRATCH_ACCESS(x) x &(MAX_TMP_SCRATCH_LEN-1)
+#define MAX_TMP_SCRATCH_LEN (SCRATCH_SIZE >> 1)
+#define SAFE_TMP_SCRATCH_ACCESS(x) (x) &(MAX_TMP_SCRATCH_LEN-1)
 
 /* Please note: Kernel 5.10 introduced a new bpf_helper called `bpf_d_path`
  * to extract a file path starting from a struct* file but it can be used only
@@ -113,7 +113,8 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 	bpf_probe_read_kernel(&mnt_root_p, sizeof(struct dentry *), &(vfsmnt->mnt_root));
 
 	/* This is the max length of the buffer in which we will write the full path.
-	 * We leave the last 4096 bytes free to please the verifier.
+	 * We leave at least 4096 bytes free to please the verifier. More precisely here
+	 * we are at the half of the map.
 	 */
     u32 max_buf_len = MAX_TMP_SCRATCH_LEN;
 
@@ -123,6 +124,8 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
     u32 name_len = 0; /* This is the len we read inside `struct qstr`. */
 	u32 current_off = 0;
     int effective_name_len = 0; /* This is the len we read with `bpf_probe_read_kernel_str`. */
+	char slash = '/';
+	char terminator = '\0';
 
 #pragma unroll
     for(int i = 0; i < MAX_NUM_COMPONENTS; i++)
@@ -180,7 +183,7 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 		 * Then we set `max_buf_len` to the last written char. 
 		 */
 		max_buf_len -= 1;
-		data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)] = '/';
+		bpf_probe_read_kernel(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)]), 1 , &slash);
 		max_buf_len -= (effective_name_len - 1);
 
         dentry = d_parent;
@@ -197,10 +200,10 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 
     /* Add leading slash */
     max_buf_len -= 1;
-	data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)] = '/';
+	bpf_probe_read_kernel(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)]), 1 , &slash);
 
 	/* Null terminate the path string */
-	data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(MAX_TMP_SCRATCH_LEN-1)] = '\0';
+	bpf_probe_read_kernel(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(MAX_TMP_SCRATCH_LEN-1)]), 1 , &terminator);
 
     return &(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)]);
 }
