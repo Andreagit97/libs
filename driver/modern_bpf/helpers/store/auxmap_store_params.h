@@ -1430,13 +1430,37 @@ static __always_inline void apply_dynamic_snaplen(struct pt_regs *regs, u16 *sna
 
 /* We must always leave at least 4096 bytes free in our tmp scratch space
  * to please the verifier since we set the max component len to 4096 bytes.
+ * The difference with the old probe is that here we don't have a dedicated map
+ * for saving tmp strings, we need to use our auxmap.
+ * We use the first 64 KB to write data, while we use the last 64 KB to save tmp buffers.
+ * In this case we start from the end (128 KB) and we leave 8192 bytes to please the verifier.
+ * 4096 bytes are enough but using 8192 simplify extreme cases in which tha path is exactly 4096 bytes.
+ *
+ *  64 KB (Used for data) 64 KB (Used to save tmp buffers)
+ * |---------------------|---------------------|
+ *                                         ^
+ *                                         |
+ *                              We start here and write backward
+ *                              as we find components of the path.
+ * 								We left 8192 bytes so we start at
+ * 								(128*1024 - 8192)
+ *
+ * As a bitmask we use `SAFE_TMP_SCRATCH_ACCESS` (128*1024 - 8192 - 1).
+ * Please note this is a little bit more complicated than usual because
+ * this bitmask is not composed by all `1` (0x 0001 1101 1111 1111 1111)
+ * but this is fine because we are sure that we will never write more than
+ * 8192 bytes (max path len is 4096 as the MAX_COMPONENT_LEN).
  */
 #define MAX_COMPONENT_LEN 4096
 #define MAX_NUM_COMPONENTS 96
-#define MAX_TMP_SCRATCH_LEN (AUXILIARY_MAP_SIZE-8192)
-#define SAFE_TMP_SCRATCH_ACCESS(x) (x) &(MAX_TMP_SCRATCH_LEN-1)
+#define MAX_TMP_SCRATCH_LEN (AUXILIARY_MAP_SIZE - 8192)
+#define SAFE_TMP_SCRATCH_ACCESS(x) (x) & (MAX_TMP_SCRATCH_LEN - 1)
 
-/* Please note: Kernel 5.10 introduced a new bpf_helper called `bpf_d_path`
+/**
+ * @brief Store in the auxamp the file path extracted from
+ * the `struct path *`.
+ *
+ * Please note: Kernel 5.10 introduced a new bpf_helper called `bpf_d_path`
  * to extract a file path starting from a struct* file but it can be used only
  * with specific hooks:
  *
@@ -1448,68 +1472,71 @@ static __always_inline void apply_dynamic_snaplen(struct pt_regs *regs, u16 *sna
  * 2. we cannot use locks so we can face race conditions during the path reconstruction.
  * 3. reconstructed path could be slightly different from the one returned by `d_path`.
  *    See pseudo_filesystem prefixes or the " (deleted)" suffix.
+ *
+ * @param auxmap pointer to the auxmap in which we are storing the param.
+ * @param path pointer to the path struct from which we will extract the path name
  */
 static __always_inline void auxmap__store_d_path_approx(struct auxiliary_map *auxmap, struct path *path)
 {
-    struct path f_path = {};
-    bpf_core_read(&f_path, sizeof(struct path), path);
-    struct dentry *dentry = f_path.dentry;
-    struct vfsmount *vfsmnt = f_path.mnt;
-    struct mount *mnt_p = container_of(vfsmnt, struct mount, mnt);
-    struct mount *mnt_parent_p = BPF_CORE_READ(mnt_p, mnt_parent);
-    struct dentry *mnt_root_p = BPF_CORE_READ(vfsmnt, mnt_root);
+	struct path f_path = {};
+	bpf_core_read(&f_path, sizeof(struct path), path);
+	struct dentry *dentry = f_path.dentry;
+	struct vfsmount *vfsmnt = f_path.mnt;
+	struct mount *mnt_p = container_of(vfsmnt, struct mount, mnt);
+	struct mount *mnt_parent_p = BPF_CORE_READ(mnt_p, mnt_parent);
+	struct dentry *mnt_root_p = BPF_CORE_READ(vfsmnt, mnt_root);
 
-	/* This is the max length of the buffer in which we will write the full path.
-	 * We leave the last 4096 bytes free to please the verifier.
-	 */
-    u32 max_buf_len = MAX_TMP_SCRATCH_LEN;
+	/* This is the max length of the buffer in which we will write the full path. */
+	u32 max_buf_len = MAX_TMP_SCRATCH_LEN;
 
 	/* Populated inside the loop */
-    struct dentry *d_parent = NULL;
-    struct qstr d_name = {};
-    u32 name_len = 0; /* This is the len we read inside `struct qstr`. */
+	struct dentry *d_parent = NULL;
+	struct qstr d_name = {};
 	u32 current_off = 0;
-    int effective_name_len = 0; /* This is the len we read with `bpf_probe_read_kernel_str`. */
+	int effective_name_len = 0;
 
+/* We need the unroll here otherwise the verifier complains about back-edges */
 #pragma unroll
-    for(int i = 0; i < MAX_NUM_COMPONENTS; i++)
-	{	
+	for(int i = 0; i < MAX_NUM_COMPONENTS; i++)
+	{
 		BPF_CORE_READ_INTO(&d_parent, dentry, d_parent);
-        if(dentry == mnt_root_p || dentry == d_parent)
+		if(dentry == mnt_root_p || dentry == d_parent)
 		{
-            if(dentry != mnt_root_p)
+			if(dentry != mnt_root_p)
 			{
-                /* We reached the root (dentry == d_parent) 
-				 * but not the mount root...there is something wrong stop here.
+				/* We reached the root (dentry == d_parent)
+				 * but not the mount root...there is something weird, stop here.
 				 */
-                break;
-            }
+				break;
+			}
 
-            if(mnt_p != mnt_parent_p)
+			if(mnt_p != mnt_parent_p)
 			{
-                /* We reached root, but not global root - continue with mount point path */
-                BPF_CORE_READ_INTO(&dentry, mnt_p, mnt_mountpoint);
-                BPF_CORE_READ_INTO(&mnt_p, mnt_p, mnt_parent);
-                BPF_CORE_READ_INTO(&mnt_parent_p, mnt_p, mnt_parent);
-                vfsmnt = &mnt_p->mnt;
-				BPF_CORE_READ_INTO(&mnt_root_p, vfsmnt,mnt_root);
-                continue;
-            }
-            
-			/* We have the full path */
-            break;
-        }
+				/* We reached root, but not global root - continue with mount point path */
+				BPF_CORE_READ_INTO(&dentry, mnt_p, mnt_mountpoint);
+				BPF_CORE_READ_INTO(&mnt_p, mnt_p, mnt_parent);
+				BPF_CORE_READ_INTO(&mnt_parent_p, mnt_p, mnt_parent);
+				vfsmnt = &mnt_p->mnt;
+				BPF_CORE_READ_INTO(&mnt_root_p, vfsmnt, mnt_root);
+				continue;
+			}
+
+			/* We have the full path, stop here */
+			break;
+		}
 
 		/* Get the dentry name */
 		bpf_core_read(&d_name, sizeof(struct qstr), &(dentry->d_name));
 
-		/* +1 for the terminator that is not considered in d_name.len (CHECK IT!) */
-		/* Reserve space for the name trusting the len written in `qstr` struct */
-        current_off = max_buf_len - (d_name.len + 1);
+		/* +1 for the terminator that is not considered in d_name.len.
+		 * Reserve space for the name trusting the len
+		 * written in `qstr` struct
+		 */
+		current_off = max_buf_len - (d_name.len + 1);
 
-        effective_name_len = bpf_probe_read_kernel_str(&(auxmap->data[SAFE_TMP_SCRATCH_ACCESS(current_off)]),
-						MAX_COMPONENT_LEN,
-						(void *)d_name.name);
+		effective_name_len = bpf_probe_read_kernel_str(&(auxmap->data[SAFE_TMP_SCRATCH_ACCESS(current_off)]),
+							       MAX_COMPONENT_LEN, (void *)d_name.name);
+
 		if(effective_name_len <= 1)
 		{
 			/* If effective_name_len is 0 or 1 we have an error
@@ -1518,32 +1545,33 @@ static __always_inline void auxmap__store_d_path_approx(struct auxiliary_map *au
 			break;
 		}
 
-		/* `max_buf_len -= 1` point to the `\0` of the just written name.
-		 * We will replace the terminating `/` at the end of the string with `\0` after the for loop.
-		 * Then we set `max_buf_len` to the last written char. 
+		/* 1. `max_buf_len -= 1` point to the `\0` of the just written name.
+		 * 2. We replace it with a `/`.
+		 * 3. Then we set `max_buf_len` to the last written char.
 		 */
 		max_buf_len -= 1;
 		auxmap->data[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)] = '/';
 		max_buf_len -= (effective_name_len - 1);
 
-        dentry = d_parent;
-    }
+		dentry = d_parent;
+	}
 
-    if(max_buf_len == MAX_TMP_SCRATCH_LEN) 
+	if(max_buf_len == MAX_TMP_SCRATCH_LEN)
 	{
-		/* We never decremented it */
-        /* memfd files have no path in the filesystem -> extract their name */
+		/* memfd files have no path in the filesystem so we never decremented the `max_buf_len` */
 		bpf_core_read(&d_name, sizeof(struct qstr), &(dentry->d_name));
 		auxmap__store_charbuf_param(auxmap, (unsigned long)d_name.name, MAX_COMPONENT_LEN, KERNEL);
 		return;
-    } 
+	}
 
-    /* Add leading slash */
-    max_buf_len -= 1;
+	/* Add leading slash */
+	max_buf_len -= 1;
 	auxmap->data[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)] = '/';
 
-	/* Null terminate the path string */
-	auxmap->data[SAFE_TMP_SCRATCH_ACCESS(MAX_TMP_SCRATCH_LEN-1)] = '\0';
+	/* Null terminate the path string.
+	 * Replace the first `/` we added in the loop with `\0`
+	 */
+	auxmap->data[SAFE_TMP_SCRATCH_ACCESS(MAX_TMP_SCRATCH_LEN - 1)] = '\0';
 
 	auxmap__store_charbuf_param(auxmap, (unsigned long)(&(auxmap->data[max_buf_len])), MAX_COMPONENT_LEN, KERNEL);
 }
