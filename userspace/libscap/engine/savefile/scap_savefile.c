@@ -715,13 +715,14 @@ static int32_t scap_read_proclist(scap_reader_t* r, uint32_t block_length, uint3
 			// we need to read the len first
 			readsize = r->read(r, &(stlen), sizeof(uint16_t));
 			CHECK_READ_SIZE_ERR(readsize, sizeof(uint16_t), error);
-			subreadsize += readsize;
 			
 			if(stlen > SCAP_MAX_PATH_SIZE)
 			{
 				snprintf(error, SCAP_LASTERR_SIZE, "invalid trusted_exepath len %d", stlen);
 				return SCAP_FAILURE;
 			}
+
+			subreadsize += readsize;
 
 			// We don't need another check since if there is the len
 			// there is also the payload

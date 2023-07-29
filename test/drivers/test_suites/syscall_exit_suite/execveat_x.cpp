@@ -154,7 +154,7 @@ TEST(SyscallExit, execveatX_failure)
 	/* Parameter 27: uid (type: PT_UINT32) */
 	evt_test->assert_numeric_param(27, (uint32_t)geteuid(), EQUAL);
 
-	/* Parameter 28: trusted_exepath (type: PT_CHARBUF) */
+	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
 	/* Here we don't call the execveat so the result should be the full path to the drivers test executable */
 	evt_test->assert_charbuf_param(28, info.exepath);
 
@@ -280,7 +280,7 @@ TEST(SyscallExit, execveatX_correct_exit)
 	/* Parameter 27: uid (type: PT_UINT32) */
 	evt_test->assert_numeric_param(27, (uint32_t)geteuid(), EQUAL);
 
-	/* Parameter 28: trusted_exepath (type: PT_CHARBUF) */
+	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
 	evt_test->assert_charbuf_param(28, pathname);
 
 	/*=============================== ASSERT PARAMETERS  ===========================*/
@@ -408,7 +408,7 @@ TEST(SyscallExit, execveatX_execve_exit)
 	/* Parameter 27: uid (type: PT_UINT32) */
 	evt_test->assert_numeric_param(27, (uint32_t)geteuid(), EQUAL);
 
-	/* Parameter 28: trusted_exepath (type: PT_CHARBUF) */
+	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
 	evt_test->assert_charbuf_param(28, pathname);
 
 	/*=============================== ASSERT PARAMETERS  ===========================*/
@@ -519,7 +519,7 @@ TEST(SyscallExit, execveatX_success_memfd)
 	 */
 	evt_test->assert_numeric_param(20, (uint32_t)PPM_EXE_WRITABLE | PPM_EXE_FROM_MEMFD);
 
-	/* Parameter 28: trusted_exepath (type: PT_CHARBUF) */
+	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
 	/* In the kmod we use d_path helper so case like memfd are correcly managed */
 	if(evt_test->is_kmod_engine())
 	{
