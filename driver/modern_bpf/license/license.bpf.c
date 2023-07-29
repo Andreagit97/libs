@@ -7,4 +7,4 @@
 
 #include <helpers/base/common.h>
 
-char LICENSE[] SEC("license") = "GPL";
+char LICENSE[] SEC("license") = "Dual MIT/GPL";

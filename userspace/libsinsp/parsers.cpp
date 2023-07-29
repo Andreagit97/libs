@@ -2683,7 +2683,7 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt)
 		evt->m_tinfo->m_user.uid = *(uint32_t *)parinfo->m_val;
 	}
 
-	/* Parameter 28: trusted_exepath */
+	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
 	if(evt->get_num_params() > 27)
 	{
 		parinfo = evt->get_param(27);

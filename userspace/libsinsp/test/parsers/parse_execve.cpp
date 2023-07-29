@@ -150,6 +150,22 @@ TEST_F(sinsp_with_test_input, EXECVE_check_resolved_symlink)
 	ASSERT_EQ(p6_t1_tinfo->get_exepath(), "/good-exe");
 	ASSERT_EQ(p6_t1_tinfo->get_comm(), "good-exe");
 	ASSERT_EQ(p6_t1_tinfo->get_trusted_exepath(), "/usr/bin/bad-exe");
+
+	/* Create a new child of p6_t1 and check if we inerith the trusted exepath */
+	int64_t p7_t1_tid = 100;
+	int64_t p7_t1_pid = 100;
+	int64_t p7_t1_ptid = p6_t1_tid;
+	int64_t p7_t1_vtid = 20;
+	int64_t p7_t1_vpid = 20;
+
+	generate_clone_x_event(0, p7_t1_tid, p7_t1_pid, p7_t1_ptid, PPM_CL_CHILD_IN_PIDNS, p7_t1_vtid, p7_t1_vpid, "new-comm");
+
+	auto p7_t1_tinfo = m_inspector.get_thread_ref(p7_t1_tid, false).get();
+	ASSERT_TRUE(p7_t1_tinfo);
+
+	ASSERT_EQ(p7_t1_tinfo->get_exepath(), "/good-exe");
+	ASSERT_EQ(p7_t1_tinfo->get_comm(), "new-comm");
+	ASSERT_EQ(p7_t1_tinfo->get_trusted_exepath(), "/usr/bin/bad-exe");
 }
 
 /*=============================== EXECVE ===========================*/

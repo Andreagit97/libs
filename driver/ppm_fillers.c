@@ -1477,7 +1477,7 @@ cgroups_error:
 				mtime = file_inode(exe_file)->i_mtime.tv_sec * (uint64_t) 1000000000 + file_inode(exe_file)->i_mtime.tv_nsec;
 			}
 #endif
-			/* Before free the exefile we catch the resolved path for symlink resolution */
+			/* Before freeing the exefile we catch the resolved path for symlink resolution */
 			trusted_exepath = d_path(&exe_file->f_path, buf, PAGE_SIZE);
 			fput(exe_file);
 		}
@@ -1553,7 +1553,7 @@ cgroups_error:
 		res = val_to_ring(args, euid, 0, false, 0);
 		CHECK_RES(res);
 
-		/* Parameter 28: trusted_exepath */
+		/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
 		res = val_to_ring(args, (unsigned long)trusted_exepath, 0, false, 0);
 		CHECK_RES(res);
 	}
@@ -7734,7 +7734,7 @@ cgroups_error:
 	res = val_to_ring(args, euid, 0, false, 0);
 	CHECK_RES(res);
 
-	/* Parameter 28: trusted_exepath */
+	/* Parameter 28: trusted_exepath (type: PT_FSPATH) */
 	res = val_to_ring(args, (unsigned long)trusted_exepath, 0, false, 0);
 	CHECK_RES(res);
 
