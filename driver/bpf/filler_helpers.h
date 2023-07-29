@@ -70,11 +70,11 @@ static __always_inline struct file *bpf_fget(int fd)
 	return fil;
 }
 
-/* In this kernel version the instruction limit was bumped 131072 from to 1000000
- * The limit of `MAX_NUM_COMPONENTS` is 50 on Amazonlinux2 4.14, so we set it to 48
- * In newer kernel versions we can use at least 96 
+/* In this kernel version the instruction limit was bumped from 131072 to 1000000.
+ * For this reason we use different values of `MAX_NUM_COMPONENTS`
+ * according to the kernel version.
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0))
+#if(LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0))
 #define MAX_NUM_COMPONENTS 48
 #else
 #define MAX_NUM_COMPONENTS 24
@@ -82,10 +82,23 @@ static __always_inline struct file *bpf_fget(int fd)
 
 /* We must always leave at least 4096 bytes free in our tmp scratch space
  * to please the verifier since we set the max component len to 4096 bytes.
+ * We start writing our exepath from half of the tmp scratch space. The
+ * whole space is 256 KB, we start at 128 KB.
+ *
+ *       128 KB           128 KB (Free space to please the verifier)
+ * |----------------|----------------|
+ *                  ^
+ *                  |
+ *        We start here and write backward
+ *        as we find components of the path
+ *
+ * As a bitmask we use `SAFE_TMP_SCRATCH_ACCESS` (128*1024 - 1).
+ * This helps the verifier to understand that our offset never overcomes
+ * 128 KB.
  */
 #define MAX_COMPONENT_LEN 4096
 #define MAX_TMP_SCRATCH_LEN (SCRATCH_SIZE >> 1)
-#define SAFE_TMP_SCRATCH_ACCESS(x) (x) &(MAX_TMP_SCRATCH_LEN-1)
+#define SAFE_TMP_SCRATCH_ACCESS(x) (x) & (MAX_TMP_SCRATCH_LEN - 1)
 
 /* Please note: Kernel 5.10 introduced a new bpf_helper called `bpf_d_path`
  * to extract a file path starting from a struct* file but it can be used only
@@ -95,44 +108,43 @@ static __always_inline struct file *bpf_fget(int fd)
  *
  * So we need to do it by hand emulating its behavior.
  * This brings some limitations:
- * 1. limitations in the path length and in the number of components that compose the full path.
+ * 1. the number of path components is limited to `MAX_NUM_COMPONENTS`.
  * 2. we cannot use locks so we can face race conditions during the path reconstruction.
  * 3. reconstructed path could be slightly different from the one returned by `d_path`.
  *    See pseudo_filesystem prefixes or the " (deleted)" suffix.
  */
 static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct path *path)
 {
-    struct path f_path = {};
-    bpf_probe_read_kernel(&f_path, sizeof(struct path), path);
-    struct dentry *dentry = f_path.dentry;
-    struct vfsmount *vfsmnt = f_path.mnt;
-    struct mount *mnt_p = container_of(vfsmnt, struct mount, mnt);
-    struct mount *mnt_parent_p = NULL;
-    bpf_probe_read_kernel(&mnt_parent_p, sizeof(struct mount *), &(mnt_p->mnt_parent));
-    struct dentry *mnt_root_p = NULL;
+	struct path f_path = {};
+	bpf_probe_read_kernel(&f_path, sizeof(struct path), path);
+	struct dentry *dentry = f_path.dentry;
+	struct vfsmount *vfsmnt = f_path.mnt;
+	struct mount *mnt_p = container_of(vfsmnt, struct mount, mnt);
+	struct mount *mnt_parent_p = NULL;
+	bpf_probe_read_kernel(&mnt_parent_p, sizeof(struct mount *), &(mnt_p->mnt_parent));
+	struct dentry *mnt_root_p = NULL;
 	bpf_probe_read_kernel(&mnt_root_p, sizeof(struct dentry *), &(vfsmnt->mnt_root));
 
-	/* This is the max length of the buffer in which we will write the full path.
-	 * We leave at least 4096 bytes free to please the verifier. More precisely here
-	 * we are at the half of the map.
-	 */
-    u32 max_buf_len = MAX_TMP_SCRATCH_LEN;
+	/* This is the max length of the buffer in which we will write the full path. */
+	u32 max_buf_len = MAX_TMP_SCRATCH_LEN;
 
 	/* Populated inside the loop */
-    struct dentry *d_parent = NULL;
-    struct qstr d_name = {};
-    u32 name_len = 0; /* This is the len we read inside `struct qstr`. */
+	struct dentry *d_parent = NULL;
+	struct qstr d_name = {};
 	u32 current_off = 0;
-    int effective_name_len = 0; /* This is the len we read with `bpf_probe_read_kernel_str`. */
+	int effective_name_len = 0;
 	char slash = '/';
 	char terminator = '\0';
 
 #pragma unroll
-    for(int i = 0; i < MAX_NUM_COMPONENTS; i++)
-	{	
+	for(int i = 0; i < MAX_NUM_COMPONENTS; i++)
+	{
 		bpf_probe_read_kernel(&d_parent, sizeof(struct dentry *), &(dentry->d_parent));
-        if(dentry == d_parent && dentry != mnt_root_p)
+		if(dentry == d_parent && dentry != mnt_root_p)
 		{
+			/* We reached the root (dentry == d_parent)
+			 * but not the mount root...there is something weird, stop here.
+			 */
 			break;
 		}
 
@@ -150,26 +162,29 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 			}
 			else
 			{
+				/* We have the full path, stop here */
 				break;
 			}
-        }
+		}
 
 		/* Get the dentry name */
 		bpf_probe_read_kernel(&d_name, sizeof(struct qstr), &(dentry->d_name));
 
-		/* +1 for the terminator that is not considered in d_name.len (CHECK IT!) */
-		/* Reserve space for the name trusting the len written in `qstr` struct */
-        current_off = max_buf_len - (d_name.len + 1);
-
-        effective_name_len = bpf_probe_read_kernel_str(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(current_off)]),
-						MAX_COMPONENT_LEN,
-						(void *)d_name.name);
-
-		/* This check shouldn't be necessary at all, right now we
-		 * keep it just to be extra safe. Unfortunately, it causes
-		 * verifier issues on s390x...
+		/* +1 for the terminator that is not considered in d_name.len.
+		 * Reserve space for the name trusting the len
+		 * written in `qstr` struct
 		 */
-#ifndef CONFIG_S390		
+		current_off = max_buf_len - (d_name.len + 1);
+
+		effective_name_len =
+			bpf_probe_read_kernel_str(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(current_off)]),
+						  MAX_COMPONENT_LEN, (void *)d_name.name);
+
+		/* This check shouldn't be necessary, right now we
+		 * keep it just to be extra safe. Unfortunately, it causes
+		 * verifier issues on s390x (5.15.0-75-generic Ubuntu s390x)
+		 */
+#ifndef CONFIG_S390
 		if(effective_name_len <= 1)
 		{
 			/* If effective_name_len is 0 or 1 we have an error
@@ -178,34 +193,36 @@ static __always_inline char *bpf_d_path_approx(struct filler_data *data, struct 
 			break;
 		}
 #endif
-		/* `max_buf_len -= 1` point to the `\0` of the just written name.
-		 * We will replace the terminating `/` at the end of the string with `\0` after the for loop.
-		 * Then we set `max_buf_len` to the last written char. 
+		/* 1. `max_buf_len -= 1` point to the `\0` of the just written name.
+		 * 2. We replace it with a `/`. Note that we have to use `bpf_probe_read_kernel`
+		 *    to please some old verifiers like (Oracle Linux 4.14).
+		 * 3. Then we set `max_buf_len` to the last written char.
 		 */
 		max_buf_len -= 1;
-		bpf_probe_read_kernel(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)]), 1 , &slash);
+		bpf_probe_read_kernel(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)]), 1, &slash);
 		max_buf_len -= (effective_name_len - 1);
 
-        dentry = d_parent;
-    }
+		dentry = d_parent;
+	}
 
-    if(max_buf_len == MAX_TMP_SCRATCH_LEN) 
+	if(max_buf_len == MAX_TMP_SCRATCH_LEN)
 	{
-		/* We never decremented it */
-        /* memfd files have no path in the filesystem -> extract their name */
+		/* memfd files have no path in the filesystem so we never decremented the `max_buf_len` */
 		bpf_probe_read_kernel(&d_name, sizeof(struct qstr), &(dentry->d_name));
-        bpf_probe_read_kernel_str(&(data->tmp_scratch[0]), MAX_COMPONENT_LEN, (void *) d_name.name);
+		bpf_probe_read_kernel_str(&(data->tmp_scratch[0]), MAX_COMPONENT_LEN, (void *)d_name.name);
 		return data->tmp_scratch;
-    } 
+	}
 
-    /* Add leading slash */
-    max_buf_len -= 1;
-	bpf_probe_read_kernel(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)]), 1 , &slash);
+	/* Add leading slash */
+	max_buf_len -= 1;
+	bpf_probe_read_kernel(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)]), 1, &slash);
 
-	/* Null terminate the path string */
-	bpf_probe_read_kernel(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(MAX_TMP_SCRATCH_LEN-1)]), 1 , &terminator);
+	/* Null terminate the path string.
+	 * Replace the first `/` we added in the loop with `\0`
+	 */
+	bpf_probe_read_kernel(&(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(MAX_TMP_SCRATCH_LEN - 1)]), 1, &terminator);
 
-    return &(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)]);
+	return &(data->tmp_scratch[SAFE_TMP_SCRATCH_ACCESS(max_buf_len)]);
 }
 
 static __always_inline struct socket *bpf_sockfd_lookup(struct filler_data *data,

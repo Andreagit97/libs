@@ -2739,7 +2739,7 @@ FILLER(proc_startupdate_3, true)
 		CHECK_RES(res);
 
 		bpf_tail_call(data->ctx, &tail_map, PPM_FILLER_execve_extra_tail_1);
-		bpf_printk("Can't tail call execve_extra_tail_1 filler\n");
+		bpf_printk("Can't tail call 'execve_extra_tail_1' filler\n");
 		return PPM_FAILURE_BUG;	
 	}
 
@@ -2851,7 +2851,7 @@ FILLER(execve_extra_tail_1, true)
 	CHECK_RES(res);
 
 	bpf_tail_call(data->ctx, &tail_map, PPM_FILLER_execve_extra_tail_2);
-	bpf_printk("Can't tail call execve_extra_tail_2 filler\n");
+	bpf_printk("Can't tail call 'execve_extra_tail_2' filler\n");
 	return PPM_FAILURE_BUG;	
 }
 
@@ -3302,7 +3302,7 @@ FILLER(sys_open_by_handle_at_x, true)
 	CHECK_RES(res);
 	
 	bpf_tail_call(data->ctx, &tail_map, PPM_FILLER_open_by_handle_at_x_extra_tail_1);
-	bpf_printk("Can't tail call open_by_handle_at_x_extra_tail_1 filler\n");
+	bpf_printk("Can't tail call 'open_by_handle_at_x_extra_tail_1' filler\n");
 	return PPM_FAILURE_BUG;	
 }
 
