@@ -205,11 +205,17 @@ public:
 	 */
 	bool should_lookup(const std::string& container_id, sinsp_container_type ctype) override
 	{
+		/* Check if we already have a lookup table associated with this container id */
 		auto container_lookups = m_lookups.find(container_id);
 		if(container_lookups == m_lookups.end())
 		{
+			/* If no we can do a lookup */
 			return true;
 		}
+		/* Check if we already have a lookup started for our container type.
+		 * According to our code a containerid could have lookup for more than one
+		 * container type.
+		 */
 		auto engine_lookup = container_lookups->second.find(ctype);
 		return engine_lookup == container_lookups->second.end();
 	}
@@ -239,4 +245,3 @@ private:
 
 	friend class test_helper;
 };
-

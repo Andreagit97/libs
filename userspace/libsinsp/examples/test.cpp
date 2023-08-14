@@ -342,6 +342,8 @@ int main(int argc, char** argv)
 {
 	sinsp inspector;
 	dump = plaintext_dump;
+	g_logger.add_stdout_log();
+	g_logger.set_severity(sinsp_logger::SEV_DEBUG);
 
 #ifndef _WIN32
 	parse_CLI_options(inspector, argc, argv);

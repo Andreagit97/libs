@@ -92,6 +92,7 @@ void container_async_source<key_type>::run_impl()
 	key_type key;
 	sinsp_container_info res;
 
+	/* lookup di docker arriva qui */
 	while(this->dequeue_next_key(key, &res))
 	{
 		g_logger.format(sinsp_logger::SEV_DEBUG,
@@ -100,6 +101,7 @@ void container_async_source<key_type>::run_impl()
 				container_id(key).c_str(),
 				res.m_lookup.retry_no());
 
+		/* entro dentro questo lookup sync */
 		lookup_sync(key, res);
 
 		if(!res.m_lookup.should_retry())

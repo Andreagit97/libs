@@ -162,6 +162,7 @@ bool async_key_value_source<key_type, value_type>::lookup_delayed(
 {
 	std::unique_lock<std::mutex> guard(m_mutex);
 
+	/* from `m_docker_info_source->lookup` we arrive here */
 	if(!m_running && !m_thread.joinable())
 	{
 		m_running = true;
@@ -458,4 +459,3 @@ std::chrono::steady_clock::time_point async_key_value_source<key_type, value_typ
 }
 
 } // end namespace libsinsp
-

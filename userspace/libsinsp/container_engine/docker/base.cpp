@@ -28,8 +28,10 @@ docker_base::resolve_impl(sinsp_threadinfo *tinfo, const docker_lookup_request& 
 
 	if(!container_info)
 	{
+		/* If we don't have the container in the cache */
 		if(!query_os_for_missing_info)
 		{
+			/* if we don't want to scan /proc we craft a fake container and we send a container event */
 			auto container = sinsp_container_info();
 			container.m_type = request.container_type;
 			container.m_id = request.container_id;
@@ -65,9 +67,11 @@ void docker_base::parse_docker(const docker_lookup_request& request, container_c
 	bool done;
 	if (cache->async_allowed())
 	{
+		/* Docker enters here */
 		g_logger.format(sinsp_logger::SEV_DEBUG,
 				"docker_async (%s): Starting asynchronous lookup",
 				request.container_id.c_str());
+		/* This is the container_async_source lookup method */
 		done = m_docker_info_source->lookup(request, result);
 	}
 	else
@@ -92,4 +96,3 @@ void docker_base::parse_docker(const docker_lookup_request& request, container_c
 		}
 	}
 }
-

@@ -58,12 +58,15 @@ bool match_one_container_id(const std::string &cgroup, const std::string &prefix
 		return false;
 	}
 
+	/* We check that the container id doesn't contain invalid chars */
 	size_t invalid_ch_pos = cgroup.find_first_not_of(CONTAINER_ID_VALID_CHARACTERS, start_pos);
 	if (invalid_ch_pos < CONTAINER_ID_LENGTH)
 	{
+		/* If we find an invalid char we return immediately */
 		return false;
 	}
 
+	/* We return only the first REPORTED_CONTAINER_ID_LENGTH chars of the container id */
 	container_id = cgroup.substr(start_pos, REPORTED_CONTAINER_ID_LENGTH);
 	return true;
 }
@@ -81,8 +84,12 @@ bool match_container_id(const std::string &cgroup, const libsinsp::runc::cgroup_
 
 	return false;
 }
+
 bool matches_runc_cgroups(const sinsp_threadinfo *tinfo, const cgroup_layout *layout, std::string &container_id, std::string &matching_cgroup)
 {
+	/* Every cgroup should contain the `containerid` so here we loop just to be sure
+	 * but we should always stop at the first iteration.
+	 */
 	for(const auto &it : tinfo->cgroups())
 	{
 		if(match_container_id(it.second, layout, container_id))

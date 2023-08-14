@@ -645,6 +645,7 @@ bool docker_async_source::parse(const docker_lookup_request& request, sinsp_cont
 {
 	std::string json;
 
+	/* sono arrivato qui dalla lookup del docker, ma qui ci è entrato il thread */
 	g_logger.format(sinsp_logger::SEV_DEBUG,
 			"docker_async (%s): Looking up info for container via socket %s",
 			request.container_id.c_str(), request.docker_socket.c_str());
@@ -905,4 +906,3 @@ bool docker_async_source::parse(const docker_lookup_request& request, sinsp_cont
 			request.container_id.c_str());
 	return true;
 }
-

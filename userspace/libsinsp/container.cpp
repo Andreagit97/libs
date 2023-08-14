@@ -125,7 +125,9 @@ bool sinsp_container_manager::resolve_container(sinsp_threadinfo* tinfo, bool qu
 	ASSERT(tinfo);
 	bool matches = false;
 
+	/* We always clear the container_id, why? */
 	tinfo->m_container_id = "";
+
 	if(m_inspector->get_observer())
 	{
 		matches = m_inspector->get_observer()->on_resolve_container(this, tinfo, query_os_for_missing_info);
@@ -140,11 +142,11 @@ bool sinsp_container_manager::resolve_container(sinsp_threadinfo* tinfo, bool qu
 
 	for(auto &eng : m_container_engines)
 	{
-		matches = matches || eng->resolve(tinfo, query_os_for_missing_info);
 		if(matches)
 		{
 			break;
 		}
+		matches = eng->resolve(tinfo, query_os_for_missing_info);
 	}
 
 	// Also possibly set the category for the threadinfo
@@ -562,6 +564,7 @@ void sinsp_container_manager::subscribe_on_remove_container(remove_container_cb 
 
 void sinsp_container_manager::create_engines()
 {
+	/* What is the static container engine? */
 	if (m_static_container)
 	{
 		auto engine = std::make_shared<container_engine::static_container>(*this,
@@ -572,8 +575,7 @@ void sinsp_container_manager::create_engines()
 		m_container_engine_by_type[CT_STATIC] = engine;
 		return;
 	}
-#if !defined(MINIMAL_BUILD) && !defined(__EMSCRIPTEN__)
-#ifndef _WIN32
+#if !defined(MINIMAL_BUILD) && !defined(__EMSCRIPTEN__) && !defined(_WIN32)
 	if (m_container_engine_mask & (1 << CT_PODMAN))
 	{
 		auto podman_engine = std::make_shared<container_engine::podman>(*this);
@@ -630,7 +632,6 @@ void sinsp_container_manager::create_engines()
 		m_container_engines.push_back(bpm_engine);
 		m_container_engine_by_type[CT_BPM] = bpm_engine;
 	}
-#endif // _WIN32
 #endif // MINIMAL_BUILD
 }
 
@@ -714,4 +715,3 @@ void sinsp_container_manager::set_container_labels_max_len(uint32_t max_label_le
 {
 	sinsp_container_info::m_container_label_max_length = max_label_len;
 }
-

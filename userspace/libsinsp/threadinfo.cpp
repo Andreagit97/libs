@@ -767,13 +767,16 @@ std::string sinsp_threadinfo::get_env(const std::string& name)
 	return "";
 }
 
-void sinsp_threadinfo::set_cgroups(const char* cgroups, size_t len)
+void sinsp_threadinfo::set_cgroups(const char* cgroups, size_t cgroups_buffer_len)
 {
 	decltype(m_cgroups) tmp_cgroups(new cgroups_t);
 
 	size_t offset = 0;
-	while(offset < len)
+	while(offset < cgroups_buffer_len)
 	{
+		/* This is an example of the cgroup string coming from the kernel
+		 * cpuset=/user.slice\0cpu=/user.slice\0cpuacct=/\0io=/user.slice\0memory=/user.slice/\0
+		 */
 		const char* str = cgroups + offset;
 		const char* sep = strrchr(str, '=');
 		if(sep == NULL)
