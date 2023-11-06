@@ -8737,32 +8737,32 @@ uint8_t* sinsp_filter_check_fdlist::extract(sinsp_evt *evt, OUT uint32_t* len, b
 ///////////////////////////////////////////////////////////////////////////////
 const filtercheck_field_info sinsp_filter_check_k8s_fields[] =
 {
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.pod.name", "Pod Name", "Kubernetes pod name."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.pod.id", "Pod ID", "Kubernetes pod id."},
-	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "k8s.pod.label", "Pod Label", "Kubernetes pod label. E.g. 'k8s.pod.label.foo'."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.pod.labels", "Pod Labels", "Kubernetes pod comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.pod.ip", "Pod Ip", "Kubernetes pod ip, same as container.ip field as each container in a pod shares the network stack of the sandbox / pod. Only ipv4 addresses are tracked. Consider k8s.pod.cni.json for logging ip addresses for each network interface."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.pod.cni.json", "Pod CNI result json", "Kubernetes pod CNI result field from the respective pod status info, same as container.cni.json field. It contains ip addresses for each network interface exposed as unparsed escaped JSON string. Supported for CRI container engine (containerd, cri-o runtimes), optimized for containerd (some non-critical JSON keys removed). Useful for tracking ips (ipv4 and ipv6, dual-stack support) for each network interface (multi-interface support)."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.rc.name", "Replication Controller Name", "Kubernetes replication controller name."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.rc.id", "Replication Controller ID", "Kubernetes replication controller id."},
-	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "k8s.rc.label", "Replication Controller Label", "Kubernetes replication controller label. E.g. 'k8s.rc.label.foo'."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.rc.labels", "Replication Controller Labels", "Kubernetes replication controller comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.svc.name", "Service Name", "Kubernetes service name (can return more than one value, concatenated)."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.svc.id", "Service ID", "Kubernetes service id (can return more than one value, concatenated)."},
-	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "k8s.svc.label", "Service Label", "Kubernetes service label. E.g. 'k8s.svc.label.foo' (can return more than one value, concatenated)."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.svc.labels", "Service Labels", "Kubernetes service comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.ns.name", "Namespace Name", "Kubernetes namespace name."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.ns.id", "Namespace ID", "Kubernetes namespace id."},
-	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "k8s.ns.label", "Namespace Label", "Kubernetes namespace label. E.g. 'k8s.ns.label.foo'."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.ns.labels", "Namespace Labels", "Kubernetes namespace comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.rs.name", "Replica Set Name", "Kubernetes replica set name."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.rs.id", "Replica Set ID", "Kubernetes replica set id."},
-	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "k8s.rs.label", "Replica Set Label", "Kubernetes replica set label. E.g. 'k8s.rs.label.foo'."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.rs.labels", "Replica Set Labels", "Kubernetes replica set comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.deployment.name", "Deployment Name", "Kubernetes deployment name."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.deployment.id", "Deployment ID", "Kubernetes deployment id."},
-	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "k8s.deployment.label", "Deployment Label", "Kubernetes deployment label. E.g. 'k8s.rs.label.foo'."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "k8s.deployment.labels", "Deployment Labels", "Kubernetes deployment comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.pod.name", "Pod Name", "Kubernetes pod name."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.pod.id", "Pod ID", "Kubernetes pod id."},
+	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "old_k8s.pod.label", "Pod Label", "Kubernetes pod label. E.g. 'k8s.pod.label.foo'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.pod.labels", "Pod Labels", "Kubernetes pod comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.pod.ip", "Pod Ip", "Kubernetes pod ip, same as container.ip field as each container in a pod shares the network stack of the sandbox / pod. Only ipv4 addresses are tracked. Consider k8s.pod.cni.json for logging ip addresses for each network interface."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.pod.cni.json", "Pod CNI result json", "Kubernetes pod CNI result field from the respective pod status info, same as container.cni.json field. It contains ip addresses for each network interface exposed as unparsed escaped JSON string. Supported for CRI container engine (containerd, cri-o runtimes), optimized for containerd (some non-critical JSON keys removed). Useful for tracking ips (ipv4 and ipv6, dual-stack support) for each network interface (multi-interface support)."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.rc.name", "Replication Controller Name", "Kubernetes replication controller name."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.rc.id", "Replication Controller ID", "Kubernetes replication controller id."},
+	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "old_k8s.rc.label", "Replication Controller Label", "Kubernetes replication controller label. E.g. 'k8s.rc.label.foo'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.rc.labels", "Replication Controller Labels", "Kubernetes replication controller comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.svc.name", "Service Name", "Kubernetes service name (can return more than one value, concatenated)."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.svc.id", "Service ID", "Kubernetes service id (can return more than one value, concatenated)."},
+	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "old_k8s.svc.label", "Service Label", "Kubernetes service label. E.g. 'k8s.svc.label.foo' (can return more than one value, concatenated)."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.svc.labels", "Service Labels", "Kubernetes service comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.ns.name", "Namespace Name", "Kubernetes namespace name."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.ns.id", "Namespace ID", "Kubernetes namespace id."},
+	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "old_k8s.ns.label", "Namespace Label", "Kubernetes namespace label. E.g. 'k8s.ns.label.foo'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.ns.labels", "Namespace Labels", "Kubernetes namespace comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.rs.name", "Replica Set Name", "Kubernetes replica set name."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.rs.id", "Replica Set ID", "Kubernetes replica set id."},
+	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "old_k8s.rs.label", "Replica Set Label", "Kubernetes replica set label. E.g. 'k8s.rs.label.foo'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.rs.labels", "Replica Set Labels", "Kubernetes replica set comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.deployment.name", "Deployment Name", "Kubernetes deployment name."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.deployment.id", "Deployment ID", "Kubernetes deployment id."},
+	{PT_CHARBUF, EPF_ARG_REQUIRED, PF_NA, "old_k8s.deployment.label", "Deployment Label", "Kubernetes deployment label. E.g. 'k8s.rs.label.foo'."},
+	{PT_CHARBUF, EPF_NONE, PF_NA, "old_k8s.deployment.labels", "Deployment Labels", "Kubernetes deployment comma-separated key/value labels. E.g. 'foo1:bar1,foo2:bar2'."},
 };
 
 sinsp_filter_check_k8s::sinsp_filter_check_k8s()
@@ -8783,53 +8783,53 @@ int32_t sinsp_filter_check_k8s::parse_field_name(const char* str, bool alloc_sta
 {
 	string val(str);
 
-	if(STR_MATCH("k8s.pod.label") &&
-		!STR_MATCH("k8s.pod.labels"))
+	if(STR_MATCH("old_k8s.pod.label") &&
+		!STR_MATCH("old_k8s.pod.labels"))
 	{
 		m_field_id = TYPE_K8S_POD_LABEL;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_arg("k8s.pod.label", val);
+		return extract_arg("old_k8s.pod.label", val);
 	}
-	else if(STR_MATCH("k8s.rc.label") &&
-		!STR_MATCH("k8s.rc.labels"))
+	else if(STR_MATCH("old_k8s.rc.label") &&
+		!STR_MATCH("old_k8s.rc.labels"))
 	{
 		m_field_id = TYPE_K8S_RC_LABEL;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_arg("k8s.rc.label", val);
+		return extract_arg("old_k8s.rc.label", val);
 	}
-	else if(STR_MATCH("k8s.rs.label") &&
-		!STR_MATCH("k8s.rs.labels"))
+	else if(STR_MATCH("old_k8s.rs.label") &&
+		!STR_MATCH("old_k8s.rs.labels"))
 	{
 		m_field_id = TYPE_K8S_RS_LABEL;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_arg("k8s.rs.label", val);
+		return extract_arg("old_k8s.rs.label", val);
 	}
-	else if(STR_MATCH("k8s.svc.label") &&
-		!STR_MATCH("k8s.svc.labels"))
+	else if(STR_MATCH("old_k8s.svc.label") &&
+		!STR_MATCH("old_k8s.svc.labels"))
 	{
 		m_field_id = TYPE_K8S_SVC_LABEL;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_arg("k8s.svc.label", val);
+		return extract_arg("old_k8s.svc.label", val);
 	}
-	else if(STR_MATCH("k8s.ns.label") &&
-		!STR_MATCH("k8s.ns.labels"))
+	else if(STR_MATCH("old_k8s.ns.label") &&
+		!STR_MATCH("old_k8s.ns.labels"))
 	{
 		m_field_id = TYPE_K8S_NS_LABEL;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_arg("k8s.ns.label", val);
+		return extract_arg("old_k8s.ns.label", val);
 	}
-	else if(STR_MATCH("k8s.deployment.label") &&
-		!STR_MATCH("k8s.deployment.labels"))
+	else if(STR_MATCH("old_k8s.deployment.label") &&
+		!STR_MATCH("old_k8s.deployment.labels"))
 	{
 		m_field_id = TYPE_K8S_DEPLOYMENT_LABEL;
 		m_field = &m_info.m_fields[m_field_id];
 
-		return extract_arg("k8s.deployment.label", val);
+		return extract_arg("old_k8s.deployment.label", val);
 	}
 	else
 	{
