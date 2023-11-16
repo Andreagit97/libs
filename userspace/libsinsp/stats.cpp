@@ -292,7 +292,7 @@ uint64_t get_container_memory_usage()
 	return memory_used;
 }
 
-const scap_stats_v2* libsinsp::stats::get_sinsp_stats_v2(uint32_t flags, const scap_agent_info* agent_info, sinsp_thread_manager* thread_manager, std::shared_ptr<sinsp_stats_v2> stats_v2, scap_stats_v2* buffer, uint32_t* nstats, int32_t* rc)
+const scap_stats_v2* libsinsp::stats::get_sinsp_stats_v2(uint32_t flags, const scap_agent_info* agent_info, sinsp_thread_manager* thread_manager, std::shared_ptr<inspector_stats> stats_v2, scap_stats_v2* buffer, uint32_t* nstats, int32_t* rc)
 {
 	if (!buffer)
 	{

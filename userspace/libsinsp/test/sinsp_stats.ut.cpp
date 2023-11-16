@@ -23,9 +23,9 @@ limitations under the License.
 
 TEST_F(sinsp_with_test_input, sinsp_stats_v2_resource_utilization)
 {
-	m_inspector.set_sinsp_stats_v2_enabled();
+	m_inspector.enable_inspector_stats();
 	// Extra call to see we don't fail
-	m_inspector.set_sinsp_stats_v2_enabled();
+	m_inspector.enable_inspector_stats();
 	// Adopted from test: TEST_F(sinsp_with_test_input, PROC_FILTER_nthreads)
 	DEFAULT_TREE
 	/* we call a random event to obtain an event associated with this thread info */

@@ -2029,9 +2029,9 @@ scap_stats_v2* sinsp::get_sinsp_stats_v2_buffer()
 	return m_sinsp_stats_v2_buffer;
 }
 
-std::shared_ptr<sinsp_stats_v2> sinsp::get_sinsp_stats_v2()
+std::shared_ptr<inspector_stats> sinsp::get_sinsp_stats_v2()
 {
-	return m_sinsp_stats_v2;
+	return m_inspector_stats;
 }
 
 sinsp_filter_check* sinsp::new_generic_filtercheck()
@@ -2320,28 +2320,28 @@ void sinsp::set_proc_scan_log_interval_ms(uint64_t val)
 	m_proc_scan_log_interval_ms = val;
 }
 
-void sinsp::set_sinsp_stats_v2_enabled()
+void sinsp::enable_inspector_stats()
 {
-	if (m_sinsp_stats_v2 == nullptr)
+	if (m_inspector_stats == nullptr)
 	{
-		m_sinsp_stats_v2 = std::make_unique<sinsp_stats_v2>();
-		m_sinsp_stats_v2->m_n_noncached_fd_lookups = 0;
-		m_sinsp_stats_v2->m_n_cached_fd_lookups = 0;
-		m_sinsp_stats_v2->m_n_failed_fd_lookups = 0;
-		m_sinsp_stats_v2->m_n_added_fds = 0;
-		m_sinsp_stats_v2->m_n_removed_fds = 0;
-		m_sinsp_stats_v2->m_n_stored_evts = 0;
-		m_sinsp_stats_v2->m_n_store_evts_drops = 0;
-		m_sinsp_stats_v2->m_n_retrieved_evts = 0;
-		m_sinsp_stats_v2->m_n_retrieve_evts_drops = 0;
-		m_sinsp_stats_v2->m_n_noncached_thread_lookups = 0;
-		m_sinsp_stats_v2->m_n_cached_thread_lookups = 0;
-		m_sinsp_stats_v2->m_n_failed_thread_lookups = 0;
-		m_sinsp_stats_v2->m_n_added_threads = 0;
-		m_sinsp_stats_v2->m_n_removed_threads = 0;
-		m_sinsp_stats_v2->m_n_drops_full_threadtable = 0;
-		m_sinsp_stats_v2->m_n_missing_container_images = 0;
-		m_sinsp_stats_v2->m_n_containers= 0;
+		m_inspector_stats = std::make_unique<inspector_stats>();
+		m_inspector_stats->m_n_noncached_fd_lookups = 0;
+		m_inspector_stats->m_n_cached_fd_lookups = 0;
+		m_inspector_stats->m_n_failed_fd_lookups = 0;
+		m_inspector_stats->m_n_added_fds = 0;
+		m_inspector_stats->m_n_removed_fds = 0;
+		m_inspector_stats->m_n_stored_evts = 0;
+		m_inspector_stats->m_n_store_evts_drops = 0;
+		m_inspector_stats->m_n_retrieved_evts = 0;
+		m_inspector_stats->m_n_retrieve_evts_drops = 0;
+		m_inspector_stats->m_n_noncached_thread_lookups = 0;
+		m_inspector_stats->m_n_cached_thread_lookups = 0;
+		m_inspector_stats->m_n_failed_thread_lookups = 0;
+		m_inspector_stats->m_n_added_threads = 0;
+		m_inspector_stats->m_n_removed_threads = 0;
+		m_inspector_stats->m_n_drops_full_threadtable = 0;
+		m_inspector_stats->m_n_missing_container_images = 0;
+		m_inspector_stats->m_n_containers= 0;
 	}
 }
 

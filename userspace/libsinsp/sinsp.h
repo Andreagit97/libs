@@ -441,7 +441,7 @@ public:
 	/*!
 	 * \brief enabling sinsp state counters on the hot path via initializing the respective smart pointer.
 	 */
-	void set_sinsp_stats_v2_enabled();
+	void enable_inspector_stats();
 
 
 	/*!
@@ -512,7 +512,7 @@ public:
 
 	  \note sinsp stats may be refactored near-term.
 	*/
-	std::shared_ptr<sinsp_stats_v2> get_sinsp_stats_v2();
+	std::shared_ptr<inspector_stats> get_sinsp_stats_v2();
 
 	/*!
 	  \brief Look up a thread given its tid and return its information,
@@ -1108,7 +1108,7 @@ private:
 	bool m_is_dumping;
 	const scap_machine_info* m_machine_info;
 	const scap_agent_info* m_agent_info;
-	std::shared_ptr<sinsp_stats_v2> m_sinsp_stats_v2;
+	std::shared_ptr<inspector_stats> m_inspector_stats;
 	scap_stats_v2 m_sinsp_stats_v2_buffer[SINSP_MAX_STATS_V2];
 	uint32_t m_num_cpus;
 	bool m_is_tracers_capture_enabled;
