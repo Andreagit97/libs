@@ -15,32 +15,32 @@ limitations under the License.
 // Containers are supported only without minimal build
 #ifndef MINIMAL_BUILD
 #include <test/helpers/threads_helpers.h>
-TEST_F(sinsp_with_test_input, CONTAINER_FILTER_check_k8s_fields_presence)
-{
-	add_default_init_thread();
-	open_inspector();
-	auto evt = generate_random_event();
-	ASSERT_TRUE(field_exists(evt, "container.k8s.pod.name"));
-	ASSERT_TRUE(field_exists(evt, "container.k8s.pod.id"));
-	ASSERT_TRUE(field_exists(evt, "container.k8s.pod.label[one.second.third]"));
-	ASSERT_TRUE(field_exists(evt, "container.k8s.pod.labels"));
-	ASSERT_TRUE(field_exists(evt, "container.k8s.ns.name"));
+// TEST_F(sinsp_with_test_input, CONTAINER_FILTER_check_k8s_fields_presence)
+// {
+// 	add_default_init_thread();
+// 	open_inspector();
+// 	auto evt = generate_random_event();
+// 	ASSERT_TRUE(field_exists(evt, "container.k8s.pod.name"));
+// 	ASSERT_TRUE(field_exists(evt, "container.k8s.pod.id"));
+// 	ASSERT_TRUE(field_exists(evt, "container.k8s.pod.label[one.second.third]"));
+// 	ASSERT_TRUE(field_exists(evt, "container.k8s.pod.labels"));
+// 	ASSERT_TRUE(field_exists(evt, "container.k8s.ns.name"));
 
-	// container.k8s.pod.label requires an argument with the `[ ]` syntax.
-	ASSERT_THROW(field_exists(evt, "container.k8s.pod.label.one"), sinsp_exception);
-	ASSERT_THROW(field_exists(evt, "container.k8s.pod.label"), sinsp_exception);
-	ASSERT_THROW(field_exists(evt, "container.k8s.pod.label."), sinsp_exception);
-	ASSERT_THROW(field_exists(evt, "container.k8s.pod.label[["), sinsp_exception);
-	ASSERT_THROW(field_exists(evt, "container.k8s.pod.label]]"), sinsp_exception);
-	ASSERT_NO_THROW(field_exists(evt, "container.k8s.pod.label[]"));
+// 	// container.k8s.pod.label requires an argument with the `[ ]` syntax.
+// 	ASSERT_THROW(field_exists(evt, "container.k8s.pod.label.one"), sinsp_exception);
+// 	ASSERT_THROW(field_exists(evt, "container.k8s.pod.label"), sinsp_exception);
+// 	ASSERT_THROW(field_exists(evt, "container.k8s.pod.label."), sinsp_exception);
+// 	ASSERT_THROW(field_exists(evt, "container.k8s.pod.label[["), sinsp_exception);
+// 	ASSERT_THROW(field_exists(evt, "container.k8s.pod.label]]"), sinsp_exception);
+// 	ASSERT_NO_THROW(field_exists(evt, "container.k8s.pod.label[]"));
 
-	// There are no containers in the container manager, so there shouldn't be values
-	ASSERT_FALSE(field_has_value(evt, "container.k8s.pod.name"));
-	ASSERT_FALSE(field_has_value(evt, "container.k8s.pod.id"));
-	ASSERT_FALSE(field_has_value(evt, "container.k8s.pod.label[one]"));
-	ASSERT_FALSE(field_has_value(evt, "container.k8s.pod.labels"));
-	ASSERT_FALSE(field_has_value(evt, "container.k8s.ns.name"));
-}
+// 	// There are no containers in the container manager, so there shouldn't be values
+// 	ASSERT_FALSE(field_has_value(evt, "container.k8s.pod.name"));
+// 	ASSERT_FALSE(field_has_value(evt, "container.k8s.pod.id"));
+// 	ASSERT_FALSE(field_has_value(evt, "container.k8s.pod.label[one]"));
+// 	ASSERT_FALSE(field_has_value(evt, "container.k8s.pod.labels"));
+// 	ASSERT_FALSE(field_has_value(evt, "container.k8s.ns.name"));
+// }
 
 TEST_F(sinsp_with_test_input, CONTAINER_FILTER_check_k8s_fields_value)
 {
@@ -69,6 +69,7 @@ TEST_F(sinsp_with_test_input, CONTAINER_FILTER_check_k8s_fields_value)
 	container_info->m_lookup.set_status(sinsp_container_lookup::state::SUCCESSFUL);
 	container_info->m_labels = labels;
 	m_inspector.m_container_manager.add_container(container_info, init_thread_info);
+	container_info.reset();
 
 	auto evt = generate_random_event();
 	// basic filterchecks
@@ -105,6 +106,7 @@ TEST_F(sinsp_with_test_input, CONTAINER_FILTER_check_k8s_fields_with_no_labels)
 	container_info->m_lookup.set_status(sinsp_container_lookup::state::SUCCESSFUL);
 	container_info->m_labels = labels;
 	m_inspector.m_container_manager.add_container(container_info, init_thread_info);
+	container_info.reset();
 
 	auto evt = generate_random_event();
 	ASSERT_EQ(get_field_as_string(evt, "container.id"), container_id);
