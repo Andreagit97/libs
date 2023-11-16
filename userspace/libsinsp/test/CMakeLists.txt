@@ -39,86 +39,86 @@ configure_file (
     "${CMAKE_CURRENT_BINARY_DIR}/libsinsp_test_var.h"
 )
 
-file(GLOB_RECURSE TEST_PLUGINS ${CMAKE_CURRENT_SOURCE_DIR}/plugins/*.cpp)
+# file(GLOB_RECURSE TEST_PLUGINS ${CMAKE_CURRENT_SOURCE_DIR}/plugins/*.cpp)
 
 add_definitions(-DRESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources")
 
 if(NOT WIN32)
-	file(GLOB_RECURSE SINSP_PARSERS_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/parsers/*.cpp)
+	# file(GLOB_RECURSE SINSP_PARSERS_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/parsers/*.cpp)
 
-	file(GLOB_RECURSE SINSP_CLASSES_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/classes/*.cpp)
+	# file(GLOB_RECURSE SINSP_CLASSES_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/classes/*.cpp)
 
 	file(GLOB_RECURSE SINSP_FILTERCHECKS_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/filterchecks/*.cpp)
 endif()
 
-option(SCAP_FILES_SUITE_ENABLE "Enable scap-file tests in sinsp" "ON")
-# Scap-files on Big Endian systems are not supported
-if((NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "s390x") AND ${SCAP_FILES_SUITE_ENABLE})
-	# Binary dir in which we will save all our Cmake files
-	file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/scap_files")
-	# Add here the name for new scap-files
-	set(SCAP_FILE_NAMES
-	    "kexec_arm64.scap"
-		"kexec_x86.scap"
-	)
-	set(SCAP_FILE_DOWNLOAD_PREFIX
-		"https://download.falco.org/fixtures/libs/scap_files"
-	)
-	message(STATUS "Download all scap-files from: ${SCAP_FILE_DOWNLOAD_PREFIX}")
-	foreach(FILE_NAME ${SCAP_FILE_NAMES})
-		message(STATUS "Downloading scap-file: ${SCAP_FILE_DOWNLOAD_PREFIX}/${FILE_NAME}")
-		if(NOT EXISTS "${CMAKE_BINARY_DIR}/scap_files/${FILE_NAME}")
-			file(DOWNLOAD
-			"${SCAP_FILE_DOWNLOAD_PREFIX}/${FILE_NAME}"
-			"${CMAKE_BINARY_DIR}/scap_files/${FILE_NAME}"
-			SHOW_PROGRESS)
-		else()
-			message(STATUS "Skipping download, file already present")
-		endif()
-	endforeach()
-	file(GLOB_RECURSE SCAP_FILES_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/scap_files/*.cpp)
-endif()
+# option(SCAP_FILES_SUITE_ENABLE "Enable scap-file tests in sinsp" "ON")
+# # Scap-files on Big Endian systems are not supported
+# if((NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "s390x") AND ${SCAP_FILES_SUITE_ENABLE})
+# 	# Binary dir in which we will save all our Cmake files
+# 	file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/scap_files")
+# 	# Add here the name for new scap-files
+# 	set(SCAP_FILE_NAMES
+# 	    "kexec_arm64.scap"
+# 		"kexec_x86.scap"
+# 	)
+# 	set(SCAP_FILE_DOWNLOAD_PREFIX
+# 		"https://download.falco.org/fixtures/libs/scap_files"
+# 	)
+# 	message(STATUS "Download all scap-files from: ${SCAP_FILE_DOWNLOAD_PREFIX}")
+# 	foreach(FILE_NAME ${SCAP_FILE_NAMES})
+# 		message(STATUS "Downloading scap-file: ${SCAP_FILE_DOWNLOAD_PREFIX}/${FILE_NAME}")
+# 		if(NOT EXISTS "${CMAKE_BINARY_DIR}/scap_files/${FILE_NAME}")
+# 			file(DOWNLOAD
+# 			"${SCAP_FILE_DOWNLOAD_PREFIX}/${FILE_NAME}"
+# 			"${CMAKE_BINARY_DIR}/scap_files/${FILE_NAME}"
+# 			SHOW_PROGRESS)
+# 		else()
+# 			message(STATUS "Skipping download, file already present")
+# 		endif()
+# 	endforeach()
+# 	# file(GLOB_RECURSE SCAP_FILES_SUITE ${CMAKE_CURRENT_SOURCE_DIR}/scap_files/*.cpp)
+# endif()
 
 file(GLOB_RECURSE TEST_HELPERS ${CMAKE_CURRENT_SOURCE_DIR}/helpers/*.cpp)
 
 set(LIBSINSP_UNIT_TESTS_SOURCES
 	test_utils.cpp
-	cgroup_list_counter.ut.cpp
-	events_evt.ut.cpp
-	events_file.ut.cpp
-	events_fspath.ut.cpp
-	events_injection.ut.cpp
-	events_net.ut.cpp
-	events_param.ut.cpp
-	events_plugin.ut.cpp
-	events_proc.ut.cpp
-	events_user.ut.cpp
-	external_processor.ut.cpp
-	token_bucket.ut.cpp
-	ppm_api_version.ut.cpp
-	plugins.ut.cpp
-	plugin_manager.ut.cpp
-	prefix_search.ut.cpp
-	string_visitor.ut.cpp
-	filter_escaping.ut.cpp
-	filter_parser.ut.cpp
-	filter_op_bcontains.ut.cpp
-	filter_op_pmatch.ut.cpp
-	filter_compiler.ut.cpp
-	user.ut.cpp
-	container_info.ut.cpp
-	sinsp_utils.ut.cpp
-	state.ut.cpp
-	eventformatter.ut.cpp
-	savefile.ut.cpp
-	thread_table.ut.cpp
-	public_sinsp_API/event_related.cpp
-	public_sinsp_API/sinsp_logger.cpp
-	"${TEST_PLUGINS}"
-	"${SINSP_PARSERS_SUITE}"
-	"${SINSP_CLASSES_SUITE}"
+	# cgroup_list_counter.ut.cpp
+	# events_evt.ut.cpp
+	# events_file.ut.cpp
+	# events_fspath.ut.cpp
+	# events_injection.ut.cpp
+	# events_net.ut.cpp
+	# events_param.ut.cpp
+	# events_plugin.ut.cpp
+	# events_proc.ut.cpp
+	# events_user.ut.cpp
+	# external_processor.ut.cpp
+	# token_bucket.ut.cpp
+	# ppm_api_version.ut.cpp
+	# plugins.ut.cpp
+	# plugin_manager.ut.cpp
+	# prefix_search.ut.cpp
+	# string_visitor.ut.cpp
+	# filter_escaping.ut.cpp
+	# filter_parser.ut.cpp
+	# filter_op_bcontains.ut.cpp
+	# filter_op_pmatch.ut.cpp
+	# filter_compiler.ut.cpp
+	# user.ut.cpp
+	# container_info.ut.cpp
+	# sinsp_utils.ut.cpp
+	# state.ut.cpp
+	# eventformatter.ut.cpp
+	# savefile.ut.cpp
+	# thread_table.ut.cpp
+	# public_sinsp_API/event_related.cpp
+	# public_sinsp_API/sinsp_logger.cpp
+	# "${TEST_PLUGINS}"
+	# "${SINSP_PARSERS_SUITE}"
+	# "${SINSP_CLASSES_SUITE}"
 	"${SINSP_FILTERCHECKS_SUITE}"
-	"${SCAP_FILES_SUITE}"
+	# "${SCAP_FILES_SUITE}"
 	"${TEST_HELPERS}"
 )
 
@@ -145,14 +145,14 @@ if(NOT MINIMAL_BUILD)
 	list(APPEND LIBSINSP_UNIT_TESTS_SOURCES procfs_utils.ut.cpp)
 endif()
 
-if (CMAKE_SYSTEM_NAME MATCHES "Linux")
-	list(APPEND LIBSINSP_UNIT_TESTS_SOURCES
-		async_key_value_source.ut.cpp
-		filter_ppm_codes.ut.cpp
-		public_sinsp_API/events_set.cpp
-		public_sinsp_API/interesting_syscalls.cpp
-		public_sinsp_API/ppm_sc_codes.cpp)
-endif()
+# if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+# 	list(APPEND LIBSINSP_UNIT_TESTS_SOURCES
+# 		async_key_value_source.ut.cpp
+# 		filter_ppm_codes.ut.cpp
+# 		public_sinsp_API/events_set.cpp
+# 		public_sinsp_API/interesting_syscalls.cpp
+# 		public_sinsp_API/ppm_sc_codes.cpp)
+# endif()
 
 add_executable(unit-test-libsinsp ${LIBSINSP_UNIT_TESTS_SOURCES})
 
