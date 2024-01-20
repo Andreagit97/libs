@@ -1205,18 +1205,7 @@ uint8_t* sinsp_filter_check_thread::extract(sinsp_evt *evt, OUT uint32_t* len, b
 			{
 				return NULL;
 			}
-
-			m_tstr = mt->get_comm();
-			for(int32_t j = 0; j < m_argid; j++)
-			{
-				mt = mt->get_parent_thread();
-
-				if(mt == NULL)
-				{
-					RETURN_EXTRACT_STRING(m_tstr);
-				}
-				m_tstr = mt->get_comm() + "->" + m_tstr;
-			}
+			m_tstr = concat_attribute_thread_hierarchy<std::string>(mt, m_argid, [](sinsp_threadinfo* t) { return t->get_comm(); });
 			RETURN_EXTRACT_STRING(m_tstr);
 		}
 	case TYPE_PEXE:
@@ -1265,17 +1254,7 @@ uint8_t* sinsp_filter_check_thread::extract(sinsp_evt *evt, OUT uint32_t* len, b
 				return NULL;
 			}
 
-			m_tstr = mt->get_exe();
-			for(int32_t j = 0; j < m_argid; j++)
-			{
-				mt = mt->get_parent_thread();
-
-				if(mt == NULL)
-				{
-					RETURN_EXTRACT_STRING(m_tstr);
-				}
-				m_tstr = mt->get_exe() + "->" + m_tstr;
-			}
+			m_tstr = concat_attribute_thread_hierarchy<std::string>(mt, m_argid, [](sinsp_threadinfo* t) { return t->get_exe(); });
 			RETURN_EXTRACT_STRING(m_tstr);
 		}
 	case TYPE_PEXEPATH:
@@ -1324,17 +1303,7 @@ uint8_t* sinsp_filter_check_thread::extract(sinsp_evt *evt, OUT uint32_t* len, b
 				return NULL;
 			}
 
-			m_tstr = mt->get_exepath();
-			for(int32_t j = 0; j < m_argid; j++)
-			{
-				mt = mt->get_parent_thread();
-
-				if(mt == NULL)
-				{
-					RETURN_EXTRACT_STRING(m_tstr);
-				}
-				m_tstr = mt->get_exepath() + "->" + m_tstr;
-			}
+			m_tstr = concat_attribute_thread_hierarchy<std::string>(mt, m_argid, [](sinsp_threadinfo* t) { return t->get_exepath(); });
 			RETURN_EXTRACT_STRING(m_tstr);
 		}
 	case TYPE_LOGINSHELLID:
