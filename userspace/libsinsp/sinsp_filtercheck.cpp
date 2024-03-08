@@ -488,6 +488,11 @@ bool flt_compare(cmpop op, ppm_param_type type, const void* operand1, const void
 	case PT_IPV6NET:
 		return flt_compare_ipv6net(op, (ipv6addr *)operand1, (ipv6net*)operand2);
 	case PT_IPADDR:
+		// This could happen at runtime but we cannot compare an ipv4 with an ipv6!
+		if(op1_len != op2_len)
+		{
+			return false;
+		}
 		if(op1_len == sizeof(struct in_addr))
 		{
 			return flt_compare(op, PT_IPV4ADDR, operand1, operand2, op1_len, op2_len);
@@ -501,6 +506,11 @@ bool flt_compare(cmpop op, ppm_param_type type, const void* operand1, const void
 			throw sinsp_exception("rawval_to_string called with IP address of incorrect size " + std::to_string(op1_len));
 		}
 	case PT_IPNET:
+		// This could happen at runtime but we cannot compare an ipv4 with an ipv6!
+		if(op1_len != op2_len)
+		{
+			return false;
+		}
 		if(op1_len == sizeof(struct in_addr))
 		{
 			return flt_compare(op, PT_IPV4NET, operand1, operand2, op1_len, op2_len);
