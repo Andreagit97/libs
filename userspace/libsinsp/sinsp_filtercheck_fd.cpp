@@ -1738,7 +1738,7 @@ bool sinsp_filter_check_fd::compare_domain(sinsp_evt *evt)
 
 		if(m_cmpop == CO_IN)
 		{
-			for (uint16_t i=0; i < m_val_storages.size(); i++)
+			for (uint16_t i=0; i < m_vals.size(); i++)
 			{
 				if(sinsp_dns_manager::get().match((const char *)filter_value_p(i), (evt_type == SCAP_FD_IPV6_SOCK)? AF_INET6 : AF_INET, addr, ts))
 				{

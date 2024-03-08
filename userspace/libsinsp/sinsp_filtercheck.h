@@ -272,8 +272,8 @@ protected:
 
 	Json::Value rawval_to_json(uint8_t* rawval, ppm_param_type ptype, ppm_print_format print_format, uint32_t len);
 
-	inline uint8_t* filter_value_p(uint16_t i = 0) { return &m_val_storages[i][0]; }
-	inline std::vector<uint8_t>* filter_value(uint16_t i = 0) { return &m_val_storages[i]; }
+	inline uint8_t* filter_value_p(uint16_t i = 0) { return m_vals[i].first; }
+	inline uint32_t filter_value_len(uint16_t i = 0) { return m_vals[i].second; }
 
 	std::vector<char> m_getpropertystr_storage;
 	std::vector<std::vector<uint8_t>> m_val_storages;
@@ -285,9 +285,6 @@ protected:
 	uint32_t m_field_id = (uint32_t) -1;
 
 private:
-
-	// used for comparing right-hand single value
-	uint32_t m_val_storage_len;
 
 	// used for comparing right-hand lists of values
 	std::unordered_set<filter_value_t,

@@ -654,7 +654,6 @@ sinsp_filter_check::sinsp_filter_check()
 	m_field = NULL;
 	m_info.m_fields = NULL;
 	m_info.m_nfields = -1;
-	m_val_storage_len = 0;
 	m_val_storages = std::vector<std::vector<uint8_t>> (1, std::vector<uint8_t>(256));
 	m_val_storages_min_size = (std::numeric_limits<uint32_t>::max)();
 	m_val_storages_max_size = (std::numeric_limits<uint32_t>::min)();
@@ -1263,12 +1262,11 @@ void sinsp_filter_check::add_filter_value(const char* str, uint32_t len, uint32_
 	{
 		m_val_storages.push_back(std::vector<uint8_t>(256));
 	}
-
-	parsed_len = parse_filter_value(str, len, filter_value_p(i), filter_value(i)->size());
+	parsed_len = parse_filter_value(str, len, &(m_val_storages[i][0]), (&m_val_storages[i])->size());
 
 	// XXX/mstemm this doesn't work if someone called
 	// add_filter_value more than once for a given index.
-	filter_value_t item(filter_value_p(i), parsed_len);
+	filter_value_t item(&(m_val_storages[i][0]), parsed_len);
 	m_vals.push_back(item);
 	m_val_storages_members.insert(item);
 
@@ -1301,7 +1299,6 @@ size_t sinsp_filter_check::parse_filter_value(const char* str, uint32_t len, uin
 			throw sinsp_exception("filter parameter too long:" + std::string(str));
 		}
 		memcpy(storage, str, len);
-		m_val_storage_len = len;
 		return len;
 	}
 	else
@@ -1369,7 +1366,7 @@ bool sinsp_filter_check::compare_rhs(cmpop op, ppm_param_type type, std::vector<
 					if (type == PT_IPNET)
 					{
 						bool found = false;
-						for (const auto& m : m_val_storages_members)
+						for (const auto& m : m_vals)
 						{
 							if (::flt_compare(CO_EQ, type, item.first, m.first, item.second, m.second))
 							{
@@ -1402,7 +1399,7 @@ bool sinsp_filter_check::compare_rhs(cmpop op, ppm_param_type type, std::vector<
 					// todo(jasondellaluce): refactor filter_value_t to actually use flt_compare instead of memcmp.
 					if (type == PT_IPNET)
 					{
-						for (const auto& m : m_val_storages_members)
+						for (const auto& m : m_vals)
 						{
 							if (::flt_compare(CO_EQ, type, item.first, m.first, item.second, m.second))
 							{
@@ -1460,14 +1457,14 @@ bool sinsp_filter_check::compare_rhs(cmpop op, ppm_param_type type, const void* 
 		case PT_FSPATH:
 		case PT_SIGSET:
 		case PT_FSRELPATH:
-			for (uint16_t i=0; i < m_val_storages.size(); i++)
+			for (uint16_t i=0; i < m_vals.size(); i++)
 			{
 				if (::flt_compare(CO_EQ,
 						  type,
 						  operand1,
 						  filter_value_p(i),
 						  op1_len,
-						  filter_value(i)->size()))
+						  filter_value_len(i)))
 				{
 					return true;
 				}
@@ -1515,7 +1512,7 @@ bool sinsp_filter_check::compare_rhs(cmpop op, ppm_param_type type, const void* 
 				      operand1,
 				      filter_value_p(),
 				      op1_len,
-				      m_val_storage_len)
+				      filter_value_len())
 			);
 	}
 }
