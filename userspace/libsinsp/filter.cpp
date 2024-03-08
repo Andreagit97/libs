@@ -344,7 +344,7 @@ void sinsp_filter_compiler::visit(const libsinsp::filter::ast::binary_check_expr
 	check->m_boolop = m_last_boolop;
 	check->parse_field_name(field.c_str(), true, true);
 
-	// Read the the the right-hand values of the filtercheck.
+	// Read the right-hand values of the filtercheck.
 	// For list-related operators ('in', 'intersects', 'pmatch'), the vector
 	// can be filled with more than 1 value, whereas in all other cases we
 	// expect the vector to only have 1 value. We don't check this here, as
@@ -561,6 +561,11 @@ std::list<sinsp_filter_factory::filter_fieldclass_info> sinsp_filter_factory::ch
 			if(fld->m_flags & EPF_DEPRECATED)
 			{
 				info.tags.insert("EPF_DEPRECATED");
+			}
+
+			if(fld->m_flags & EPF_NO_RHS_FILTER)
+			{
+				info.tags.insert("EPF_NO_RHS_FILTER");
 			}
 
 			if(fld->m_flags & EPF_ARG_REQUIRED)

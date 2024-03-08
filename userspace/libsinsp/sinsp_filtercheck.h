@@ -225,6 +225,14 @@ public:
 	}
 
 	//
+	// Return true if this filter check can support a rhs filter check instead of a const value.
+	//
+	inline bool is_rhs_filtercheck_supported() const
+	{
+		return !(get_field_info()->m_flags & EPF_NO_RHS_FILTER);
+	}
+
+	//
 	// Return the type of the current field
 	//
 	inline ppm_param_type get_type() const
