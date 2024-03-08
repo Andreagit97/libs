@@ -196,16 +196,48 @@ public:
 	virtual const filtercheck_field_info* get_field_info() const;
 
 	//
-	// Return true if this filtercheck can have an argument,
+	// Return true if this filed can have an argument,
 	// either due to being required (flag EPF_ARG_REQUIRED) or
 	// allowed (flag EPF_ARG_ALLOWED).
 	//
+	inline bool can_have_argument() const
+	{
+		const filtercheck_field_info *info = get_field_info();
+		return ((info->m_flags & EPF_ARG_REQUIRED) || (info->m_flags & EPF_ARG_ALLOWED));
+	}
+
+	//
+	// Return true if this field is a list of values,
+	//
+	inline bool is_list() const
+	{
+		return get_field_info()->m_flags & EPF_IS_LIST;
+	}
+
+	//
+	// TODO!
+	//
+	// Return true if the filter check is compared against a const value
+	//
+	inline bool has_const_value() const
+	{
+		return !m_vals.empty();
+	}
+
 	//
 	// Return the type of the current field
 	//
 	inline ppm_param_type get_type() const
 	{
 		return get_field_info()->m_type;
+	}
+
+	//
+	// Return the operator associated with the filter check.
+	//
+	inline cmpop get_op() const
+	{
+		return m_cmpop;
 	}
 
 	//

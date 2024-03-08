@@ -1324,17 +1324,10 @@ const filtercheck_field_info* sinsp_filter_check::get_field_info() const
 	return &m_info.m_fields[m_field_id];
 }
 
-bool sinsp_filter_check::can_have_argument() const
-{
-	const filtercheck_field_info *info = get_field_info();
-
-	return ((info->m_flags & EPF_ARG_REQUIRED) ||
-		(info->m_flags & EPF_ARG_ALLOWED));
-}
 
 bool sinsp_filter_check::compare_rhs(cmpop op, ppm_param_type type, std::vector<extract_value_t>& values)
 {
-	if (m_info.m_fields[m_field_id].m_flags & EPF_IS_LIST)
+	if(is_list())
 	{
 		// NOTE: using m_val_storages_members.find(item) relies on memcmp to
 		// compare filter_value_t values, and not the base-level flt_compare.
