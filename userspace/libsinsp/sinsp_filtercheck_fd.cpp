@@ -1830,7 +1830,7 @@ bool sinsp_filter_check_fd::compare_nocache(sinsp_evt *evt)
 		{
 			return false;
 		}
-		return compare_rhs(m_cmpop, m_info.m_fields[m_field_id].m_type, m_extracted_values);
+		return compare_rhs(m_cmpop, sinsp_filter_check::get_type(), m_extracted_values);
 	}
 
 	//
@@ -1859,7 +1859,7 @@ bool sinsp_filter_check_fd::compare_nocache(sinsp_evt *evt)
 	}
 
 	return compare_rhs(m_cmpop,
-			   m_info.m_fields[m_field_id].m_type,
+			   sinsp_filter_check::get_type(),
 			   extracted_val,
 			   len);
 }

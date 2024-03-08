@@ -1437,7 +1437,7 @@ bool sinsp_filter_check::compare_rhs(cmpop op, ppm_param_type type, std::vector<
 	}
 
 	return compare_rhs(m_cmpop,
-		m_info.m_fields[m_field_id].m_type,
+		type,
 		values[0].ptr,
 		values[0].len);
 }
@@ -1618,6 +1618,6 @@ bool sinsp_filter_check::compare_nocache(sinsp_evt* evt)
 	}
 
 	return compare_rhs(m_cmpop,
-		m_info.m_fields[m_field_id].m_type,
+		get_type(),
 		m_extracted_values);
 }

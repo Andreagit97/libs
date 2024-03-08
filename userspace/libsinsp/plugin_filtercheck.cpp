@@ -164,7 +164,7 @@ bool sinsp_filter_check_plugin::extract(sinsp_evt *evt, OUT vector<extract_value
 		return false;
 	}
 
-	auto type = m_info.m_fields[m_field_id].m_type;
+	auto type = sinsp_filter_check::get_type();
 
 	// here we want to extract just one field
 	uint32_t num_fields = 1;

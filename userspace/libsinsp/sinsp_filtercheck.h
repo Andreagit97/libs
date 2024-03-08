@@ -200,7 +200,13 @@ public:
 	// either due to being required (flag EPF_ARG_REQUIRED) or
 	// allowed (flag EPF_ARG_ALLOWED).
 	//
-	bool can_have_argument() const;
+	//
+	// Return the type of the current field
+	//
+	inline ppm_param_type get_type() const
+	{
+		return get_field_info()->m_type;
+	}
 
 	//
 	// Extract the field from the event. In sanitize_strings is true, any
