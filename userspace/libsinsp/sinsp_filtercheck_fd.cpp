@@ -1842,6 +1842,19 @@ bool sinsp_filter_check_fd::compare_nocache(sinsp_evt *evt)
 	// class does not support multi-valued extraction
 	uint8_t* extracted_val = extract(evt, &len, sanitize_strings);
 
+	// We need to extract here the values of the rhs filter check because `compare_domain` below needs them.
+	// todo!: we can also decide to call `sinsp_filter_check::compare_nocache` here, in the end the code
+	// is almost the same, we lose only this optimization of the single extraction + `compare_domain` logic.
+	if(has_filtercheck_value())
+	{
+		m_rhs_filter_check->m_extracted_values.clear();
+		if(!m_rhs_filter_check->extract(evt, m_rhs_filter_check->m_extracted_values, false))
+		{
+			return false;
+		}
+		populate_filter_values_with_rhs_extracted_values();
+	}
+
 	if(extracted_val == NULL)
 	{
 		// optimization for *_NAME fields

@@ -191,6 +191,11 @@ public:
 	virtual void add_filter_value(const char* str, uint32_t len, uint32_t i = 0);
 
 	//
+	// If this check is used by a filter, extract the rhs filter check to compare it to.
+	//
+	virtual void add_filter_value(std::unique_ptr<sinsp_filter_check> chk);
+
+	//
 	// Return the info about the field that this instance contains
 	//
 	virtual const filtercheck_field_info* get_field_info() const;
@@ -215,7 +220,13 @@ public:
 	}
 
 	//
-	// TODO!
+	// Return true if the filter check is compared against another filter check
+	//
+	inline bool has_filtercheck_value() const
+	{
+		return m_rhs_filter_check.get() != nullptr;
+	}
+
 	//
 	// Return true if the filter check is compared against a const value
 	//
@@ -241,12 +252,27 @@ public:
 	}
 
 	//
+	// Return filter check name
+	//
+	inline const char* get_name() const
+	{
+		return get_field_info()->m_name;
+	}
+
+	//
 	// Return the operator associated with the filter check.
 	//
 	inline cmpop get_op() const
 	{
 		return m_cmpop;
 	}
+
+	//
+	// Instead of populating the filter check values with const values extracted at
+	// filter compile time, it populates the filter check values with values extracted
+	// from a right-hand side filter check at runtime.
+	//
+	void populate_filter_values_with_rhs_extracted_values();
 
 	//
 	// Extract the field from the event. In sanitize_strings is true, any
@@ -319,6 +345,8 @@ protected:
 	std::vector<std::vector<uint8_t>> m_val_storages;
 
 	std::vector<filter_value_t> m_vals;
+	
+	std::unique_ptr<sinsp_filter_check> m_rhs_filter_check;
 
 	const filtercheck_field_info* m_field = nullptr;
 	filter_check_info m_info;

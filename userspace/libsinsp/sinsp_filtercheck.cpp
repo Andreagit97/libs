@@ -1264,8 +1264,42 @@ int32_t sinsp_filter_check::parse_field_name(const char* str, bool alloc_state, 
 	return max_fldlen;
 }
 
+void sinsp_filter_check::populate_filter_values_with_rhs_extracted_values()
+{
+	// The storage of the extracted values from the rhs filter check should
+	// be handled by the filter check itself during the extraction.
+	
+	// Clean the previous comparison.
+	m_vals.clear();
+	// These are needed for In/Intersects. We could optimize if `In` and `Intersects` are not involved.
+	m_val_storages_members.clear();
+	m_val_storages_min_size = (std::numeric_limits<uint32_t>::max)();
+	m_val_storages_max_size = (std::numeric_limits<uint32_t>::min)();
+
+	for(const auto& v :m_rhs_filter_check->m_extracted_values)
+	{
+		filter_value_t item(v.ptr, v.len);
+		m_vals.push_back(item);
+		m_val_storages_members.insert(std::move(item));
+		if(v.len < m_val_storages_min_size)
+		{
+			m_val_storages_min_size = v.len;
+		}
+
+		if(v.len > m_val_storages_max_size)
+		{
+			m_val_storages_max_size = v.len;
+		}
+	}
+}
+
 void sinsp_filter_check::add_filter_value(const char* str, uint32_t len, uint32_t i)
 {
+	if(has_filtercheck_value())
+	{
+		throw sinsp_exception("This current field '" + std::string(get_name()) + "' is already compared with another filter check, we cannot associate also a const value.");
+	}
+
 	size_t parsed_len;
 
 	if (i >= m_val_storages.size())
@@ -1297,6 +1331,86 @@ void sinsp_filter_check::add_filter_value(const char* str, uint32_t len, uint32_
 	}
 }
 
+void sinsp_filter_check::add_filter_value(std::unique_ptr<sinsp_filter_check> rhs_chk)
+{
+	if(has_const_value())
+	{
+		throw sinsp_exception("This current field '" + std::string(get_name()) + "' is already compared with a const value, we cannot associate also a filter check.");
+	}
+
+	if(has_filtercheck_value())
+	{
+		throw sinsp_exception("This current field '" + std::string(get_name()) + "' is already compared with a filter check, we cannot associate another a filter check.");
+	}
+
+	// At the moment we don't support comparison between different types.
+	if(get_type() != rhs_chk->get_type())
+	{
+		throw sinsp_exception("The current field has type '" + std::to_string(get_type()) + "' while the rhs field has type '" + std::to_string(rhs_chk->get_type()) + "'.");
+	}
+	
+	if(get_op() == CO_PMATCH)
+	{
+		throw sinsp_exception("Operator `CO_PMATCH` doesn't support a rhs filter check.");
+	}
+
+	/*
+		Now for each filter check we need to answer 2 questions:
+		1. Which filter checks cannot have a rhs filter check?
+		2. Which filter checks cannot be used as a rhs filter check?
+
+		There are the involved filter checks:
+
+		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
+		// 2. It cannot be used as a rhs filter check because doesn't provide the extraction phase.
+		"fd.ip"
+		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
+		// 2. It cannot be used as a rhs filter check because doesn't provide the extraction phase.
+		"fd.net"
+		// 1. It requires a netmask as a rhs value, we don't have filter checks that return a netmask in the extraction phase
+		// 2. It cannot be used as a rhs value filter check for other `PT_IPNET` filter checks, becuase they expect a netmask while it returns an address
+		"fd.cnet"
+		"fd.snet"
+		"fd.lnet"
+		"fd.rnet"
+		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
+		// 2. It is a PT_DYN we don't know which is the effective type value.
+		"evt.rawarg"
+		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
+		// 2. It has no real sense to be used as a rhs (we can do if want, let's see)
+		"evt.around"
+		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
+		// 2. It cannot be used as a rhs filter check because doesn't provide the extraction phase.
+		"fd.port"
+		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
+		// 2. It cannot be used as a rhs filter check because doesn't provide the extraction phase.
+		"fd.proto"
+		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
+		// 2. OK! (but not supported for simplicity)
+		"fd.types"
+		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
+		// 2. OK! (but not supported for simplicity)
+		"proc.apid"
+		"proc.aname"
+		"proc.aexe"
+		"proc.aexepath"
+		"proc.acmdline"
+		"proc.aenv"
+	*/
+
+	if(!is_rhs_filtercheck_supported())
+	{
+		throw sinsp_exception("The field '" + std::string(get_name()) +"' doesn't support a rhs filter check.");
+	}
+	
+	if(!rhs_chk->is_rhs_filtercheck_supported())
+	{
+		throw sinsp_exception("The field '" + std::string(get_name()) +"' cannot be used as a rhs filter check.");
+	}
+
+	m_rhs_filter_check = std::move(rhs_chk);
+}
+
 size_t sinsp_filter_check::parse_filter_value(const char* str, uint32_t len, uint8_t *storage, uint32_t storage_len)
 {
 	size_t parsed_len;
@@ -1321,6 +1435,7 @@ size_t sinsp_filter_check::parse_filter_value(const char* str, uint32_t len, uin
 
 const filtercheck_field_info* sinsp_filter_check::get_field_info() const
 {
+	// todo!: to be safe we should check `m_fields!=nullptr` and `m_field_id!=-1`
 	return &m_info.m_fields[m_field_id];
 }
 
@@ -1582,9 +1697,12 @@ bool sinsp_filter_check::compare(sinsp_evt* evt)
 		m_cache_metrics->m_num_eval++;
 	}
 
-	// Never cache extractions for fields that contain arguments.
+	// Never cache extractions for fields that contain arguments or that have
+	// a rhs filter check.
+	// todo!: It's not clear when is possible to cache the result of a comparison? what is a practical example?
 	if(m_eval_cache_entry != NULL &&
-	   !can_have_argument())
+	   !can_have_argument() &&
+	   !has_filtercheck_value())
 	{
 		uint64_t en = evt->get_num();
 
@@ -1615,6 +1733,16 @@ bool sinsp_filter_check::compare_nocache(sinsp_evt* evt)
 	if(!extract(evt, m_extracted_values, false))
 	{
 		return false;
+	}
+
+	if(has_filtercheck_value())
+	{
+		m_rhs_filter_check->m_extracted_values.clear();
+		if(!m_rhs_filter_check->extract(evt, m_rhs_filter_check->m_extracted_values, false))
+		{
+			return false;
+		}
+		populate_filter_values_with_rhs_extracted_values();
 	}
 
 	return compare_rhs(m_cmpop,
