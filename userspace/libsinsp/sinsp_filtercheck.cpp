@@ -1664,10 +1664,7 @@ bool sinsp_filter_check::extract(sinsp_evt *evt, OUT std::vector<extract_value_t
 		m_cache_metrics->m_num_extract++;
 	}
 
-	// Even if we don't apply modifiers we always reset the modified field type
-	// because we will use it in the compare. We need to do this here because it is
-	// the unique place that is called by everyone.
-	set_modified_field_type(get_original_field_type());
+	bool ret = false;
 
 	// Never cache extractions for fields that contain arguments.
 	if(m_extraction_cache_entry != NULL &&
@@ -1690,13 +1687,25 @@ bool sinsp_filter_check::extract(sinsp_evt *evt, OUT std::vector<extract_value_t
 
 		// Shallow-copy the m_cached values to values
 		values = m_extraction_cache_entry->m_res;
-
-		return !m_extraction_cache_entry->m_res.empty();
+		ret = !m_extraction_cache_entry->m_res.empty();
 	}
 	else
 	{
-		return extract_nocache(evt, values, sanitize_strings);
+		ret = extract_nocache(evt, values, sanitize_strings);
 	}
+
+	// Even if we don't apply modifiers we always reset the modified field type
+	// because we will use it in the `compare_nocache`.
+	// todo! maybe we can remove this since we do it in `apply_extract_modifiers`
+	set_modified_field_type(get_original_field_type());
+	if(ret)
+	{
+		// At the moment caches don't take into consideration the modifiers so we need to apply them
+		// after the cache extraction.
+		apply_extract_modifiers();
+	}
+
+	return ret;
 }
 
 bool sinsp_filter_check::compare(sinsp_evt* evt)
@@ -1758,4 +1767,28 @@ bool sinsp_filter_check::compare_nocache(sinsp_evt* evt)
 	return compare_rhs(m_cmpop,
 		get_modified_field_type(),
 		m_extracted_values);
+}
+
+void sinsp_filter_check::add_extract_modifier(extract_modifier modifier)
+{
+	if(!support_extract_modifier())
+	{
+		throw sinsp_exception("The field '" + std::string(get_name()) +"' cannot have an extraction modifier.");
+	}
+	m_extract_modifiers.push_back(std::move(modifier));
+}
+
+void sinsp_filter_check::apply_extract_modifiers()
+{
+	if(!has_extract_modifiers())
+	{
+		return;
+	}
+	
+	ppm_param_type type = get_original_field_type();
+	for(auto& mod: m_extract_modifiers)
+	{
+		mod.apply_mod(m_extracted_values, type);
+	}
+	set_modified_field_type(type);
 }
