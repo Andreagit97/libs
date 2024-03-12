@@ -244,7 +244,7 @@ void chisel_table::configure(vector<chisel_view_column_info>* entries, const str
 
 	for(auto it = m_premerge_extractors.begin(); it != m_premerge_extractors.end(); ++it)
 	{
-		m_premerge_types.push_back((*it)->m_check->get_field_info()->m_type);
+		m_premerge_types.push_back((*it)->m_check->get_original_field_type());
 		m_premerge_legend.push_back(*(*it)->m_check->get_field_info());
 	}
 
@@ -337,7 +337,7 @@ void chisel_table::configure(vector<chisel_view_column_info>* entries, const str
 
 	for(auto it = m_postmerge_extractors.begin(); it != m_postmerge_extractors.end(); ++it)
 	{
-		m_postmerge_types.push_back((*it)->m_check->get_field_info()->m_type);
+		m_postmerge_types.push_back((*it)->m_check->get_original_field_type());
 		m_postmerge_legend.push_back(*(*it)->m_check->get_field_info());
 	}
 
