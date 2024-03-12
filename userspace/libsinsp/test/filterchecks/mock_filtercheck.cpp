@@ -41,7 +41,7 @@ static const filtercheck_field_info sinsp_filter_check_mock_fields[] = {
 	{PT_CHARBUF, EPF_NONE, PF_NA, "test.charbuf", "", ""},
 	{PT_BYTEBUF, EPF_NONE, PF_NA, "test.bytebuf", "", ""},
 	{PT_CHARBUF, EPF_IS_LIST, PF_NA, "test.list", "", ""},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "test.more_than_256", "", ""},
+	{PT_CHARBUF, EPF_NONE | EPF_NO_EXTR_MODIFIER, PF_NA, "test.more_than_256", "", ""},
 };
 
 class sinsp_filter_check_mock : public sinsp_filter_check
@@ -417,4 +417,69 @@ TEST_F(sinsp_with_test_input, check_some_fd_fields)
 		chk->add_filter_value(create_filtercheck_from_field(&m_inspector, "fd.types"));
 		ASSERT_TRUE(chk->compare(evt));
 	}
+}
+
+/////////////////////
+// MODIFIERS
+/////////////////////
+
+TEST(mock_filtercheck_modifiers, to_string_method_with_modifiers)
+{
+	sinsp insp;
+	auto chk = create_filtercheck_from_field(&insp, "test.charbuf");
+	chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOUPPER));
+	ASSERT_TRUE(chk->has_extract_modifiers());
+	ASSERT_EQ(std::string(chk->tostring(nullptr)), "CHARBUF");
+}
+
+TEST(mock_filtercheck_modifiers, simple_compare_with_modifiers)
+{
+	sinsp insp;
+	auto chk = create_filtercheck_from_field(&insp, "test.charbuf");
+	chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOUPPER));
+	add_filtercheck_value_vec(chk.get(), {"CHARBUF"});
+	ASSERT_TRUE(chk->compare(nullptr));
+}
+
+TEST(mock_filtercheck_modifiers, same_modifier_multiple_times)
+{
+	sinsp insp;
+	auto chk = create_filtercheck_from_field(&insp, "test.charbuf");
+	chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOUPPER));
+	chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOUPPER));
+	chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOUPPER));
+	chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOUPPER));
+	add_filtercheck_value_vec(chk.get(), {"CHARBUF"});
+	ASSERT_TRUE(chk->compare(nullptr));
+}
+
+TEST(mock_filtercheck_modifiers, filter_with_not_supported_modifier)
+{
+	sinsp insp;
+	auto chk = create_filtercheck_from_field(&insp, "test.more_than_256");
+	ASSERT_THROW(chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOUPPER)), sinsp_exception);
+}
+
+TEST(mock_filtercheck_modifiers, specular_expression)
+{
+	sinsp insp;
+	// we want to check this filter `toupper(test.charbuf) = toupper(test.charbuf)` returns `true`.
+	auto chk = create_filtercheck_from_field(&insp, "test.charbuf");
+	chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOUPPER));
+
+	auto rhs_chk = create_filtercheck_from_field(&insp, "test.charbuf");
+	rhs_chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOUPPER));
+
+	chk->add_filter_value(std::move(rhs_chk));
+	ASSERT_TRUE(chk->compare(nullptr));
+}
+
+TEST(mock_filtercheck_modifiers, toupper_plus_tolower)
+{
+	sinsp insp;
+	auto chk = create_filtercheck_from_field(&insp, "test.charbuf");
+	chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOUPPER));
+	chk->add_extract_modifier(extract_modifier(extract_modifier::MOD_TOLOWER));
+	add_filtercheck_value_vec(chk.get(), {"charbuf"});
+	ASSERT_TRUE(chk->compare(nullptr));
 }
