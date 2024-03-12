@@ -1446,8 +1446,8 @@ size_t sinsp_filter_check::parse_filter_value(const char* str, uint32_t len, uin
 
 const filtercheck_field_info* sinsp_filter_check::get_field_info() const
 {
-	// todo!: to be safe we should check `m_fields!=nullptr` and `m_field_id!=-1`
-	return &m_info.m_fields[m_field_id];
+	ASSERT(m_field != nullptr);
+	return m_field;
 }
 
 
