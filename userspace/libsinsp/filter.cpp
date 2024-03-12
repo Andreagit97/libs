@@ -568,6 +568,11 @@ std::list<sinsp_filter_factory::filter_fieldclass_info> sinsp_filter_factory::ch
 				info.tags.insert("EPF_NO_RHS_FILTER");
 			}
 
+			if(fld->m_flags & EPF_NO_EXTR_MODIFIER)
+			{
+				info.tags.insert("EPF_NO_EXTR_MODIFIER");
+			}
+
 			if(fld->m_flags & EPF_ARG_REQUIRED)
 			{
 				info.tags.insert("ARG_REQUIRED");

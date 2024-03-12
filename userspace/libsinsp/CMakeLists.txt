@@ -115,6 +115,7 @@ add_library(sinsp
 	sinsp_suppress.cpp
 	events/sinsp_events.cpp
 	events/sinsp_events_ppm_sc.cpp
+	extract_modifier/extract_modifier.cpp
 )
 
 if(NOT WIN32 AND NOT APPLE)

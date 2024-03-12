@@ -167,7 +167,8 @@ bool sinsp_filter_check_plugin::extract(sinsp_evt *evt, OUT std::vector<extract_
 	auto type = sinsp_filter_check::get_original_field_type();
 
 	// Even if we don't apply modifiers we always reset the modified field type
-	// because we will use it in the compare.
+	// because we will use it in the `compare_nocache`.
+	// todo!: we still need to implement modifiers with plugins
 	set_modified_field_type(type);
 
 	// here we want to extract just one field

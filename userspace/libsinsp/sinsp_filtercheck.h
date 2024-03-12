@@ -27,6 +27,7 @@ limitations under the License.
 #include <libsinsp/filter_value.h>
 #include <libsinsp/prefix_search.h>
 #include <libsinsp/event.h>
+#include <libsinsp/extract_modifier/extract_modifier.h>
 
 /*
  * Operators to compare events
@@ -75,11 +76,6 @@ namespace std
 std::string to_string(cmpop);
 std::string to_string(boolop);
 }
-
-struct extract_value_t {
-	uint8_t* ptr = nullptr;
-	uint32_t len = 0;
-};
 
 class check_extraction_cache_entry
 {
@@ -196,6 +192,17 @@ public:
 	virtual void add_filter_value(std::unique_ptr<sinsp_filter_check> chk);
 
 	//
+	// Add extract modifiers to the filter check
+	//
+	void add_extract_modifier(extract_modifier modifier);
+
+	//
+	// If present, apply all the extract modifiers on the current filter check
+	// changing extracted values and the filter check type.
+	//
+	void apply_extract_modifiers();
+
+	//
 	// Return the info about the field that this instance contains
 	// This must be used only after `parse_field_name`
 	//
@@ -232,6 +239,14 @@ public:
 	}
 
 	//
+	// Return true if the filter check contains extract modifiers
+	//
+	inline bool has_extract_modifiers() const
+	{
+		return !m_extract_modifiers.empty();
+	}
+
+	//
 	// Return true if the filter check is compared against a const value
 	//
 	inline bool has_const_value() const
@@ -245,6 +260,14 @@ public:
 	inline bool is_rhs_filtercheck_supported() const
 	{
 		return !(get_field_info()->m_flags & EPF_NO_RHS_FILTER);
+	}
+
+	//
+	// Return true if this filter check can support an extraction modifier on it.
+	//
+	inline bool support_extract_modifier() const
+	{
+		return !(get_field_info()->m_flags & EPF_NO_EXTR_MODIFIER);
 	}
 
 	//
@@ -368,6 +391,7 @@ protected:
 
 private:
 	ppm_param_type m_modified_type;
+	std::list<extract_modifier> m_extract_modifiers;
 	// used for comparing right-hand lists of values
 	std::unordered_set<filter_value_t,
 		g_hash_membuf,
