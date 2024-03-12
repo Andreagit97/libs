@@ -84,10 +84,10 @@ static const filtercheck_field_info sinsp_filter_check_fd_fields[] =
 	{PT_IPNET, EPF_FILTER_ONLY | EPF_NO_RHS_FILTER, PF_NA, "fd.rnet", "FD Remote Network", "matches the remote IP network of the fd."},
 	{PT_BOOL, EPF_NONE, PF_NA, "fd.connected", "FD Connected", "for TCP/UDP FDs, 'true' if the socket is connected."},
 	{PT_BOOL, EPF_NONE, PF_NA, "fd.name_changed", "FD Name Changed", "True when an event changes the name of an fd used by this event. This can occur in some cases such as udp connections where the connection tuple changes."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "fd.cip.name", "FD Client Domain Name", "Domain name associated with the client IP address."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "fd.sip.name", "FD Server Domain Name", "Domain name associated with the server IP address."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "fd.lip.name", "FD Local Domain Name", "Domain name associated with the local IP address."},
-	{PT_CHARBUF, EPF_NONE, PF_NA, "fd.rip.name", "FD Remote Domain Name", "Domain name associated with the remote IP address."},
+	{PT_CHARBUF, EPF_FILTER_ONLY, PF_NA, "fd.cip.name", "FD Client Domain Name", "Domain name associated with the client IP address."},
+	{PT_CHARBUF, EPF_FILTER_ONLY, PF_NA, "fd.sip.name", "FD Server Domain Name", "Domain name associated with the server IP address."},
+	{PT_CHARBUF, EPF_FILTER_ONLY, PF_NA, "fd.lip.name", "FD Local Domain Name", "Domain name associated with the local IP address."},
+	{PT_CHARBUF, EPF_FILTER_ONLY, PF_NA, "fd.rip.name", "FD Remote Domain Name", "Domain name associated with the remote IP address."},
 	{PT_INT32, EPF_NONE, PF_HEX, "fd.dev", "FD Device", "device number (major/minor) containing the referenced file"},
 	{PT_INT32, EPF_NONE, PF_DEC, "fd.dev.major", "FD Major Device", "major device number containing the referenced file"},
 	{PT_INT32, EPF_NONE, PF_DEC, "fd.dev.minor", "FD Minor Device", "minor device number containing the referenced file"},
@@ -1832,6 +1832,18 @@ bool sinsp_filter_check_fd::compare_nocache(sinsp_evt *evt)
 		}
 		return compare_rhs(m_cmpop, sinsp_filter_check::get_type(), m_extracted_values);
 	}
+	else if(m_field_id == TYPE_CLIENTIP_NAME ||
+		m_field_id == TYPE_SERVERIP_NAME ||
+		m_field_id == TYPE_LIP_NAME ||
+		m_field_id == TYPE_RIP_NAME)
+	{
+		m_extracted_values.clear();
+		if(!extract(evt, m_extracted_values, false))
+		{
+			return compare_domain(evt);
+		}
+		return compare_rhs(m_cmpop, sinsp_filter_check::get_type(), m_extracted_values);
+	}
 
 	//
 	// Standard extract-based fields
@@ -1853,22 +1865,6 @@ bool sinsp_filter_check_fd::compare_nocache(sinsp_evt *evt)
 			return false;
 		}
 		populate_filter_values_with_rhs_extracted_values();
-	}
-
-	if(extracted_val == NULL)
-	{
-		// optimization for *_NAME fields
-		// the first time we will call compare_domain, the next ones
-		// we will the able to extract and use flt_compare
-		if(m_field_id == TYPE_CLIENTIP_NAME ||
-		   m_field_id == TYPE_SERVERIP_NAME ||
-		   m_field_id == TYPE_LIP_NAME ||
-		   m_field_id == TYPE_RIP_NAME)
-		{
-			return compare_domain(evt);
-		}
-
-		return false;
 	}
 
 	return compare_rhs(m_cmpop,

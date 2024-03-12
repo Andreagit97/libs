@@ -1364,30 +1364,38 @@ void sinsp_filter_check::add_filter_value(std::unique_ptr<sinsp_filter_check> rh
 		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
 		// 2. It cannot be used as a rhs filter check because doesn't provide the extraction phase.
 		"fd.ip"
+
 		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
 		// 2. It cannot be used as a rhs filter check because doesn't provide the extraction phase.
 		"fd.net"
+
 		// 1. It requires a netmask as a rhs value, we don't have filter checks that return a netmask in the extraction phase
 		// 2. It cannot be used as a rhs value filter check for other `PT_IPNET` filter checks, becuase they expect a netmask while it returns an address
 		"fd.cnet"
 		"fd.snet"
 		"fd.lnet"
 		"fd.rnet"
+
 		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
 		// 2. It is a PT_DYN we don't know which is the effective type value.
 		"evt.rawarg"
+
 		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
 		// 2. It has no real sense to be used as a rhs (we can do if want, let's see)
 		"evt.around"
+
 		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
 		// 2. It cannot be used as a rhs filter check because doesn't provide the extraction phase.
 		"fd.port"
+
 		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
 		// 2. It cannot be used as a rhs filter check because doesn't provide the extraction phase.
 		"fd.proto"
+
 		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
 		// 2. OK! (but not supported for simplicity)
 		"fd.types"
+
 		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
 		// 2. OK! (but not supported for simplicity)
 		"proc.apid"
@@ -1396,6 +1404,13 @@ void sinsp_filter_check::add_filter_value(std::unique_ptr<sinsp_filter_check> rh
 		"proc.aexepath"
 		"proc.acmdline"
 		"proc.aenv"
+
+		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
+		// 2. OK! (but not supported for simplicity)
+		"fd.cip.name"
+		"fd.sip.name"
+		"fd.lip.name"
+		"fd.rip.name"
 	*/
 
 	if(!is_rhs_filtercheck_supported())
@@ -1699,7 +1714,6 @@ bool sinsp_filter_check::compare(sinsp_evt* evt)
 
 	// Never cache extractions for fields that contain arguments or that have
 	// a rhs filter check.
-	// todo!: It's not clear when is possible to cache the result of a comparison? what is a practical example?
 	if(m_eval_cache_entry != NULL &&
 	   !can_have_argument() &&
 	   !has_filtercheck_value())
