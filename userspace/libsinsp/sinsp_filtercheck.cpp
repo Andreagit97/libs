@@ -1184,14 +1184,14 @@ char* sinsp_filter_check::tostring(sinsp_evt* evt)
 			{
 				res += ",";
 			}
-			res += rawval_to_string(val.ptr, m_field->m_type, m_field->m_print_format, val.len);
+			res += rawval_to_string(val.ptr, get_modified_field_type(), m_field->m_print_format, val.len);
 		}
 		res += ")";
 		m_getpropertystr_storage.resize(STRPROPERTY_STORAGE_SIZE);
 		strlcpy(m_getpropertystr_storage.data(), res.c_str(), STRPROPERTY_STORAGE_SIZE);
 		return m_getpropertystr_storage.data();
 	}
-	return rawval_to_string(m_extracted_values[0].ptr, m_field->m_type, m_field->m_print_format, m_extracted_values[0].len);
+	return rawval_to_string(m_extracted_values[0].ptr, get_modified_field_type(), m_field->m_print_format, m_extracted_values[0].len);
 }
 
 Json::Value sinsp_filter_check::tojson(sinsp_evt* evt)
@@ -1211,11 +1211,11 @@ Json::Value sinsp_filter_check::tojson(sinsp_evt* evt)
 		{
 			for (auto &val : m_extracted_values)
 			{
-				jsonval.append(rawval_to_json(val.ptr, m_field->m_type, m_field->m_print_format, val.len));
+				jsonval.append(rawval_to_json(val.ptr, get_modified_field_type(), m_field->m_print_format, val.len));
 			}
 			return jsonval;
 		}
-		return rawval_to_json(m_extracted_values[0].ptr, m_field->m_type, m_field->m_print_format, m_extracted_values[0].len);
+		return rawval_to_json(m_extracted_values[0].ptr, get_modified_field_type(), m_field->m_print_format, m_extracted_values[0].len);
 	}
 
 	return jsonval;
@@ -1344,9 +1344,9 @@ void sinsp_filter_check::add_filter_value(std::unique_ptr<sinsp_filter_check> rh
 	}
 
 	// At the moment we don't support comparison between different types.
-	if(get_type() != rhs_chk->get_type())
+	if(get_original_field_type() != rhs_chk->get_original_field_type())
 	{
-		throw sinsp_exception("The current field has type '" + std::to_string(get_type()) + "' while the rhs field has type '" + std::to_string(rhs_chk->get_type()) + "'.");
+		throw sinsp_exception("The current field has type '" + std::to_string(get_original_field_type()) + "' while the rhs field has type '" + std::to_string(rhs_chk->get_original_field_type()) + "'.");
 	}
 	
 	if(get_op() == CO_PMATCH)
@@ -1427,7 +1427,7 @@ size_t sinsp_filter_check::parse_filter_value(const char* str, uint32_t len, uin
 	size_t parsed_len;
 
 	// byte buffer, no parsing needed
-	if (m_field->m_type == PT_BYTEBUF)
+	if (get_original_field_type() == PT_BYTEBUF)
 	{
 		if(len >= storage_len)
 		{
@@ -1438,18 +1438,11 @@ size_t sinsp_filter_check::parse_filter_value(const char* str, uint32_t len, uin
 	}
 	else
 	{
-		parsed_len = sinsp_filter_value_parser::string_to_rawval(str, len, storage, storage_len, m_field->m_type);
+		parsed_len = sinsp_filter_value_parser::string_to_rawval(str, len, storage, storage_len, get_original_field_type());
 	}
 
 	return parsed_len;
 }
-
-const filtercheck_field_info* sinsp_filter_check::get_field_info() const
-{
-	ASSERT(m_field != nullptr);
-	return m_field;
-}
-
 
 bool sinsp_filter_check::compare_rhs(cmpop op, ppm_param_type type, std::vector<extract_value_t>& values)
 {
@@ -1671,6 +1664,11 @@ bool sinsp_filter_check::extract(sinsp_evt *evt, OUT std::vector<extract_value_t
 		m_cache_metrics->m_num_extract++;
 	}
 
+	// Even if we don't apply modifiers we always reset the modified field type
+	// because we will use it in the compare. We need to do this here because it is
+	// the unique place that is called by everyone.
+	set_modified_field_type(get_original_field_type());
+
 	// Never cache extractions for fields that contain arguments.
 	if(m_extraction_cache_entry != NULL &&
 	   !can_have_argument())
@@ -1712,7 +1710,9 @@ bool sinsp_filter_check::compare(sinsp_evt* evt)
 	// a rhs filter check.
 	if(m_eval_cache_entry != NULL &&
 	   !can_have_argument() &&
-	   !has_filtercheck_value())
+	   !has_filtercheck_value()
+	   // todo! we cannot use the cache if we have modifiers... becuase maybe are different
+	   )
 	{
 		uint64_t en = evt->get_num();
 
@@ -1756,6 +1756,6 @@ bool sinsp_filter_check::compare_nocache(sinsp_evt* evt)
 	}
 
 	return compare_rhs(m_cmpop,
-		get_type(),
+		get_modified_field_type(),
 		m_extracted_values);
 }

@@ -164,7 +164,11 @@ bool sinsp_filter_check_plugin::extract(sinsp_evt *evt, OUT std::vector<extract_
 		return false;
 	}
 
-	auto type = sinsp_filter_check::get_type();
+	auto type = sinsp_filter_check::get_original_field_type();
+
+	// Even if we don't apply modifiers we always reset the modified field type
+	// because we will use it in the compare.
+	set_modified_field_type(type);
 
 	// here we want to extract just one field
 	uint32_t num_fields = 1;
