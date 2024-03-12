@@ -388,18 +388,6 @@ void sinsp_filter_check_event::validate_filter_value(const char* str, uint32_t l
 	}
 }
 
-const filtercheck_field_info* sinsp_filter_check_event::get_field_info() const
-{
-	if(m_field_id == TYPE_ARGRAW)
-	{
-		return &m_customfield;
-	}
-	else
-	{
-		return &m_info.m_fields[m_field_id];
-	}
-}
-
 uint8_t* extract_argraw(sinsp_evt *evt, OUT uint32_t* len, const char *argname)
 {
 	const sinsp_evt_param* pi = evt->get_param_by_name(argname);

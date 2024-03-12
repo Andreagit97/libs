@@ -198,7 +198,7 @@ public:
 	//
 	// Return the info about the field that this instance contains
 	//
-	virtual const filtercheck_field_info* get_field_info() const;
+	const filtercheck_field_info* get_field_info() const;
 
 	//
 	// Return true if this filed can have an argument,
