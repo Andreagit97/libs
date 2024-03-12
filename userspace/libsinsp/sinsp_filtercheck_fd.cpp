@@ -456,7 +456,7 @@ bool sinsp_filter_check_fd::extract(sinsp_evt *evt, OUT std::vector<extract_valu
 		};
 
 		m_tinfo->loop_fds(fd_type_gather);
-
+		set_modified_field_type(get_original_field_type());
 		return true;
 	}
 
@@ -1833,7 +1833,7 @@ bool sinsp_filter_check_fd::compare_nocache(sinsp_evt *evt)
 		{
 			return compare_domain(evt);
 		}
-		return compare_rhs(m_cmpop, sinsp_filter_check::get_type(), m_extracted_values);
+		return compare_rhs(m_cmpop, sinsp_filter_check::get_modified_field_type(), m_extracted_values);
 	}
 
 	return sinsp_filter_check::compare_nocache(evt);		   

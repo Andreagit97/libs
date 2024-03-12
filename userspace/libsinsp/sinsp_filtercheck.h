@@ -197,8 +197,13 @@ public:
 
 	//
 	// Return the info about the field that this instance contains
+	// This must be used only after `parse_field_name`
 	//
-	const filtercheck_field_info* get_field_info() const;
+	inline const filtercheck_field_info* get_field_info() const
+	{
+		ASSERT(m_field != nullptr);
+		return m_field;
+	}
 
 	//
 	// Return true if this filed can have an argument,
@@ -207,8 +212,7 @@ public:
 	//
 	inline bool can_have_argument() const
 	{
-		const filtercheck_field_info *info = get_field_info();
-		return ((info->m_flags & EPF_ARG_REQUIRED) || (info->m_flags & EPF_ARG_ALLOWED));
+		return ((get_field_info()->m_flags & EPF_ARG_REQUIRED) || (get_field_info()->m_flags & EPF_ARG_ALLOWED));
 	}
 
 	//
@@ -246,9 +250,19 @@ public:
 	//
 	// Return the type of the current field
 	//
-	inline ppm_param_type get_type() const
+	inline ppm_param_type get_original_field_type() const
 	{
 		return get_field_info()->m_type;
+	}
+
+	inline ppm_param_type get_modified_field_type() const
+	{
+		return m_modified_type;
+	}
+
+	inline void set_modified_field_type(ppm_param_type t)
+	{
+		m_modified_type = t;
 	}
 
 	//
@@ -353,7 +367,7 @@ protected:
 	uint32_t m_field_id = (uint32_t) -1;
 
 private:
-
+	ppm_param_type m_modified_type;
 	// used for comparing right-hand lists of values
 	std::unordered_set<filter_value_t,
 		g_hash_membuf,
