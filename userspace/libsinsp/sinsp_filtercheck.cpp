@@ -1394,10 +1394,6 @@ void sinsp_filter_check::add_filter_value(std::unique_ptr<sinsp_filter_check> rh
 
 		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
 		// 2. OK! (but not supported for simplicity)
-		"fd.types"
-
-		// 1. It has a custom comparison logic (no base `compare_nocache`) so we cannot use a rhs filter check with this.
-		// 2. OK! (but not supported for simplicity)
 		"proc.apid"
 		"proc.aname"
 		"proc.aexe"

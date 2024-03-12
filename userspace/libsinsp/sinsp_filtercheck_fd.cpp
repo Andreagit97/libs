@@ -93,7 +93,7 @@ static const filtercheck_field_info sinsp_filter_check_fd_fields[] =
 	{PT_INT32, EPF_NONE, PF_DEC, "fd.dev.minor", "FD Minor Device", "minor device number containing the referenced file"},
 	{PT_INT64, EPF_NONE, PF_DEC, "fd.ino", "FD Inode Number", "inode number of the referenced file"},
 	{PT_CHARBUF, EPF_NONE, PF_NA, "fd.nameraw", "FD Name Raw", "FD full name raw. Just like fd.name, but only used if fd is a file path. File path is kept raw with limited sanitization and without deriving the absolute path."},
-	{PT_CHARBUF, EPF_IS_LIST | EPF_ARG_ALLOWED | EPF_NO_RHS_FILTER, PF_DEC, "fd.types", "FD Type", "List of FD types in used. Can be passed an fd number e.g. fd.types[0] to get the type of stdout as a single item list."},
+	{PT_CHARBUF, EPF_IS_LIST | EPF_ARG_ALLOWED, PF_DEC, "fd.types", "FD Type", "List of FD types in used. Can be passed an fd number e.g. fd.types[0] to get the type of stdout as a single item list."},
 };
 
 sinsp_filter_check_fd::sinsp_filter_check_fd()
@@ -1823,15 +1823,6 @@ bool sinsp_filter_check_fd::compare_nocache(sinsp_evt *evt)
 	{
 		return compare_net(evt);
 	}
-	else if(m_field_id == TYPE_FDTYPES)
-	{
-		m_extracted_values.clear();
-		if(!extract(evt, m_extracted_values, false))
-		{
-			return false;
-		}
-		return compare_rhs(m_cmpop, sinsp_filter_check::get_type(), m_extracted_values);
-	}
 	else if(m_field_id == TYPE_CLIENTIP_NAME ||
 		m_field_id == TYPE_SERVERIP_NAME ||
 		m_field_id == TYPE_LIP_NAME ||
@@ -1845,30 +1836,5 @@ bool sinsp_filter_check_fd::compare_nocache(sinsp_evt *evt)
 		return compare_rhs(m_cmpop, sinsp_filter_check::get_type(), m_extracted_values);
 	}
 
-	//
-	// Standard extract-based fields
-	//
-	uint32_t len = 0;
-	bool sanitize_strings = false;
-	// note: this uses the single-value extract because this filtercheck
-	// class does not support multi-valued extraction
-	uint8_t* extracted_val = extract(evt, &len, sanitize_strings);
-
-	// We need to extract here the values of the rhs filter check because `compare_domain` below needs them.
-	// todo!: we can also decide to call `sinsp_filter_check::compare_nocache` here, in the end the code
-	// is almost the same, we lose only this optimization of the single extraction + `compare_domain` logic.
-	if(has_filtercheck_value())
-	{
-		m_rhs_filter_check->m_extracted_values.clear();
-		if(!m_rhs_filter_check->extract(evt, m_rhs_filter_check->m_extracted_values, false))
-		{
-			return false;
-		}
-		populate_filter_values_with_rhs_extracted_values();
-	}
-
-	return compare_rhs(m_cmpop,
-			   sinsp_filter_check::get_type(),
-			   extracted_val,
-			   len);
+	return sinsp_filter_check::compare_nocache(evt);		   
 }

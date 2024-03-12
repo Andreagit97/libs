@@ -355,7 +355,7 @@ TEST(mock_filtercheck_compare, rhs_filter_EPF_NO_RHS_FILTER_flag)
 	}
 }
 
-TEST_F(sinsp_with_test_input, check_PT_IPADDR_safety)
+TEST_F(sinsp_with_test_input, check_some_fd_fields)
 {
 	add_default_init_thread();
 	open_inspector();
@@ -400,5 +400,21 @@ TEST_F(sinsp_with_test_input, check_PT_IPADDR_safety)
 		auto chk = create_filtercheck_from_field(&m_inspector, "fd.cip");
 		chk->add_filter_value(create_filtercheck_from_field(&m_inspector, "fd.sip"));
 		ASSERT_FALSE(chk->compare(evt));
+	}
+
+	{
+		// fd.types with const values
+		ASSERT_EQ(get_field_as_string(evt, "fd.types"), "(ipv6,file)");
+		auto chk = create_filtercheck_from_field(&m_inspector, "fd.types", CO_IN);
+		add_filtercheck_value_vec(chk.get(), {"file", "ipv6"});
+		ASSERT_TRUE(chk->compare(evt));
+	}
+
+	{
+		// fd.types with rhs filter check
+		ASSERT_EQ(get_field_as_string(evt, "fd.types"), "(ipv6,file)");
+		auto chk = create_filtercheck_from_field(&m_inspector, "fd.types", CO_IN);
+		chk->add_filter_value(create_filtercheck_from_field(&m_inspector, "fd.types"));
+		ASSERT_TRUE(chk->compare(evt));
 	}
 }
