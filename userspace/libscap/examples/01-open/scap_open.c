@@ -150,6 +150,18 @@ static int simple_set[] = {
 	-1
 };
 
+static int poc_set[] = {
+	PPM_SC_ACCEPT,
+	PPM_SC_ACCEPT4,
+	PPM_SC_CONNECT,
+	PPM_SC_RECVFROM,
+	PPM_SC_RECVMSG,
+	PPM_SC_SENDMMSG,
+	PPM_SC_SENDTO,
+	PPM_SC_SOCKET,
+	-1
+};
+
 /* Generic global variables. */
 static scap_open_args oargs = {};						    /* scap oargs used in `scap_open`. */
 static const struct scap_vtable* vtable = NULL;
@@ -246,26 +258,41 @@ void enable_single_ppm_sc(int ppm_sc_code)
 void enable_sc_and_print()
 {
 	printf("\n---------------------- INTERESTING SYSCALLS ----------------------\n");
-	if(ppm_sc_is_set)
+	printf("* sc codes enabled:\n");
+	for(int j = 0; j < PPM_SC_MAX; j++)
 	{
-		printf("* sc codes enabled:\n");
-		for(int j = 0; j < PPM_SC_MAX; j++)
-		{
-			if(oargs.ppm_sc_of_interest.ppm_sc[j])
-			{
-				printf("- %s\n", scap_get_ppm_sc_name(j));
-			}
-		}
+		oargs.ppm_sc_of_interest.ppm_sc[j] = false;
 	}
-	else
+
+	// enable only what we want
+	for (int i = 0; poc_set[i] != -1; i++)
 	{
-		printf("* All sc codes are enabled!\n");
-		for(int j = 0; j < PPM_SC_MAX; j++)
-		{
-			oargs.ppm_sc_of_interest.ppm_sc[j] = true;
-		}
+		oargs.ppm_sc_of_interest.ppm_sc[poc_set[i]] = true;
+		printf("- %s\n", scap_get_ppm_sc_name(poc_set[i]));
 	}
 	printf("------------------------------------------------------------------\n\n");
+
+	// 	printf("\n---------------------- INTERESTING SYSCALLS ----------------------\n");
+	// if(ppm_sc_is_set)
+	// {
+	// 	printf("* sc codes enabled:\n");
+	// 	for(int j = 0; j < PPM_SC_MAX; j++)
+	// 	{
+	// 		if(oargs.ppm_sc_of_interest.ppm_sc[j])
+	// 		{
+	// 			printf("- %s\n", scap_get_ppm_sc_name(j));
+	// 		}
+	// 	}
+	// }
+	// else
+	// {
+	// 	printf("* All sc codes are enabled!\n");
+	// 	for(int j = 0; j < PPM_SC_MAX; j++)
+	// 	{
+	// 		oargs.ppm_sc_of_interest.ppm_sc[j] = true;
+	// 	}
+	// }
+	// printf("------------------------------------------------------------------\n\n");
 }
 
 void enable_simple_set()
