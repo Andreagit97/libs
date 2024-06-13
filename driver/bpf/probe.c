@@ -381,8 +381,6 @@ BPF_PROBE("sched/", sched_process_exec, sched_process_exec_args)
 	}
 	uint64_t ts = settings->boot_time + bpf_ktime_get_boot_ns();
 	reset_tail_ctx(state, event_type, ts);
-	++state->n_evts;
-
 
 	int filler_code = PPM_FILLER_sched_prog_exec;
 	bpf_tail_call(ctx, &tail_map, filler_code);
@@ -424,7 +422,6 @@ int bpf_sched_process_fork(struct sched_process_fork_raw_args *ctx)
 	}
 	uint64_t ts = settings->boot_time + bpf_ktime_get_boot_ns();
 	reset_tail_ctx(state, event_type, ts);
-	++state->n_evts;
 
 	int filler_code = PPM_FILLER_sched_prog_fork;
 	bpf_tail_call(ctx, &tail_map, filler_code);

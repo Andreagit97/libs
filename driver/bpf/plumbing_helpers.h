@@ -764,8 +764,6 @@ static __always_inline void call_filler(void *ctx,
 	if (drop_event(stack_ctx, state, evt_type, settings, drop_flags))
 		goto cleanup;
 
-	++state->n_evts;
-
 	state->tail_ctx.socketcall_syscall_id = socketcall_syscall_id;
 
 	filler_info = get_event_filler_info(state->tail_ctx.evt_type);

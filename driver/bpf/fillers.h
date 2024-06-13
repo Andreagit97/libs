@@ -97,6 +97,9 @@ FILLER_RAW(terminate_filler)
 	if (!state)
 		return 0;
 
+	// we want to count the event even if it is dropped
+	++state->n_evts;
+
 	switch (state->tail_ctx.prev_res) {
 	case PPM_SUCCESS:
 		break;
@@ -279,6 +282,8 @@ FILLER_RAW(terminate_filler)
 		}
 		break;
 	case PPM_SKIP_EVENT:
+		// This are now the enter events that are skipped.
+		--state->n_evts;
 		break;
 	case PPM_FAILURE_FRAME_SCRATCH_MAP_FULL:
 		bpf_printk("PPM_FAILURE_FRAME_SCRATCH_MAP_FULL event=%d curarg=%d\n",

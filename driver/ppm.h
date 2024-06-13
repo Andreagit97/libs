@@ -47,7 +47,7 @@ struct ppm_ring_buffer_context {
 	struct ppm_ring_buffer_info *info;
 	char *buffer;
 	nanoseconds last_print_time;
-	uint32_t nevents;
+	uint32_t nevents; // what is this? 
 	atomic_t preempt_count;
 	char *str_storage;	/* String storage. Size is one page. */
 };

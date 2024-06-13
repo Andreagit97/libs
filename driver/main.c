@@ -1822,7 +1822,6 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 	ASSERT(ring);
 
 	ring_info = ring->info;
-	ring_info->n_evts++;
 	if (event_datap->category == PPMC_CONTEXT_SWITCH && event_datap->event_info.context_data.sched_prev != NULL) {
 		if (event_type != PPME_SCAPEVENT_E && event_type != PPME_CPU_HOTPLUG_E) {
 			ASSERT(event_datap->event_info.context_data.sched_prev != NULL);
@@ -2020,6 +2019,12 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 		}
 	}
 
+	// todo!: to remove at the end of the process
+	if(likely(cbres != PPM_SKIP_EVENT))
+	{
+		ring_info->n_evts++;
+	}	
+
 	if (likely(!drop)) {
 		res = 1;
 
@@ -2050,6 +2055,7 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 
 		ring_info->head = next;
 
+		// what is this?
 		++ring->nevents;
 	} else {
 		if (cbres == PPM_SUCCESS) {
@@ -2063,7 +2069,10 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 		} else if (cbres == PPM_FAILURE_BUFFER_FULL) {
 			ring_info->n_drops_buffer++;
 			drops_buffer_syscall_categories_counters(event_type, ring_info);
-		} else {
+		}  else if (cbres == PPM_SKIP_EVENT) {
+			// do nothing.
+		}
+		else {
 			ASSERT(false);
 		}
 	}
