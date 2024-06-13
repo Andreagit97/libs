@@ -73,6 +73,13 @@ void display_thread_lineage(sinsp_threadinfo* tinfo)
 	tinfo->traverse_parent_state(scap_file_visitor);
 }
 
+struct scap_file_params
+{
+	bool present;
+	int num_params;
+	std::vector<std::string> params_names;
+};
+
 int main(int argc, char** argv)
 {
 	signal(SIGINT, sigint_handler);
@@ -87,25 +94,30 @@ int main(int argc, char** argv)
 	sinsp inspector;
 	inspector.open_savefile(file_path);
 
-	std::cout << "ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ " << std::endl;
-	std::cout << "ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ " << std::endl;
-	std::cout << "-- Read all threads from /proc" << std::endl;
-	std::cout << "ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ " << std::endl;
-	std::cout << "ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ " << std::endl << std::endl;
+	// std::cout << "ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ " <<
+	// std::endl;
+	// std::cout << "ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ " <<
+	// std::endl; std::cout << "-- Read all threads from /proc" << std::endl;
+	// std::cout << "ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ " <<
+	// std::endl;
+	// std::cout << "ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ ℹ️ " << std::endl
+	// << std::endl;
 
-	// Print lineage for all threads in the table
-	inspector.m_thread_manager->get_threads()->loop(
-		[&](sinsp_threadinfo& tinfo)
-		{
-			printf("* %s\n", thread_info_to_string(&tinfo).c_str());
-			return true;
-		});
+	// // Print lineage for all threads in the table
+	// inspector.m_thread_manager->get_threads()->loop(
+	// 	[&](sinsp_threadinfo& tinfo)
+	// 	{
+	// 		printf("* %s\n", thread_info_to_string(&tinfo).c_str());
+	// 		return true;
+	// 	});
 
 	std::cout << std::endl << std::endl << "-- Start capture" << std::endl;
 
 	inspector.start_capture();
 
 	std::cout << "-- Read from the loop" << std::endl;
+
+	scap_file_params events[PPM_EVENT_MAX] = {};
 
 	sinsp_evt* ev = nullptr;
 	int32_t res = 0;
@@ -124,92 +136,118 @@ int main(int argc, char** argv)
 			continue;
 		}
 
-		auto tinfo = ev->get_thread_info();
-		if(tinfo == nullptr)
-		{
-			continue;
-		}
+		// auto tinfo = ev->get_thread_info();
+		// if(tinfo == nullptr)
+		// {
+		// 	continue;
+		// }
 
 		// Print all interesting events
 		uint16_t evt_type = ev->get_type();
-		switch(evt_type)
+	
+		// just one time
+		if(!events[evt_type].present)
 		{
-		case PPME_SYSCALL_CLONE_11_X:
-		case PPME_SYSCALL_CLONE_16_X:
-		case PPME_SYSCALL_CLONE_17_X:
-		case PPME_SYSCALL_CLONE_20_X:
-		case PPME_SYSCALL_FORK_X:
-		case PPME_SYSCALL_FORK_17_X:
-		case PPME_SYSCALL_FORK_20_X:
-		case PPME_SYSCALL_VFORK_X:
-		case PPME_SYSCALL_VFORK_17_X:
-		case PPME_SYSCALL_VFORK_20_X:
-		case PPME_SYSCALL_CLONE3_X:
-		{
-			int64_t child_tid = ev->get_param(0)->as<int64_t>();
-			if(child_tid == 0)
+			events[evt_type].present = true;
+			events[evt_type].num_params = ev->get_num_params();
+			for(int i = 0; i < events[evt_type].num_params; i++)
 			{
-				printf("🧵 CLONE CHILD EXIT: evt_num(%ld)\n", ev->get_num());
+				events[evt_type].params_names.push_back(ev->get_param_name(i));
 			}
-			else
-			{
-				printf("🧵 CLONE CALLER EXIT for child (%ld): evt_num(%ld)\n", child_tid,
-				       ev->get_num());
-			}
-			display_thread_lineage(tinfo);
 		}
-		break;
+	
+		// switch(evt_type)
+		// {
 
-		case PPME_SYSCALL_EXECVE_8_X:
-		case PPME_SYSCALL_EXECVE_13_X:
-		case PPME_SYSCALL_EXECVE_14_X:
-		case PPME_SYSCALL_EXECVE_15_X:
-		case PPME_SYSCALL_EXECVE_16_X:
-		case PPME_SYSCALL_EXECVE_17_X:
-		case PPME_SYSCALL_EXECVE_18_X:
-		case PPME_SYSCALL_EXECVE_19_X:
-		case PPME_SYSCALL_EXECVEAT_X:
-			printf("🟢 EXECVE EXIT: evt_num(%ld)\n", ev->get_num());
-			display_thread_lineage(tinfo);
-			break;
+		// 	// case PPME_SYSCALL_CLONE_11_X:
+		// 	// case PPME_SYSCALL_CLONE_16_X:
+		// 	// case PPME_SYSCALL_CLONE_17_X:
+		// 	// case PPME_SYSCALL_CLONE_20_X:
+		// 	// case PPME_SYSCALL_FORK_X:
+		// 	// case PPME_SYSCALL_FORK_17_X:
+		// 	// case PPME_SYSCALL_FORK_20_X:
+		// 	// case PPME_SYSCALL_VFORK_X:
+		// 	// case PPME_SYSCALL_VFORK_17_X:
+		// 	// case PPME_SYSCALL_VFORK_20_X:
+		// 	// case PPME_SYSCALL_CLONE3_X:
+		// 	// {
+		// 	// 	int64_t child_tid = ev->get_param(0)->as<int64_t>();
+		// 	// 	if(child_tid == 0)
+		// 	// 	{
+		// 	// 		printf("🧵 CLONE CHILD EXIT: evt_num(%ld)\n", ev->get_num());
+		// 	// 	}
+		// 	// 	else
+		// 	// 	{
+		// 	// 		printf("🧵 CLONE CALLER EXIT for child (%ld): evt_num(%ld)\n", child_tid,
+		// 	// 		       ev->get_num());
+		// 	// 	}
+		// 	// 	display_thread_lineage(tinfo);
+		// 	// }
+		// 	// break;
 
-		case PPME_PROCEXIT_E:
-		case PPME_PROCEXIT_1_E:
-			printf("💥 THREAD EXIT: evt_num(%ld)\n", ev->get_num());
-			for(const auto& child : tinfo->m_children)
-			{
-				if(!child.expired())
-				{
-					auto child_shr = child.lock().get();
-					printf("- move child, tid: %ld, ptid: %ld (dead) to a new reaper.\n",
-					       child_shr->m_tid, child_shr->m_ptid);
-				}
-			}
-			display_thread_lineage(tinfo);
-			break;
+		// 	// case PPME_SYSCALL_EXECVE_8_X:
+		// 	// case PPME_SYSCALL_EXECVE_13_X:
+		// 	// case PPME_SYSCALL_EXECVE_14_X:
+		// 	// case PPME_SYSCALL_EXECVE_15_X:
+		// 	// case PPME_SYSCALL_EXECVE_16_X:
+		// 	// case PPME_SYSCALL_EXECVE_17_X:
+		// 	// case PPME_SYSCALL_EXECVE_18_X:
+		// 	// case PPME_SYSCALL_EXECVE_19_X:
+		// 	// case PPME_SYSCALL_EXECVEAT_X:
+		// 	// 	printf("🟢 EXECVE EXIT: evt_num(%ld)\n", ev->get_num());
+		// 	// 	display_thread_lineage(tinfo);
+		// 	// 	break;
 
-		default:
-			break;
-		}
+		// 	// case PPME_PROCEXIT_E:
+		// 	// case PPME_PROCEXIT_1_E:
+		// 	// 	printf("💥 THREAD EXIT: evt_num(%ld)\n", ev->get_num());
+		// 	// 	for(const auto& child : tinfo->m_children)
+		// 	// 	{
+		// 	// 		if(!child.expired())
+		// 	// 		{
+		// 	// 			auto child_shr = child.lock().get();
+		// 	// 			printf("- move child, tid: %ld, ptid: %ld (dead) to a new reaper.\n",
+		// 	// 			       child_shr->m_tid, child_shr->m_ptid);
+		// 	// 		}
+		// 	// 	}
+		// 	// 	display_thread_lineage(tinfo);
+		// 	// 	break;
+
+		// default:
+		// 	break;
+		// }
 	}
 
 	inspector.stop_capture();
 
-	std::cout << "-- Stop capture" << std::endl << std::endl;
-
-	std::cout << "📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜" << std::endl;
-	std::cout << "📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜" << std::endl;
-	std::cout << "-- Print all lineages of the table" << std::endl;
-	std::cout << "📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜" << std::endl;
-	std::cout << "📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜" << std::endl << std::endl;
-
-	// Print lineage for all threads in the table
-	inspector.m_thread_manager->get_threads()->loop(
-		[&](sinsp_threadinfo& tinfo)
+	for (int i = 0; i < PPM_EVENT_MAX; i++)
+	{
+		if(events[i].present)
 		{
-			display_thread_lineage(&tinfo);
-			return true;
-		});
+			printf("🔵 [%s_%s](n: %d): ", scap_get_event_info_table()[i].name, PPME_IS_ENTER(i)? "enter":"exit", events[i].num_params);
+			for(int j = 0; j < events[i].num_params; j++)
+			{
+				printf("%s,", events[i].params_names[j].c_str());
+			}
+			printf("\n");
+		}
+	}
+
+	// std::cout << "-- Stop capture" << std::endl << std::endl;
+
+	// std::cout << "📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜" << std::endl;
+	// std::cout << "📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜" << std::endl;
+	// std::cout << "-- Print all lineages of the table" << std::endl;
+	// std::cout << "📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜" << std::endl;
+	// std::cout << "📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜📜" << std::endl << std::endl;
+
+	// // Print lineage for all threads in the table
+	// inspector.m_thread_manager->get_threads()->loop(
+	// 	[&](sinsp_threadinfo& tinfo)
+	// 	{
+	// 		display_thread_lineage(&tinfo);
+	// 		return true;
+	// 	});
 
 	return 0;
 }

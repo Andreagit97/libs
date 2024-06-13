@@ -349,7 +349,6 @@ uint8_t* sinsp_filter_check_fd::extract_from_null_fd(sinsp_evt *evt, uint32_t* l
 		*len = 1;
 		switch(PPME_MAKE_ENTER(evt->get_type()))
 		{
-		case PPME_SYSCALL_OPEN_E:
 		case PPME_SYSCALL_OPENAT_E:
 		case PPME_SYSCALL_OPENAT_2_E:
 		case PPME_SYSCALL_OPENAT2_E:

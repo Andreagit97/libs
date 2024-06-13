@@ -1846,6 +1846,29 @@ static int32_t scap_read_init(struct savefile_engine *handle, scap_reader_t* r, 
 	return SCAP_SUCCESS;
 }
 
+// todo!: we need to add a dedicated test in which we read the file and we check that everything works.
+static int32_t manage_open_e(struct savefile_engine* handle, scap_evt **pevent)
+{
+	uint32_t num_params = (*pevent)->nparams;
+	switch (num_params)
+	{
+	case 0:
+		// if the event has 0 param we have to do nothing, it was before the TOCTOU mitigation
+		// todo!: we don't want to send the event so we simulate a timeout, probably we can do better...
+		return SCAP_TIMEOUT;
+	
+	case 2:
+		// todo!: here we SHOULD STORE THE ENTER EVENT to overwrite some params in the exit for the TOCTOU
+		/* code */
+		return SCAP_SUCCESS;
+
+	default:
+		// this is done to catch unhandled events with a number of params different from 0 or 2
+		snprintf(handle->m_lasterr, SCAP_LASTERR_SIZE, "unhandled number of params for open event %u", num_params);
+		return SCAP_FAILURE;
+	}
+}
+
 //
 // Read an event from disk
 //
@@ -2051,6 +2074,16 @@ static int32_t next(struct scap_engine_handle engine, scap_evt **pevent, uint16_
 			(*pevent)->nparams = nparams;
 		}
 
+		break;
+	}
+
+	// Here we need a logic to mutate the number of arguments of old events.
+	switch ((*pevent)->type)
+	{
+	case PPME_SYSCALL_OPEN_E:
+		return manage_open_e(handle, pevent);
+	
+	default:
 		break;
 	}
 

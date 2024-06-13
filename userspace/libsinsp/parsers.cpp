@@ -147,7 +147,6 @@ void sinsp_parser::process_event(sinsp_evt *evt)
 		}
 
 		// FALLTHRU
-	case PPME_SYSCALL_OPEN_E:
 	case PPME_SYSCALL_CREAT_E:
 	case PPME_SYSCALL_OPENAT_E:
 	case PPME_SYSCALL_OPENAT_2_E:
@@ -2585,26 +2584,6 @@ void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt)
 			if (evt->get_num_params() > 5)
 			{
 				ino = evt->get_param(5)->as<uint64_t>();
-			}
-		}
-
-		//
-		// Compare with enter event parameters
-		//
-		if(lastevent_retrieved && enter_evt->get_num_params() >= 2)
-		{
-			enter_evt_name = enter_evt->get_param(0)->as<std::string_view>();
-			enter_evt_flags = enter_evt->get_param(1)->as<uint32_t>();
-
-			if(enter_evt_name.data() != nullptr && enter_evt_name != "<NA>")
-			{
-				name = enter_evt_name;
-
-				// keep PPM_O_F_CREATED flag if present
-				if (flags & PPM_O_F_CREATED)
-					flags = enter_evt_flags | PPM_O_F_CREATED;
-				else
-					flags = enter_evt_flags;
 			}
 		}
 
