@@ -84,6 +84,7 @@ int pman_get_scap_stats(struct scap_stats *stats)
 	char error_message[MAX_ERROR_MESSAGE_LEN];
 	struct counter_map cnt_map;
 
+	uint64_t seconds = *(uint64_t*)stats;
 
 	int counter_maps_fd = bpf_map__fd(g_state.skel->maps.counter_maps);
 	if(counter_maps_fd <= 0)
@@ -110,7 +111,15 @@ int pman_get_scap_stats(struct scap_stats *stats)
 			pman_print_error((const char *)error_message);
 			goto clean_print_stats;
 		}
-		printf("- CPU %d: n_evts: %lu, num_drops: %lu\n", index, cnt_map.n_evts, cnt_map.n_drops_buffer);
+
+		if(seconds == 0 )
+		{
+			printf("- CPU %d: n_evts: %lu, num_drops: %lu\n", index, cnt_map.n_evts, cnt_map.n_drops_buffer);
+		}
+		else
+		{
+			printf("- CPU %d: n_evts: %lu, num_drops: %lu, evt/s: %lu, drop/s: %lu\n", index, cnt_map.n_evts, cnt_map.n_drops_buffer, cnt_map.n_evts/seconds, cnt_map.n_drops_buffer/seconds);
+		}
 	}
 	return 0;
 
