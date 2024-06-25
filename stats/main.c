@@ -29,16 +29,24 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 
-	printf("Start openat stressor\n");
+	if(argc != 3)
+	{
+		fprintf(stderr, "Wrong number of params.\n");
+		return EXIT_FAILURE;
+	}
+	
+	int num_iteration =  strtoul(argv[1], NULL, 10);
+	int sleep_time_us = strtoul(argv[2], NULL, 10);
+	printf("Start openat stressor with '%d' iterations and '%d' us of sleep\n", num_iteration, sleep_time_us);
 	while(1)
 	{
 		// Note that we are using failed syscalls to increase the throughput
 		// Moreover the syscall fails so we don't populate a new file-descriptor
-		for(size_t i = 0; i < 200; i++)
+		for(size_t i = 0; i < num_iteration; i++)
 		{
 			syscall(SYS_openat, AT_FDCWD, "aaaaaaaaaa", 0);
 		}
-		usleep(1);
+		usleep(sleep_time_us);
 	}
 
 	printf("Aborted\n");

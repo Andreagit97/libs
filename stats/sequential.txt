@@ -26,22 +26,39 @@ Chosen buffer policy: 2
 
 ----------------------------- STATS ------------------------------
 
+- CPU 0: n_evts: 4497191, num_drops: 0
+- CPU 1: n_evts: 4414974, num_drops: 0
+- CPU 2: n_evts: 4543902, num_drops: 0
+- CPU 3: n_evts: 4605996, num_drops: 0
+- CPU 4: n_evts: 4599922, num_drops: 0
+- CPU 5: n_evts: 4407768, num_drops: 0
+- CPU 6: n_evts: 4503486, num_drops: 0
+- CPU 7: n_evts: 2118404, num_drops: 0
+- CPU 8: n_evts: 4591822, num_drops: 0
+- CPU 9: n_evts: 4504911, num_drops: 0
+- CPU 10: n_evts: 4523607, num_drops: 0
+- CPU 11: n_evts: 4403592, num_drops: 0
+- CPU 12: n_evts: 4442349, num_drops: 0
+- CPU 13: n_evts: 4587434, num_drops: 0
+- CPU 14: n_evts: 4521452, num_drops: 0
+- CPU 15: n_evts: 3132, num_drops: 0
+
 ------------> Kernel stats
-Seen by driver (kernel side events): 73319321
-Rate of kernel side events (events/second): 2443977
+Seen by driver (kernel side events): 65269942
+Rate of kernel side events (events/second): 2175664
 Stats v2: 18 metrics in total
 [1] kernel-side counters
 [Notice]: `/proc/sys/kernel/bpf_stats_enabled` not enabled, no `libbpf` stats retrieved.
-[1] n_evts: 73319321
-[1] n_drops_buffer_total: 18870934
+[1] n_evts: 65269942
+[1] n_drops_buffer_total: 0
 [1] n_drops_buffer_clone_fork_enter: 0
 [1] n_drops_buffer_clone_fork_exit: 0
 [1] n_drops_buffer_execve_enter: 0
 [1] n_drops_buffer_execve_exit: 0
 [1] n_drops_buffer_connect_enter: 0
 [1] n_drops_buffer_connect_exit: 0
-[1] n_drops_buffer_open_enter: 8258560
-[1] n_drops_buffer_open_exit: 10612374
+[1] n_drops_buffer_open_enter: 0
+[1] n_drops_buffer_open_exit: 0
 [1] n_drops_buffer_dir_file_enter: 0
 [1] n_drops_buffer_dir_file_exit: 0
 [1] n_drops_buffer_other_interest_enter: 0
@@ -49,19 +66,19 @@ Stats v2: 18 metrics in total
 [1] n_drops_buffer_close_exit: 0
 [1] n_drops_buffer_proc_exit: 0
 [1] n_drops_scratch_map: 0
-[1] n_drops: 18870934
+[1] n_drops: 0
 
 ------------> Userspace stats
-Number of `SCAP_SUCCESS` (events correctly captured): 54046592
-Number of `SCAP_TIMEOUTS`: 33
-Number of `scap_next` calls: 54046625
-Number of bytes received: 3969170363 bytes
-Average dimension of events: 73 bytes
+Number of `SCAP_SUCCESS` (events correctly captured): 65216116
+Number of `SCAP_TIMEOUTS`: 1024
+Number of `scap_next` calls: 65217141
+Number of bytes received: 4826100941 bytes
+Average dimension of events: 74 bytes
 Time elapsed: 30 s
-Rate of userspace events (events/second): 1801553
+Rate of userspace events (events/second): 2173870
 Syscall stats (userspace-side):
-- [openat__enter]: 28191706
-- [openat__exit]: 25854886
+- [openat__enter]: 32608061
+- [openat__exit]: 32608055
 
 
 ------------------------------------------------------------------
