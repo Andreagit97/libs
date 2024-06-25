@@ -266,6 +266,41 @@ clean_percpu_ring_buffers:
 	return errno;
 }
 
+////////////////////////
+// RINGBUF LOGIC
+////////////////////////
+
+/* We return NULL only in case there is no new data to consume */
+static inline void *ringbuf_get_first_event(struct ring *r, size_t *cons_update)
+{
+	unsigned long cons_pos = smp_load_acquire(r->consumer_pos);
+
+restart:
+	if(cons_pos >= smp_load_acquire(r->producer_pos))
+	{
+		return NULL;
+	}
+
+	int *len_ptr = r->data + (cons_pos & r->mask);
+	int len = smp_load_acquire(len_ptr);
+
+	/* sample not committed yet, bail out for now */
+	if(len & BPF_RINGBUF_BUSY_BIT)
+	{
+		return NULL;
+	}
+
+	/* We can also remove it if we are sure we will never discard an event kernel side */
+	if((len & BPF_RINGBUF_DISCARD_BIT) != 0)
+	{
+		cons_pos += roundup_len(len);
+		smp_store_release(r->consumer_pos, cons_pos);
+		goto restart;
+	}
+	*cons_update = roundup_len(len);
+	return (void *)len_ptr + BPF_RINGBUF_HDR_SZ;
+}
+
 static inline void *ringbuf__get_first_ring_event(struct ring *r, int pos)
 {
 	int *len_ptr = NULL;
@@ -345,45 +380,6 @@ static void ringbuf__standard(struct ring_buffer *rb, struct ppm_evt_hdr **event
 	g_state.last_event_size = tmp_cons_increment;
 }
 
-// Custom struct defined by us
-struct ringbuf_evt_storage
-{
-	void *evt_data;
-	size_t cons_update;
-	int ring_num;
-};
-
-/* We return NULL only in case there is no new data to consume */
-static inline void *ringbuf_get_first_event(struct ring *r, size_t *cons_update)
-{
-	unsigned long cons_pos = smp_load_acquire(r->consumer_pos);
-
-restart:
-	if(cons_pos >= smp_load_acquire(r->producer_pos))
-	{
-		return NULL;
-	}
-
-	int *len_ptr = r->data + (cons_pos & r->mask);
-	int len = smp_load_acquire(len_ptr);
-
-	/* sample not committed yet, bail out for now */
-	if(len & BPF_RINGBUF_BUSY_BIT)
-	{
-		return NULL;
-	}
-
-	/* We can also remove it if we are sure we will never discard an event kernel side */
-	if((len & BPF_RINGBUF_DISCARD_BIT) != 0)
-	{
-		cons_pos += roundup_len(len);
-		smp_store_release(r->consumer_pos, cons_pos);
-		goto restart;
-	}
-	*cons_update = roundup_len(len);
-	return (void *)len_ptr + BPF_RINGBUF_HDR_SZ;
-}
-
 // This is not thread-safe just one thread should call it
 // todo!: we always start the scraping from the first ring, but we should start from the last ring we read from.
 void *ring_buffer__consume_sequential(struct ring_buffer *rb)
@@ -401,8 +397,7 @@ void *ring_buffer__consume_sequential(struct ring_buffer *rb)
 	for(u_int8_t i = 0; i < rb->ring_cnt; i++)
 	{
 		storage.ring_num = ((storage.ring_num + 1) % rb->ring_cnt);
-		storage.evt_data =
-			ringbuf_get_first_event(rb->rings[storage.ring_num], &storage.cons_update);
+		storage.evt_data = ringbuf_get_first_event(rb->rings[storage.ring_num], &storage.cons_update);
 		if(storage.evt_data == NULL)
 		{
 			continue;
@@ -415,37 +410,35 @@ void *ring_buffer__consume_sequential(struct ring_buffer *rb)
 	return NULL;
 }
 
-void *ring_buffer__consume_first_event(struct ring_buffer *rb)
+static void ring_buffer__consume_first_event(struct ring_buffer *rb, struct ppm_evt_hdr **event_ptr)
 {
-	static struct ringbuf_evt_storage storage = {.cons_update = 0, .evt_data = NULL, .ring_num = -1};
-
-	if(storage.ring_num != -1)
+	/* If the last consume operation was successful we can push the consumer position */
+	if(g_state.last_ring_read != -1)
 	{
-		// We update the consumer position
-		smp_store_release(rb->rings[storage.ring_num]->consumer_pos,
-				  *rb->rings[storage.ring_num]->consumer_pos + storage.cons_update);
+		// saving the consumer position in the state seems a great optimization since we don't have to get it each time we read the buffers
+		struct ring *r = rb->rings[g_state.last_ring_read];
+		g_state.cons_pos[g_state.last_ring_read] += g_state.last_event_size;
+		smp_store_release(r->consumer_pos, g_state.cons_pos[g_state.last_ring_read]);
 	}
 
-	// At every new read we start from the first ring, it really
-	// depends on the use case if this is right or not
-	for(int i = 0; i < rb->ring_cnt; i++)
+	for(uint8_t pos = 0; pos < rb->ring_cnt; pos++)
 	{
-		storage.evt_data = ringbuf_get_first_event(rb->rings[i], &storage.cons_update);
-		if(storage.evt_data == NULL)
+		*event_ptr = ringbuf__get_first_ring_event(rb->rings[pos], pos);
+
+		/* this if condition is ok in this way, if we try != NULL we lose in perf*/
+		if(*event_ptr == NULL)
 		{
 			continue;
 		}
-		storage.ring_num = i;
-		return storage.evt_data;
+		g_state.last_ring_read = pos;
+		return;
 	}
 
-	storage.cons_update = 0;
-	storage.ring_num = -1;
-	return NULL;
+	g_state.last_ring_read = -1;
 }
 
 /* Consume */
-void pman_consume_first_event(void **event_ptr, int16_t *buffer_id)
+void pman_consume_event(void **event_ptr, int16_t *buffer_id)
 {
 	switch(g_state.policy)
 	{
@@ -455,7 +448,7 @@ void pman_consume_first_event(void **event_ptr, int16_t *buffer_id)
 
 	case POLICY_FIRST_EVENT:
 		*buffer_id = 0;
-		*event_ptr = ring_buffer__consume_first_event(g_state.rb_manager);
+		ring_buffer__consume_first_event(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr);
 		break;
 
 	case POLICY_SEQUENTIAL_EVENT:

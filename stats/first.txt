@@ -27,21 +27,21 @@ Chosen buffer policy: 1
 ----------------------------- STATS ------------------------------
 
 ------------> Kernel stats
-Seen by driver (kernel side events): 72094211
-Rate of kernel side events (events/second): 2403140
+Seen by driver (kernel side events): 71167219
+Rate of kernel side events (events/second): 2372240
 Stats v2: 18 metrics in total
 [1] kernel-side counters
 [Notice]: `/proc/sys/kernel/bpf_stats_enabled` not enabled, no `libbpf` stats retrieved.
-[1] n_evts: 72094211
-[1] n_drops_buffer_total: 21496576
+[1] n_evts: 71167219
+[1] n_drops_buffer_total: 17804974
 [1] n_drops_buffer_clone_fork_enter: 0
 [1] n_drops_buffer_clone_fork_exit: 0
 [1] n_drops_buffer_execve_enter: 0
 [1] n_drops_buffer_execve_exit: 0
 [1] n_drops_buffer_connect_enter: 0
 [1] n_drops_buffer_connect_exit: 0
-[1] n_drops_buffer_open_enter: 10737791
-[1] n_drops_buffer_open_exit: 10758785
+[1] n_drops_buffer_open_enter: 8828991
+[1] n_drops_buffer_open_exit: 8975983
 [1] n_drops_buffer_dir_file_enter: 0
 [1] n_drops_buffer_dir_file_exit: 0
 [1] n_drops_buffer_other_interest_enter: 0
@@ -49,19 +49,19 @@ Stats v2: 18 metrics in total
 [1] n_drops_buffer_close_exit: 0
 [1] n_drops_buffer_proc_exit: 0
 [1] n_drops_scratch_map: 0
-[1] n_drops: 21496576
+[1] n_drops: 17804974
 
 ------------> Userspace stats
-Number of `SCAP_SUCCESS` (events correctly captured): 50497353
-Number of `SCAP_TIMEOUTS`: 14
-Number of `scap_next` calls: 50497368
-Number of bytes received: 3736592089 bytes
+Number of `SCAP_SUCCESS` (events correctly captured): 53252007
+Number of `SCAP_TIMEOUTS`: 126
+Number of `scap_next` calls: 53252134
+Number of bytes received: 3938856975 bytes
 Average dimension of events: 73 bytes
 Time elapsed: 30 s
-Rate of userspace events (events/second): 1683245
+Rate of userspace events (events/second): 1775066
 Syscall stats (userspace-side):
-- [openat__enter]: 25258840
-- [openat__exit]: 25238513
+- [openat__enter]: 26698244
+- [openat__exit]: 26553763
 
 
 ------------------------------------------------------------------

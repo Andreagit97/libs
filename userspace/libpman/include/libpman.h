@@ -274,7 +274,7 @@ extern "C"
 	 * @param buffer_id in case of success returns the id of the ring buffer
 	 * from which we retrieved the event, otherwise return `-1`.
 	 */
-	void pman_consume_first_event(void** event_ptr, int16_t* buffer_id);
+	void pman_consume_event(void** event_ptr, int16_t* buffer_id);
 
 	/////////////////////////////
 	// CAPTURE (EXCHANGE VALUES WITH BPF SIDE)

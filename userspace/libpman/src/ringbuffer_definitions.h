@@ -75,3 +75,11 @@ static inline int roundup_len(uint32_t len)
 		barrier();                       \
 		___p;                            \
 	})
+
+// Custom struct defined by us
+struct ringbuf_evt_storage
+{
+	void *evt_data;
+	size_t cons_update;
+	int ring_num;
+};

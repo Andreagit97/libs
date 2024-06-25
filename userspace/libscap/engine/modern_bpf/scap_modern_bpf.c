@@ -55,7 +55,7 @@ static void scap_modern_bpf__free_engine(struct scap_engine_handle engine)
 static int32_t scap_modern_bpf__next(struct scap_engine_handle engine, scap_evt** pevent, uint16_t* buffer_id,
 				     uint32_t* pflags)
 {
-	pman_consume_first_event((void**)pevent, (int16_t*)buffer_id);
+	pman_consume_event((void**)pevent, (int16_t*)buffer_id);
 
 	if((*pevent) == NULL)
 	{
