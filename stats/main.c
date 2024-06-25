@@ -34,9 +34,11 @@ int main(int argc, char** argv)
 	{
 		// Note that we are using failed syscalls to increase the throughput
 		// Moreover the syscall fails so we don't populate a new file-descriptor
-		syscall(SYS_openat, AT_FDCWD, "aaaaaaaaaa", 0);
-		syscall(SYS_openat, AT_FDCWD, "aaaaaaaaaa", 0);
-		syscall(SYS_openat, AT_FDCWD, "aaaaaaaaaa", 0);
+		for(size_t i = 0; i < 200; i++)
+		{
+			syscall(SYS_openat, AT_FDCWD, "aaaaaaaaaa", 0);
+		}
+		usleep(1);
 	}
 
 	printf("Aborted\n");
