@@ -32,7 +32,11 @@ int main(int argc, char** argv)
 	printf("Start openat stressor\n");
 	while(1)
 	{
-		syscall(__NR_openat, AT_FDCWD, "./not_existent", 0);
+		// Note that we are using failed syscalls to increase the throughput
+		// Moreover the syscall fails so we don't populate a new file-descriptor
+		syscall(SYS_openat, AT_FDCWD, "aaaaaaaaaa", 0);
+		syscall(SYS_openat, AT_FDCWD, "aaaaaaaaaa", 0);
+		syscall(SYS_openat, AT_FDCWD, "aaaaaaaaaa", 0);
 	}
 
 	printf("Aborted\n");

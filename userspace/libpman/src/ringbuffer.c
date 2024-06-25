@@ -305,7 +305,7 @@ static inline void *ringbuf__get_first_ring_event(struct ring *r, int pos)
 	}
 }
 
-static void ringbuf__consume_first_event(struct ring_buffer *rb, struct ppm_evt_hdr **event_ptr, int16_t *buffer_id)
+static void ringbuf__standard(struct ring_buffer *rb, struct ppm_evt_hdr **event_ptr, int16_t *buffer_id)
 {
 	uint64_t min_ts = 0xffffffffffffffffLL;
 	struct ppm_evt_hdr *tmp_pointer = NULL;
@@ -386,7 +386,36 @@ restart:
 
 // This is not thread-safe just one thread should call it
 // todo!: we always start the scraping from the first ring, but we should start from the last ring we read from.
-void *ring_buffer__consume_out_of_order(struct ring_buffer *rb)
+void *ring_buffer__consume_sequential(struct ring_buffer *rb)
+{
+	static struct ringbuf_evt_storage storage = {.cons_update = 0, .evt_data = NULL, .ring_num = -1};
+
+	if(storage.ring_num != -1)
+	{
+		// We update the consumer position
+		smp_store_release(rb->rings[storage.ring_num]->consumer_pos,
+				  *rb->rings[storage.ring_num]->consumer_pos + storage.cons_update);
+	}
+
+	// We read from the last buffer
+	for(u_int8_t i = 0; i < rb->ring_cnt; i++)
+	{
+		storage.ring_num = ((storage.ring_num + 1) % rb->ring_cnt);
+		storage.evt_data =
+			ringbuf_get_first_event(rb->rings[storage.ring_num], &storage.cons_update);
+		if(storage.evt_data == NULL)
+		{
+			continue;
+		}
+		return storage.evt_data;
+	}
+
+	storage.cons_update = 0;
+	storage.ring_num = -1;
+	return NULL;
+}
+
+void *ring_buffer__consume_first_event(struct ring_buffer *rb)
 {
 	static struct ringbuf_evt_storage storage = {.cons_update = 0, .evt_data = NULL, .ring_num = -1};
 
@@ -421,12 +450,17 @@ void pman_consume_first_event(void **event_ptr, int16_t *buffer_id)
 	switch(g_state.policy)
 	{
 	case POLICY_STANDARD:
-		ringbuf__consume_first_event(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, buffer_id);
+		ringbuf__standard(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, buffer_id);
 		break;
 
 	case POLICY_FIRST_EVENT:
 		*buffer_id = 0;
-		*event_ptr = ring_buffer__consume_out_of_order(g_state.rb_manager);
+		*event_ptr = ring_buffer__consume_first_event(g_state.rb_manager);
+		break;
+
+	case POLICY_SEQUENTIAL_EVENT:
+		*buffer_id = 0;
+		*event_ptr = ring_buffer__consume_sequential(g_state.rb_manager);
 		break;
 
 	default:

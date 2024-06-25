@@ -107,7 +107,7 @@ int pman_init_state(falcosecurity_log_fn log_fn, unsigned long buf_bytes_dim, ui
 	{
 	case POLICY_STANDARD:
 	case POLICY_FIRST_EVENT:
-	case POLICY_SAME_EVENT:
+	case POLICY_SEQUENTIAL_EVENT:
 		printf("\nChosen buffer policy: %d\n\n", policy);
 		g_state.policy =policy;
 		break;

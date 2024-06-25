@@ -18,7 +18,7 @@
 ------------------------------------------------------------------
 
 
-Chosen buffer policy: 0
+Chosen buffer policy: 2
 
 * OK! modern BPF probe correctly loaded: NO VERIFIER ISSUES :)
 * Live capture in progress...
@@ -27,21 +27,21 @@ Chosen buffer policy: 0
 ----------------------------- STATS ------------------------------
 
 ------------> Kernel stats
-Seen by driver (kernel side events): 72986312
-Rate of kernel side events (events/second): 2432877
+Seen by driver (kernel side events): 70751379
+Rate of kernel side events (events/second): 2358379
 Stats v2: 18 metrics in total
 [1] kernel-side counters
 [Notice]: `/proc/sys/kernel/bpf_stats_enabled` not enabled, no `libbpf` stats retrieved.
-[1] n_evts: 72986312
-[1] n_drops_buffer_total: 16800472
+[1] n_evts: 70751379
+[1] n_drops_buffer_total: 19196530
 [1] n_drops_buffer_clone_fork_enter: 0
 [1] n_drops_buffer_clone_fork_exit: 0
 [1] n_drops_buffer_execve_enter: 0
 [1] n_drops_buffer_execve_exit: 0
 [1] n_drops_buffer_connect_enter: 0
 [1] n_drops_buffer_connect_exit: 0
-[1] n_drops_buffer_open_enter: 8162033
-[1] n_drops_buffer_open_exit: 8638439
+[1] n_drops_buffer_open_enter: 9075414
+[1] n_drops_buffer_open_exit: 10121116
 [1] n_drops_buffer_dir_file_enter: 0
 [1] n_drops_buffer_dir_file_exit: 0
 [1] n_drops_buffer_other_interest_enter: 0
@@ -49,19 +49,19 @@ Stats v2: 18 metrics in total
 [1] n_drops_buffer_close_exit: 0
 [1] n_drops_buffer_proc_exit: 0
 [1] n_drops_scratch_map: 0
-[1] n_drops: 16800472
+[1] n_drops: 19196530
 
 ------------> Userspace stats
-Number of `SCAP_SUCCESS` (events correctly captured): 55914083
-Number of `SCAP_TIMEOUTS`: 22
-Number of `scap_next` calls: 55914106
-Number of bytes received: 4355171292 bytes
-Average dimension of events: 77 bytes
+Number of `SCAP_SUCCESS` (events correctly captured): 51254670
+Number of `SCAP_TIMEOUTS`: 25
+Number of `scap_next` calls: 51254695
+Number of bytes received: 3779411255 bytes
+Average dimension of events: 73 bytes
 Time elapsed: 30 s
-Rate of userspace events (events/second): 1863802
+Rate of userspace events (events/second): 1708489
 Syscall stats (userspace-side):
-- [openat__enter]: 28194607
-- [openat__exit]: 27719476
+- [openat__enter]: 26147087
+- [openat__exit]: 25107583
 
 
 ------------------------------------------------------------------

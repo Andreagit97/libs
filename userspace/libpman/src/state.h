@@ -37,8 +37,7 @@ limitations under the License.
 
 #define POLICY_STANDARD 0
 #define POLICY_FIRST_EVENT 1
-#define POLICY_SAME_EVENT 2
-
+#define POLICY_SEQUENTIAL_EVENT 2
 
 struct metrics_v2;
 

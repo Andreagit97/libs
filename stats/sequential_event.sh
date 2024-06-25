@@ -1,5 +1,5 @@
 #! /usr/bin/bash
-taskset 0x20 /home/ubuntu/lsm_poc/build-scap-full/libscap/examples/01-open/scap-open --modern_bpf --ppm_sc 197 --policy 0 > ordered.txt &
+taskset 0x20 /home/ubuntu/lsm_poc/build-scap-full/libscap/examples/01-open/scap-open --modern_bpf --ppm_sc 197 --policy 2 > sequential.txt &
 sleep 2
 taskset 0x10 /home/ubuntu/lsm_poc/stats/main &
 taskset 0x40 /home/ubuntu/lsm_poc/stats/main &
