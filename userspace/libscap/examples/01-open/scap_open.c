@@ -897,6 +897,9 @@ void print_stats()
 
 	printf("\n----------------------------- STATS ------------------------------\n");
 
+	// This now prints some statistics about CPUS.
+	scap_get_stats(g_h, NULL);
+
 	/////////////////////
 	// Kernel stats
 	/////////////////////

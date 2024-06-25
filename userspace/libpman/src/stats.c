@@ -84,11 +84,6 @@ int pman_get_scap_stats(struct scap_stats *stats)
 	char error_message[MAX_ERROR_MESSAGE_LEN];
 	struct counter_map cnt_map;
 
-	if(!stats)
-	{
-		pman_print_error("pointer to scap_stats is empty");
-		return errno;
-	}
 
 	int counter_maps_fd = bpf_map__fd(g_state.skel->maps.counter_maps);
 	if(counter_maps_fd <= 0)
@@ -106,6 +101,7 @@ int pman_get_scap_stats(struct scap_stats *stats)
 	/* We always take statistics from all the CPUs, even if some of them are not online.
 	 * If the CPU is not online the counter map will be empty.
 	 */
+	printf("\n");
 	for(int index = 0; index < g_state.n_possible_cpus; index++)
 	{
 		if(bpf_map_lookup_elem(counter_maps_fd, &index, &cnt_map) < 0)
@@ -114,24 +110,7 @@ int pman_get_scap_stats(struct scap_stats *stats)
 			pman_print_error((const char *)error_message);
 			goto clean_print_stats;
 		}
-		stats->n_evts += cnt_map.n_evts;
-		stats->n_drops_buffer += cnt_map.n_drops_buffer;
-		stats->n_drops_buffer_clone_fork_enter += cnt_map.n_drops_buffer_clone_fork_enter;
-		stats->n_drops_buffer_clone_fork_exit += cnt_map.n_drops_buffer_clone_fork_exit;
-		stats->n_drops_buffer_execve_enter += cnt_map.n_drops_buffer_execve_enter;
-		stats->n_drops_buffer_execve_exit += cnt_map.n_drops_buffer_execve_exit;
-		stats->n_drops_buffer_connect_enter += cnt_map.n_drops_buffer_connect_enter;
-		stats->n_drops_buffer_connect_exit += cnt_map.n_drops_buffer_connect_exit;
-		stats->n_drops_buffer_open_enter += cnt_map.n_drops_buffer_open_enter;
-		stats->n_drops_buffer_open_exit += cnt_map.n_drops_buffer_open_exit;
-		stats->n_drops_buffer_dir_file_enter += cnt_map.n_drops_buffer_dir_file_enter;
-		stats->n_drops_buffer_dir_file_exit += cnt_map.n_drops_buffer_dir_file_exit;
-		stats->n_drops_buffer_other_interest_enter += cnt_map.n_drops_buffer_other_interest_enter;
-		stats->n_drops_buffer_close_exit += cnt_map.n_drops_buffer_close_exit;
-		stats->n_drops_buffer_proc_exit += cnt_map.n_drops_buffer_proc_exit;
-		stats->n_drops_buffer_other_interest_exit += cnt_map.n_drops_buffer_other_interest_exit;
-		stats->n_drops_scratch_map += cnt_map.n_drops_max_event_size;
-		stats->n_drops += (cnt_map.n_drops_buffer + cnt_map.n_drops_max_event_size);
+		printf("- CPU %d: n_evts: %lu, num_drops: %lu\n", index, cnt_map.n_evts, cnt_map.n_drops_buffer);
 	}
 	return 0;
 

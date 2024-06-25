@@ -256,34 +256,34 @@ int32_t scap_next(scap_t* handle, scap_evt** pevent, uint16_t* pdevid, uint32_t*
 //
 int32_t scap_get_stats(scap_t* handle, scap_stats* stats)
 {
-	if(!handle || stats == NULL)
+	if(!handle)
 	{
 		return SCAP_FAILURE;
 	}
 
-	stats->n_evts = 0;
-	stats->n_drops = 0;
-	stats->n_drops_buffer = 0;
-	stats->n_drops_buffer_clone_fork_enter = 0;
-	stats->n_drops_buffer_clone_fork_exit = 0;
-	stats->n_drops_buffer_execve_enter = 0;
-	stats->n_drops_buffer_execve_exit = 0;
-	stats->n_drops_buffer_connect_enter = 0;
-	stats->n_drops_buffer_connect_exit = 0;
-	stats->n_drops_buffer_open_enter = 0;
-	stats->n_drops_buffer_open_exit = 0;
-	stats->n_drops_buffer_dir_file_enter = 0;
-	stats->n_drops_buffer_dir_file_exit = 0;
-	stats->n_drops_buffer_other_interest_enter = 0;
-	stats->n_drops_buffer_other_interest_exit = 0;
-	stats->n_drops_buffer_close_exit = 0;
-	stats->n_drops_buffer_proc_exit = 0;
-	stats->n_drops_scratch_map = 0;
-	stats->n_drops_pf = 0;
-	stats->n_drops_bug = 0;
-	stats->n_preemptions = 0;
-	stats->n_suppressed = 0;
-	stats->n_tids_suppressed = 0;
+	// stats->n_evts = 0;
+	// stats->n_drops = 0;
+	// stats->n_drops_buffer = 0;
+	// stats->n_drops_buffer_clone_fork_enter = 0;
+	// stats->n_drops_buffer_clone_fork_exit = 0;
+	// stats->n_drops_buffer_execve_enter = 0;
+	// stats->n_drops_buffer_execve_exit = 0;
+	// stats->n_drops_buffer_connect_enter = 0;
+	// stats->n_drops_buffer_connect_exit = 0;
+	// stats->n_drops_buffer_open_enter = 0;
+	// stats->n_drops_buffer_open_exit = 0;
+	// stats->n_drops_buffer_dir_file_enter = 0;
+	// stats->n_drops_buffer_dir_file_exit = 0;
+	// stats->n_drops_buffer_other_interest_enter = 0;
+	// stats->n_drops_buffer_other_interest_exit = 0;
+	// stats->n_drops_buffer_close_exit = 0;
+	// stats->n_drops_buffer_proc_exit = 0;
+	// stats->n_drops_scratch_map = 0;
+	// stats->n_drops_pf = 0;
+	// stats->n_drops_bug = 0;
+	// stats->n_preemptions = 0;
+	// stats->n_suppressed = 0;
+	// stats->n_tids_suppressed = 0;
 
 	if(handle->m_vtable)
 	{
