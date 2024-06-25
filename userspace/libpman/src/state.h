@@ -35,6 +35,11 @@ limitations under the License.
 #define BPF_LOG_BIG_BUF_SIZE (UINT32_MAX >> 8) /* Recommended log buffer size, taken from libbpf. Used for verifier logs */
 #define BPF_LOG_SMALL_BUF_SIZE 8192 /* Used for libbpf non-verifier logs */
 
+#define POLICY_STANDARD 0
+#define POLICY_FIRST_EVENT 1
+#define POLICY_SAME_EVENT 2
+
+
 struct metrics_v2;
 
 struct internal_state
@@ -64,6 +69,7 @@ struct internal_state
 	char* log_buf; /* buffer used to store logs before sending them to the log_fn */
 	size_t log_buf_size; /* size of the log buffer */
 	falcosecurity_log_fn log_fn;
+	uint16_t policy;
 };
 
 extern struct internal_state g_state;

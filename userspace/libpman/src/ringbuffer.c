@@ -26,6 +26,14 @@ limitations under the License.
 
 #include "ringbuffer_definitions.h"
 
+#ifndef likely
+#define likely(X) __builtin_expect(!!(X), 1)
+#endif
+
+#ifndef unlikely
+#define unlikely(X) __builtin_expect(!!(X), 0)
+#endif
+
 /* Utility functions object loading */
 
 /* This must be done to please the verifier! At load-time, the verifier must know the
@@ -153,7 +161,10 @@ int pman_finalize_ringbuf_array_after_loading()
 		ringbufs_fds[i] = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, g_state.buffer_bytes_dim, NULL);
 		if(ringbufs_fds[i] <= 0)
 		{
-			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to create the ringbuf map for CPU '%d'. (If you get memory allocation errors try to reduce the buffer dimension)", i);
+			snprintf(error_message, MAX_ERROR_MESSAGE_LEN,
+				 "failed to create the ringbuf map for CPU '%d'. (If you get memory allocation errors "
+				 "try to reduce the buffer dimension)",
+				 i);
 			pman_print_error((const char *)error_message);
 			goto clean_percpu_ring_buffers;
 		}
@@ -175,7 +186,8 @@ int pman_finalize_ringbuf_array_after_loading()
 	{
 		if(ring_buffer__add(g_state.rb_manager, ringbufs_fds[i], NULL, NULL))
 		{
-			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to add the ringbuf map for CPU %d into the manager", i);
+			snprintf(error_message, MAX_ERROR_MESSAGE_LEN,
+				 "failed to add the ringbuf map for CPU %d into the manager", i);
 			pman_print_error((const char *)error_message);
 			goto clean_percpu_ring_buffers;
 		}
@@ -207,14 +219,17 @@ int pman_finalize_ringbuf_array_after_loading()
 			/* If we arrive here it means that we have too many CPUs for our allocated ring buffers
 			 * so probably we faced a CPU hotplug.
 			 */
-			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "the actual system configuration requires more than '%d' ring buffers", g_state.n_required_buffers);
+			snprintf(error_message, MAX_ERROR_MESSAGE_LEN,
+				 "the actual system configuration requires more than '%d' ring buffers",
+				 g_state.n_required_buffers);
 			pman_print_error((const char *)error_message);
 			goto clean_percpu_ring_buffers;
 		}
 
 		if(bpf_map_update_elem(ringubuf_array_fd, &i, &ringbufs_fds[ringbuf_id], BPF_ANY))
 		{
-			snprintf(error_message, MAX_ERROR_MESSAGE_LEN, "failed to add the ringbuf map for CPU '%d' to ringbuf '%d'", i, ringbuf_id);
+			snprintf(error_message, MAX_ERROR_MESSAGE_LEN,
+				 "failed to add the ringbuf map for CPU '%d' to ringbuf '%d'", i, ringbuf_id);
 			pman_print_error((const char *)error_message);
 			goto clean_percpu_ring_buffers;
 		}
@@ -330,8 +345,93 @@ static void ringbuf__consume_first_event(struct ring_buffer *rb, struct ppm_evt_
 	g_state.last_event_size = tmp_cons_increment;
 }
 
+// Custom struct defined by us
+struct ringbuf_evt_storage
+{
+	void *evt_data;
+	size_t cons_update;
+	int ring_num;
+};
+
+/* We return NULL only in case there is no new data to consume */
+static inline void *ringbuf_get_first_event(struct ring *r, size_t *cons_update)
+{
+	unsigned long cons_pos = smp_load_acquire(r->consumer_pos);
+
+restart:
+	if(cons_pos >= smp_load_acquire(r->producer_pos))
+	{
+		return NULL;
+	}
+
+	int *len_ptr = r->data + (cons_pos & r->mask);
+	int len = smp_load_acquire(len_ptr);
+
+	/* sample not committed yet, bail out for now */
+	if(len & BPF_RINGBUF_BUSY_BIT)
+	{
+		return NULL;
+	}
+
+	/* We can also remove it if we are sure we will never discard an event kernel side */
+	if((len & BPF_RINGBUF_DISCARD_BIT) != 0)
+	{
+		cons_pos += roundup_len(len);
+		smp_store_release(r->consumer_pos, cons_pos);
+		goto restart;
+	}
+	*cons_update = roundup_len(len);
+	return (void *)len_ptr + BPF_RINGBUF_HDR_SZ;
+}
+
+// This is not thread-safe just one thread should call it
+// todo!: we always start the scraping from the first ring, but we should start from the last ring we read from.
+void *ring_buffer__consume_out_of_order(struct ring_buffer *rb)
+{
+	static struct ringbuf_evt_storage storage = {.cons_update = 0, .evt_data = NULL, .ring_num = -1};
+
+	if(storage.ring_num != -1)
+	{
+		// We update the consumer position
+		smp_store_release(rb->rings[storage.ring_num]->consumer_pos,
+				  *rb->rings[storage.ring_num]->consumer_pos + storage.cons_update);
+	}
+
+	// At every new read we start from the first ring, it really
+	// depends on the use case if this is right or not
+	for(int i = 0; i < rb->ring_cnt; i++)
+	{
+		storage.evt_data = ringbuf_get_first_event(rb->rings[i], &storage.cons_update);
+		if(storage.evt_data == NULL)
+		{
+			continue;
+		}
+		storage.ring_num = i;
+		return storage.evt_data;
+	}
+
+	storage.cons_update = 0;
+	storage.ring_num = -1;
+	return NULL;
+}
+
 /* Consume */
 void pman_consume_first_event(void **event_ptr, int16_t *buffer_id)
 {
-	ringbuf__consume_first_event(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, buffer_id);
+	switch(g_state.policy)
+	{
+	case POLICY_STANDARD:
+		ringbuf__consume_first_event(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, buffer_id);
+		break;
+
+	case POLICY_FIRST_EVENT:
+		*buffer_id = 0;
+		*event_ptr = ring_buffer__consume_out_of_order(g_state.rb_manager);
+		break;
+
+	default:
+		*buffer_id = 0;
+		*event_ptr = NULL;
+		break;
+	}
 }

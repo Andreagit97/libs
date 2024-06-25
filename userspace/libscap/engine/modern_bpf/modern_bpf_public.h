@@ -26,6 +26,7 @@ extern "C"
 
 	struct scap_modern_bpf_engine_params
 	{
+		uint16_t policy;
 		uint16_t cpus_for_each_buffer;	///< [EXPERIMENTAL] We will allocate a ring buffer every `cpus_for_each_buffer` CPUs. `0` is a special value and means a single ring buffer shared between all the CPUs.
 		bool allocate_online_only; ///< [EXPERIMENTAL] Allocate ring buffers only for online CPUs. The number of ring buffers allocated changes according to the `cpus_for_each_buffer` param. Please note: this buffer will be mapped twice both kernel and userspace-side, so pay attention to its size.
 		unsigned long buffer_bytes_dim; ///< Dimension of a ring buffer in bytes. The number of ring buffers allocated changes according to the `cpus_for_each_buffer` param. Please note: this buffer will be mapped twice both kernel and userspace-side, so pay attention to its size.

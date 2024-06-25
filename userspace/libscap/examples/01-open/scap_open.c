@@ -44,6 +44,7 @@ limitations under the License.
 #define ALL_AVAILABLE_CPUS_MODE "--available_cpus"
 #define DROP_FAILED "--drop-failed"
 #define VERBOSE_OPTION "--verbose"
+#define POLICY_OPTION "--policy"
 
 /* PRINT */
 #define PRINT_SYSCALLS_OPTION "--print_syscalls"
@@ -783,6 +784,15 @@ void parse_CLI_options(int argc, char** argv)
 				exit(EXIT_FAILURE);
 			}
 			severity_level = (enum falcosecurity_log_severity)level;
+		}
+		if(!strcmp(argv[i], POLICY_OPTION))
+		{
+			if(!(i + 1 < argc))
+			{
+				printf("\nYou need to specify also the POLICY! Bye!\n");
+				exit(EXIT_FAILURE);
+			}
+			modern_bpf_params.policy = strtoul(argv[++i], NULL, 10);
 		}
 
 		/*=============================== CONFIGURATIONS ===========================*/

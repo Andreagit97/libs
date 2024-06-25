@@ -92,7 +92,7 @@ void pman_clear_state()
 }
 
 int pman_init_state(falcosecurity_log_fn log_fn, unsigned long buf_bytes_dim, uint16_t cpus_for_each_buffer,
-		    bool allocate_online_only)
+		    bool allocate_online_only, uint16_t policy)
 {
 	char error_message[MAX_ERROR_MESSAGE_LEN];
 
@@ -101,6 +101,21 @@ int pman_init_state(falcosecurity_log_fn log_fn, unsigned long buf_bytes_dim, ui
 	 * `libbpf_set_strict_mode` returns always 0.
 	 */
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+
+
+	switch (policy)
+	{
+	case POLICY_STANDARD:
+	case POLICY_FIRST_EVENT:
+	case POLICY_SAME_EVENT:
+		printf("\nChosen buffer policy: %d\n\n", policy);
+		g_state.policy =policy;
+		break;
+
+	default:
+		pman_print_error("invalid policy");
+		return -1;
+	}
 
 	/* Set libbpf logging. */
 	g_state.log_fn = log_fn;
