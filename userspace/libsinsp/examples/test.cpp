@@ -56,6 +56,7 @@ static bool ppm_sc_modifies_state = false;
 static bool ppm_sc_repair_state = false;
 static bool ppm_sc_state_remove_io_sc = false;
 static bool enable_glogger = false;
+static uint64_t policy = 0;
 static string engine_string = KMOD_ENGINE; /* Default for backward compatibility. */
 static string filter_string = "";
 static string file_path = "";
@@ -111,6 +112,7 @@ Options:
   -q, --remove-io-sc-state                   Remove ppm sc codes belonging to `io_sc_set` from `sinsp_state_sc_set` sinsp state enforcement, defaults to false and only applies when choosing `-z` option, used for e2e testing of sinsp state.
   -g, --enable-glogger                       Enable libs g_logger, set to SEV_DEBUG. For a different severity adjust the test binary source and re-compile.
   -r, --raw                                  raw event ouput
+  -p, --policy                               policy
 )";
 	cout << usage << endl;
 }
@@ -137,13 +139,14 @@ void parse_CLI_options(sinsp& inspector, int argc, char** argv)
 		{"remove-io-sc-state", no_argument, 0, 'q'},
 		{"enable-glogger", no_argument, 0, 'g'},
 		{"raw", no_argument, 0, 'r'},
+		{"policy", required_argument, 0, 'p'},
 		{0, 0, 0, 0}};
 
 	bool format_set = false;
 	int op;
 	int long_index = 0;
 	while((op = getopt_long(argc, argv,
-				"hf:jab:mks:d:o:En:zxqgr",
+				"hf:jab:mks:d:o:En:zxqgrp:",
 				long_options, &long_index)) != -1)
 	{
 		switch(op)
@@ -210,6 +213,8 @@ void parse_CLI_options(sinsp& inspector, int argc, char** argv)
 			break;
 		case 'r':
 			dump = raw_dump;
+		case 'p':
+			policy = strtoul(optarg, NULL, 10);	
 		default:
 			break;
 		}
@@ -246,9 +251,7 @@ void open_engine(sinsp& inspector, libsinsp::events::set<ppm_sc_code> events_sc_
 			auto events_sc_names = libsinsp::events::sc_set_to_sc_names(ppm_sc);
 			printf("-- Activated (%ld) ppm sc names in kernel using `sinsp_repair_state_sc_set` enforcement: %s\n", events_sc_names.size(), concat_set_in_order(events_sc_names).c_str());
 		}
-	}
-
-	if (ppm_sc_modifies_state && !events_sc_codes.empty())
+	} else if (ppm_sc_modifies_state && !events_sc_codes.empty())
 	{
 		ppm_sc = libsinsp::events::sinsp_state_sc_set();
 		if (ppm_sc_state_remove_io_sc)
@@ -264,6 +267,9 @@ void open_engine(sinsp& inspector, libsinsp::events::set<ppm_sc_code> events_sc_
 			auto events_sc_names = libsinsp::events::sc_set_to_sc_names(ppm_sc);
 			printf("-- Activated (%ld) ppm sc names in kernel using `sinsp_state_sc_set` enforcement: %s\n", events_sc_names.size(), concat_set_in_order(events_sc_names).c_str());
 		}
+	} else {
+		ppm_sc.insert(PPM_SC_OPENAT);
+		printf("Enable openat\n");
 	}
 
 	if(false)
@@ -305,7 +311,7 @@ void open_engine(sinsp& inspector, libsinsp::events::set<ppm_sc_code> events_sc_
 #ifdef HAS_ENGINE_MODERN_BPF
 	else if(!engine_string.compare(MODERN_BPF_ENGINE))
 	{
-		inspector.open_modern_bpf(buffer_bytes_dim, DEFAULT_CPU_FOR_EACH_BUFFER, true, ppm_sc);
+		inspector.open_modern_bpf(buffer_bytes_dim, DEFAULT_CPU_FOR_EACH_BUFFER, true, ppm_sc, policy);
 	}
 #endif
 	else
@@ -449,16 +455,18 @@ int main(int argc, char** argv)
 	}
 	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 	const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+	uint64_t seconds_duration = duration/1000;
 
 	inspector.stop_capture();
 
 	std::cout << "-- Stop capture" << std::endl;
 	std::cout << "Retrieved events: " << std::to_string(num_events) << std::endl;
-	std::cout << "Time spent: " << duration << "ms" << std::endl;
-	if (duration > 0)
+	std::cout << "Time spent: " << seconds_duration << "s" << std::endl;
+	if (seconds_duration > 0)
 	{
-		std::cout << "Events/ms: " << num_events / (long double)duration << std::endl;
+		std::cout << "Events/s: " << num_events / (long double)seconds_duration << std::endl;
 	}
+	inspector.get_capture_stats((scap_stats*)(&seconds_duration));
 
 	return 0;
 }

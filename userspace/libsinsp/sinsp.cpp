@@ -608,7 +608,7 @@ void sinsp::open_gvisor(const std::string& config_path, const std::string& root_
 #endif
 }
 
-void sinsp::open_modern_bpf(unsigned long driver_buffer_bytes_dim, uint16_t cpus_for_each_buffer, bool online_only, const libsinsp::events::set<ppm_sc_code> &ppm_sc_of_interest)
+void sinsp::open_modern_bpf(unsigned long driver_buffer_bytes_dim, uint16_t cpus_for_each_buffer, bool online_only, const libsinsp::events::set<ppm_sc_code> &ppm_sc_of_interest, uint64_t policy)
 {
 #ifdef HAS_ENGINE_MODERN_BPF
 	scap_open_args oargs {};
@@ -621,6 +621,7 @@ void sinsp::open_modern_bpf(unsigned long driver_buffer_bytes_dim, uint16_t cpus
 	params.buffer_bytes_dim = driver_buffer_bytes_dim;
 	params.cpus_for_each_buffer = cpus_for_each_buffer;
 	params.allocate_online_only = online_only;
+	params.policy = policy;
 	oargs.engine_params = &params;
 
 	scap_platform* platform = scap_linux_alloc_platform(::on_new_entry_from_proc, this);
@@ -1594,10 +1595,10 @@ void sinsp::stop_capture()
 	}
 
 	/* Print scap stats */
-	if (m_auto_stats_print)
-	{
-		print_capture_stats(sinsp_logger::SEV_DEBUG);
-	}
+	// if (m_auto_stats_print)
+	// {
+	// 	print_capture_stats(sinsp_logger::SEV_DEBUG);
+	// }
 
 	/* Print the number of threads and fds in our tables */
 	uint64_t thread_cnt = 0;
@@ -1727,8 +1728,8 @@ void sinsp::get_capture_stats(scap_stats* stats) const
 {
 	/* On purpose ignoring failures to not interrupt in case of stats retrieval failure. */
 	scap_get_stats(m_h, stats);
-	stats->n_suppressed = m_suppress.get_num_suppressed_events();
-	stats->n_tids_suppressed = m_suppress.get_num_suppressed_tids();
+	// stats->n_suppressed = m_suppress.get_num_suppressed_events();
+	// stats->n_tids_suppressed = m_suppress.get_num_suppressed_tids();
 }
 
 void sinsp::print_capture_stats(sinsp_logger::severity sev) const
@@ -2164,4 +2165,3 @@ void sinsp::set_track_connection_status(bool enabled)
 {
 	m_parser->set_track_connection_status(enabled);
 }
-

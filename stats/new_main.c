@@ -43,8 +43,8 @@ int main(int argc, char** argv)
 	}
 
 	// - first CPU for init processes
-	// - last CPU for scap-open
-	for(int i = 1; i < num_cpus - 1; i++)
+	// - second CPU for scap-open
+	for(int i = 2; i < num_cpus; i++)
 	{
 		int pid = fork();
 		if(pid == 0)

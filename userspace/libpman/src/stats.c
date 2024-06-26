@@ -102,6 +102,9 @@ int pman_get_scap_stats(struct scap_stats *stats)
 	/* We always take statistics from all the CPUs, even if some of them are not online.
 	 * If the CPU is not online the counter map will be empty.
 	 */
+
+	uint64_t n_evts = 0;
+	uint64_t n_drops = 0;
 	printf("\n");
 	for(int index = 0; index < g_state.n_possible_cpus; index++)
 	{
@@ -112,6 +115,8 @@ int pman_get_scap_stats(struct scap_stats *stats)
 			goto clean_print_stats;
 		}
 
+		n_evts += cnt_map.n_evts;
+		n_drops += cnt_map.n_drops_buffer;
 		if(seconds == 0 )
 		{
 			printf("- CPU %d: n_evts: %lu,\t num_drops: %lu\n", index, cnt_map.n_evts, cnt_map.n_drops_buffer);
@@ -121,6 +126,17 @@ int pman_get_scap_stats(struct scap_stats *stats)
 			printf("- CPU %d: n_evts: %lu,\t num_drops: %lu,\t evt/s: %lu,\t drop/s: %lu\n", index, cnt_map.n_evts, cnt_map.n_drops_buffer, cnt_map.n_evts/seconds, cnt_map.n_drops_buffer/seconds);
 		}
 	}
+
+	if(seconds == 0)
+	{
+		printf("\n--- n_evts: %lu,\t num_drops: %lu\n", n_evts, n_drops);
+	}
+	else
+	{
+		printf("\n--- n_evts: %lu,\t num_drops: %lu,\t evt/s: %lu,\t drop/s: %lu\n", n_evts, n_drops,
+		       n_evts / seconds, n_drops / seconds);
+	}
+
 	return 0;
 
 clean_print_stats:
