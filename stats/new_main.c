@@ -38,7 +38,7 @@ int main(int argc, char** argv)
 	ssize_t num_cpus = sysconf(_SC_NPROCESSORS_CONF);
 	if(num_cpus == -1)
 	{
-		fprintf(stderr, "cannot obtain the number of available CPUs from '_SC_NPROCESSORS_CONF'");
+		fprintf(stderr, "cannot obtain the number of available CPUs from '_SC_NPROCESSORS_CONF'\n");
 		return EXIT_FAILURE;
 	}
 
@@ -49,14 +49,14 @@ int main(int argc, char** argv)
 		int pid = fork();
 		if(pid == 0)
 		{
-			const char* newargv[] = {"./main", argv[1], argv[2], NULL};
-			syscall(__NR_execveat, AT_FDCWD, "./main", newargv, NULL, 0);
-			fprintf(stderr, "failed to exec the stressor for cpu %d", i);
+			const char* newargv[] = {"./../../main", argv[1], argv[2], NULL};
+			syscall(__NR_execveat, AT_FDCWD, "./../../main", newargv, NULL, 0);
+			fprintf(stderr, "failed to exec the stressor for cpu %d. %s: %d\n", i, strerror(errno), errno);
 			return EXIT_FAILURE;
 		}
 		if(pid == -1)
 		{
-			fprintf(stderr, "failed to exec the stressor on CPU %d", i);
+			fprintf(stderr, "failed to fork the stressor on CPU %d. %s: %d\n", i, strerror(errno), errno);
 			return EXIT_FAILURE;
 		}
 		// to shift them in time
