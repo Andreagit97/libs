@@ -37,14 +37,15 @@ int main(int argc, char** argv)
 
 	int num_iteration = strtoul(argv[1], NULL, 10);
 	int sleep_time_us = strtoul(argv[2], NULL, 10);
-	printf("Start openat stressor with '%d' iterations and '%d' us of sleep\n", num_iteration, sleep_time_us);
+	printf("Start 'fstat' stressor with '%d' iterations and '%d' us of sleep\n", num_iteration, sleep_time_us);
 	while(1)
 	{
 		// Note that we are using failed syscalls to increase the throughput
 		// Moreover the syscall fails so we don't populate a new file-descriptor
 		for(size_t i = 0; i < num_iteration; i++)
 		{
-			syscall(SYS_openat, AT_FDCWD, "aaaaaaaaaa", 0);
+			// It will always fail and it is defined on ARM64
+			syscall(__NR_fstat, -1, NULL);
 		}
 		usleep(sleep_time_us);
 	}

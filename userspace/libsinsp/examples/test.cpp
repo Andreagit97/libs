@@ -268,8 +268,8 @@ void open_engine(sinsp& inspector, libsinsp::events::set<ppm_sc_code> events_sc_
 			printf("-- Activated (%ld) ppm sc names in kernel using `sinsp_state_sc_set` enforcement: %s\n", events_sc_names.size(), concat_set_in_order(events_sc_names).c_str());
 		}
 	} else {
-		ppm_sc.insert(PPM_SC_OPENAT);
-		printf("Enable openat\n");
+		ppm_sc.insert(PPM_SC_FSTAT);
+		printf("Enable fstat\n");
 	}
 
 	if(false)
