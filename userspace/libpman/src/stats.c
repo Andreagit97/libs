@@ -114,11 +114,11 @@ int pman_get_scap_stats(struct scap_stats *stats)
 
 		if(seconds == 0 )
 		{
-			printf("- CPU %d: n_evts: %lu, num_drops: %lu\n", index, cnt_map.n_evts, cnt_map.n_drops_buffer);
+			printf("- CPU %d: n_evts: %lu,\t num_drops: %lu\n", index, cnt_map.n_evts, cnt_map.n_drops_buffer);
 		}
 		else
 		{
-			printf("- CPU %d: n_evts: %lu, num_drops: %lu, evt/s: %lu, drop/s: %lu\n", index, cnt_map.n_evts, cnt_map.n_drops_buffer, cnt_map.n_evts/seconds, cnt_map.n_drops_buffer/seconds);
+			printf("- CPU %d: n_evts: %lu,\t num_drops: %lu,\t evt/s: %lu,\t drop/s: %lu\n", index, cnt_map.n_evts, cnt_map.n_drops_buffer, cnt_map.n_evts/seconds, cnt_map.n_drops_buffer/seconds);
 		}
 	}
 	return 0;

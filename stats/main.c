@@ -34,8 +34,8 @@ int main(int argc, char** argv)
 		fprintf(stderr, "Wrong number of params.\n");
 		return EXIT_FAILURE;
 	}
-	
-	int num_iteration =  strtoul(argv[1], NULL, 10);
+
+	int num_iteration = strtoul(argv[1], NULL, 10);
 	int sleep_time_us = strtoul(argv[2], NULL, 10);
 	printf("Start openat stressor with '%d' iterations and '%d' us of sleep\n", num_iteration, sleep_time_us);
 	while(1)

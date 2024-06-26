@@ -34,7 +34,7 @@ int main(int argc, char** argv)
 		fprintf(stderr, "An error occurred while setting SIGINT signal handler.\n");
 		return EXIT_FAILURE;
 	}
-	
+
 	ssize_t num_cpus = sysconf(_SC_NPROCESSORS_CONF);
 	if(num_cpus == -1)
 	{
@@ -43,13 +43,13 @@ int main(int argc, char** argv)
 	}
 
 	// - first CPU for init processes
-    // - last CPU for scap-open
-	for(int i = 1; i < num_cpus-1; i++)
+	// - last CPU for scap-open
+	for(int i = 1; i < num_cpus - 1; i++)
 	{
 		int pid = fork();
 		if(pid == 0)
 		{
-			const char *newargv[] = {"./main", argv[1], argv[2], NULL};
+			const char* newargv[] = {"./main", argv[1], argv[2], NULL};
 			syscall(__NR_execveat, AT_FDCWD, "./main", newargv, NULL, 0);
 			fprintf(stderr, "failed to exec the stressor for cpu %d", i);
 			return EXIT_FAILURE;
@@ -62,6 +62,6 @@ int main(int argc, char** argv)
 		// to shift them in time
 		usleep(50);
 	}
-	printf("Spawned '%ld' stressors\n", num_cpus-2);
+	printf("Spawned '%ld' stressors\n", num_cpus - 2);
 	return EXIT_SUCCESS;
 }
