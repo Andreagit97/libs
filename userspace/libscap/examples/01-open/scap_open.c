@@ -1111,11 +1111,11 @@ int main(int argc, char** argv)
 			return -1;
 		}
 
-		if(ev->type == evt_type)
-		{
-			print_event(ev);
-		}
-		count_syscalls(ev);
+		// if(ev->type == evt_type)
+		// {
+		// 	print_event(ev);
+		// }
+		// count_syscalls(ev);
 		g_total_number_of_bytes += ev->len;
 		g_nevts++;
 	}
