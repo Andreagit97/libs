@@ -14,6 +14,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <sys/time.h>
 
 static void signal_callback(int signal)
 {
@@ -29,24 +30,35 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 
-	if(argc != 3)
+	if(argc != 2)
 	{
 		fprintf(stderr, "Wrong number of params.\n");
 		return EXIT_FAILURE;
 	}
+	
+	struct timeval tval_start, tval_end, tval_result = {};
 
-	int num_iteration = strtoul(argv[1], NULL, 10);
-	int sleep_time_us = strtoul(argv[2], NULL, 10);
-	printf("Start 'fstat' stressor with '%d' iterations and '%d' us of sleep\n", num_iteration, sleep_time_us);
+	int num_events = strtoul(argv[1], NULL, 10);
+	printf("Start 'fstat' stressor with '%d' evt/s\n", num_events);
 	while(1)
 	{
-		// Note that we are using failed syscalls to increase the throughput
-		// Moreover the syscall fails so we don't populate a new file-descriptor
-		for(size_t i = 0; i < num_iteration; i++)
+		gettimeofday(&tval_start, NULL);
+		// We increment by 2 because we have enter and exit events.
+		for(size_t i = 0; i < num_events; i = i+2)
 		{
 			// It will always fail and it is defined on ARM64
 			syscall(__NR_fstat, -1, NULL);
 		}
+		gettimeofday(&tval_end, NULL);
+		timersub(&tval_end, &tval_start, &tval_result);
+		if(tval_result.tv_sec > 0)
+		{
+			printf("Time spent to generate the required throuhput: %ld.%06ld. We skip the slepp\n", tval_result.tv_sec, tval_result.tv_usec);
+			continue;
+		}
+
+		// To complete the second we need to sleep this time.
+		uint64_t sleep_time_us = 1000000 - (tval_result.tv_usec);
 		usleep(sleep_time_us);
 	}
 

@@ -23,7 +23,7 @@ static void signal_callback(int signal)
 
 int main(int argc, char** argv)
 {
-	if(argc != 3)
+	if(argc != 2)
 	{
 		fprintf(stderr, "Wrong number of params.\n");
 		return EXIT_FAILURE;
@@ -49,8 +49,8 @@ int main(int argc, char** argv)
 		int pid = fork();
 		if(pid == 0)
 		{
-			const char* newargv[] = {"./../../main", argv[1], argv[2], NULL};
-			syscall(__NR_execveat, AT_FDCWD, "./../../main", newargv, NULL, 0);
+			const char* newargv[] = {"./../main", argv[1], NULL};
+			syscall(__NR_execveat, AT_FDCWD, "./../main", newargv, NULL, 0);
 			fprintf(stderr, "failed to exec the stressor for cpu %d. %s: %d\n", i, strerror(errno), errno);
 			return EXIT_FAILURE;
 		}
