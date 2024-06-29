@@ -14,6 +14,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <math.h>
 
 static void signal_callback(int signal)
 {
@@ -23,7 +24,7 @@ static void signal_callback(int signal)
 
 int main(int argc, char** argv)
 {
-	if(argc != 2)
+	if(argc != 3)
 	{
 		fprintf(stderr, "Wrong number of params.\n");
 		return EXIT_FAILURE;
@@ -43,14 +44,21 @@ int main(int argc, char** argv)
 	}
 
 	// - first CPU for init processes
-	// - second CPU for scap-open
+	// - second CPU for scap-open/sinsp
+	char buffer[50];
 	for(int i = 2; i < num_cpus; i++)
 	{
+		// number in hexadecimal used by taskset binary
+		snprintf(buffer, sizeof(buffer), "0x%X", 1 << i);
+
+		// Debug:
+		// printf("[DEBUG] calling 'taskset %s %s %s %s'\n", buffer, "../stressor", argv[1], argv[2]);
+
 		int pid = fork();
 		if(pid == 0)
 		{
-			const char* newargv[] = {"./../main", argv[1], NULL};
-			syscall(__NR_execveat, AT_FDCWD, "./../main", newargv, NULL, 0);
+			const char* newargv[] = {"stressor", buffer, "../stressor", argv[1], argv[2], NULL};
+			syscall(__NR_execveat, AT_FDCWD, "/usr/bin/taskset", newargv, NULL, 0);
 			fprintf(stderr, "failed to exec the stressor for cpu %d. %s: %d\n", i, strerror(errno), errno);
 			return EXIT_FAILURE;
 		}
