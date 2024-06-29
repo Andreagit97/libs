@@ -49,15 +49,15 @@ int main(int argc, char** argv)
 	for(int i = 2; i < num_cpus; i++)
 	{
 		// number in hexadecimal used by taskset binary
-		snprintf(buffer, sizeof(buffer), "0x%X", 1 << i);
+		snprintf(buffer, sizeof(buffer), "%d-%d", i, i);
 
 		// Debug:
-		// printf("[DEBUG] calling 'taskset %s %s %s %s'\n", buffer, "../stressor", argv[1], argv[2]);
+		// printf("[DEBUG] calling 'taskset --cpu-list %s %s %s %s'\n", buffer, "../stressor", argv[1], argv[2]);
 
 		int pid = fork();
 		if(pid == 0)
 		{
-			const char* newargv[] = {"stressor", buffer, "../stressor", argv[1], argv[2], NULL};
+			const char* newargv[] = {"stressor", "--cpu-list", buffer, "../stressor", argv[1], argv[2], NULL};
 			syscall(__NR_execveat, AT_FDCWD, "/usr/bin/taskset", newargv, NULL, 0);
 			fprintf(stderr, "failed to exec the stressor for cpu %d. %s: %d\n", i, strerror(errno), errno);
 			return EXIT_FAILURE;
