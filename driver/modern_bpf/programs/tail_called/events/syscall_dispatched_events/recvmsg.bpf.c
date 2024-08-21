@@ -62,13 +62,15 @@ int BPF_PROG(recvmsg_x,
 	/* Parameter 1: res (type: PT_ERRNO) */
 	auxmap__store_s64_param(auxmap, ret);
 
-	/* Please note: when the peer has performed an orderly shutdown the return value is 0
-	 * and we cannot catch the right length of the data received from the return value.
-	 * Right now in this case we send an empty parameter to userspace.
-	 */
-	if(ret > 0)
+	if(ret >= 0)
 	{
-
+		/* Collect parameters at the beginning to manage socketcalls */
+		unsigned long args[2] = {0};
+		extract__network_args(args, 2, regs);
+		// We need the sockaddr for the snaplen calculation.
+		struct sockaddr *sockaddr = NULL;
+		BPF_CORE_READ_USER_INTO(&sockaddr, (struct msghdr*)args[1], msg_name);
+		
 		/* Parameter 2: size (type: PT_UINT32) */
 		auxmap__store_u32_param(auxmap, (uint32_t)ret);
 
@@ -76,15 +78,11 @@ int BPF_PROG(recvmsg_x,
 		 * have in the buffer.
 		 */
 		uint16_t snaplen = maps__get_snaplen();
-		apply_dynamic_snaplen(regs, &snaplen, true, NULL);
+		apply_dynamic_snaplen(regs, &snaplen, true, PPME_SOCKET_RECVMSG_X);
 		if(snaplen > ret)
 		{
 			snaplen = ret;
 		}
-
-		/* Collect parameters at the beginning to manage socketcalls */
-		unsigned long args[2] = {0};
-		extract__network_args(args, 2, regs);
 
 		/* Parameter 3: data (type: PT_BYTEBUF) */
 		unsigned long msghdr_pointer = args[1];

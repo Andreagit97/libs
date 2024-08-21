@@ -67,25 +67,22 @@ int BPF_PROG(recvfrom_x,
 	/* Parameter 1: res (type: PT_ERRNO) */
 	auxmap__store_s64_param(auxmap, ret);
 
-	/* Please note: when the peer has performed an orderly shutdown the return value is 0
-	 * and we cannot catch the right length of the data received from the return value.
-	 * Right now in this case we send an empty parameter to userspace.
-	 */
-	if(ret > 0)
+	if(ret >= 0)
 	{
+		/* Collect parameters at the beginning to manage socketcalls */
+		unsigned long args[5] = {0};
+		extract__network_args(args, 5, regs);
+		struct sockaddr *usrsockaddr = (struct sockaddr *)args[4];
+
 		/* We read the minimum between `snaplen` and what we really
 		 * have in the buffer.
 		 */
 		uint16_t snaplen = maps__get_snaplen();
-		apply_dynamic_snaplen(regs, &snaplen, false, NULL);
+		apply_dynamic_snaplen(regs, &snaplen, false, PPME_SOCKET_RECVFROM_X);
 		if(snaplen > ret)
 		{
 			snaplen = ret;
 		}
-
-		/* Collect parameters at the beginning to manage socketcalls */
-		unsigned long args[5] = {0};
-		extract__network_args(args, 5, regs);
 
 		/* Parameter 2: data (type: PT_BYTEBUF) */
 		unsigned long received_data_pointer = args[1];
@@ -93,7 +90,6 @@ int BPF_PROG(recvfrom_x,
 
 		/* Parameter 3: tuple (type: PT_SOCKTUPLE) */
 		uint32_t socket_fd = (uint32_t)args[0];
-		struct sockaddr *usrsockaddr = (struct sockaddr *)args[4];
 		auxmap__store_socktuple_param(auxmap, socket_fd, INBOUND, usrsockaddr);
 	}
 	else
