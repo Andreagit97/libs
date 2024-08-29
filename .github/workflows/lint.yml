@@ -1,0 +1,70 @@
+name: Lint code
+on:
+  pull_request:
+
+jobs:
+  clang-tidy:
+    name: clang-tidy 🧹
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install clang-tools 📥
+        uses: KyleMayes/install-llvm-action@v2.0.4
+        with:
+          version: 17.0.6
+          directory: ${{ runner.temp }}/llvm
+
+      - name: Install project dependencies ⛓️
+        run: |
+          sudo apt update && sudo apt install -y --no-install-recommends curl ca-certificates build-essential git clang llvm pkg-config autoconf automake libtool libelf-dev wget libc-ares-dev libcurl4-openssl-dev libssl-dev libtbb-dev libjq-dev libjsoncpp-dev libgrpc++-dev protobuf-compiler-grpc libgtest-dev libprotobuf-dev
+
+      - name: Checkout Libs ⤵️
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Install deps ⛓️
+        run: |
+          sudo .github/install-deps.sh
+
+      - name: Expose cmake compilation flags 🎏
+        run: |
+          mkdir clang-tidy-result
+          mkdir -p build
+          cd build && cmake -DUSE_BUNDLED_DEPS=Off -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+          make scap-open -j3
+
+      - name: Get all files changed by the pull request 🗄️
+        id: files
+        uses: jitterbit/get-changed-files@v1
+
+      - name: Apply clang-tidy 🤕
+        run: |
+          END=""
+          FOUND=0
+          for changed_file in ${{ steps.files.outputs.all }}; do
+              if (echo "${changed_file}" | grep -E '\.(cpp|h|c)$$')
+              then
+                  END+=" ${changed_file}"
+                  FOUND=1
+              fi    
+          done
+          if (($FOUND == 1))
+          then
+            clang-tidy -p build --export-fixes clang-tidy-result/fixes.yml ${END}
+          fi
+
+      - name: Run clang-tidy-pr-comments action 💬
+        if: failure()
+        uses: platisd/clang-tidy-pr-comments@1.1.7
+        with:
+          # The GitHub token (or a personal access token)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # The path to the clang-tidy fixes generated previously
+          clang_tidy_fixes: clang-tidy-result/fixes.yml
+          # Optionally set to true if you want the Action to request
+          # changes in case warnings are found
+          request_changes: false
+          # Optionally set the number of comments per review
+          # to avoid GitHub API timeouts for heavily loaded
+          # pull requests
+          suggestions_per_comment: 10
