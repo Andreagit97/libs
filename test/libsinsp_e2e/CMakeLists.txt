@@ -74,7 +74,7 @@ target_include_directories(libsinsp_e2e_tests
 
 add_executable(test_helper test_helper.cpp)
 target_link_libraries(test_helper pthread)
-add_dependencies(libsinsp_e2e_tests test_helper)
+add_dependencies(libsinsp_e2e_tests test_helper gtest)
 
 add_executable(vtidcollision vtidcollision.c)
 add_dependencies(libsinsp_e2e_tests vtidcollision)
