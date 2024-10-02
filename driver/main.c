@@ -1884,9 +1884,6 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 		 */
 		struct ppm_evt_hdr *hdr = (struct ppm_evt_hdr *)(ring->buffer + head);
 
-#ifdef PPM_ENABLE_SENTINEL
-		hdr->sentinel_begin = ring->nevents;
-#endif
 		hdr->ts = ns;
 		hdr->tid = current->pid;
 		hdr->type = event_type;
@@ -1897,9 +1894,6 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
 		 */
 		args.consumer = consumer;
 		args.buffer = ring->buffer + head + sizeof(struct ppm_evt_hdr);
-#ifdef PPM_ENABLE_SENTINEL
-		args.sentinel = ring->nevents;
-#endif
 		args.buffer_size = min(freespace, delta_from_end) -
 		                   sizeof(struct ppm_evt_hdr); /* freespace is guaranteed to be bigger than
 		                                                  sizeof(struct ppm_evt_hdr) */

@@ -2180,9 +2180,6 @@ struct ppm_event_info {
 #pragma pack(push, 1)
 #endif
 struct ppm_evt_hdr {
-#ifdef PPM_ENABLE_SENTINEL
-	uint32_t sentinel_begin;
-#endif
 	uint64_t ts;      /* timestamp, in nanoseconds from epoch */
 	uint64_t tid;     /* the tid of the thread that generated this event */
 	uint32_t len;     /* the event len, including the header */

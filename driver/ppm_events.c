@@ -1533,5 +1533,5 @@ int f_sys_autofill(struct event_filler_arguments *args) {
 		}
 	}
 
-	return add_sentinel(args);
+	return PPM_SUCCESS;
 }

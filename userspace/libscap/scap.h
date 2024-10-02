@@ -878,11 +878,6 @@ uint32_t scap_get_ndevs(scap_t* handle);
  */
 extern int32_t scap_readbuf(scap_t* handle, uint32_t cpuid, char** buf, uint32_t* len);
 
-#ifdef PPM_ENABLE_SENTINEL
-// Get the sentinel at the beginning of the event
-uint32_t scap_event_get_sentinel_begin(scap_evt* e);
-#endif
-
 int32_t scap_stop_dropping_mode(scap_t* handle);
 int32_t scap_start_dropping_mode(scap_t* handle, uint32_t sampling_ratio);
 int32_t scap_enable_dynamic_snaplen(scap_t* handle);

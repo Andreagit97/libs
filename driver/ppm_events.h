@@ -34,9 +34,6 @@ struct event_filler_arguments {
 	char *buffer;         /* the buffer that will be filled with the data */
 	uint32_t buffer_size; /* the space in the ring buffer available for this event */
 	uint32_t syscall_id;  /* the system call ID */
-#ifdef PPM_ENABLE_SENTINEL
-	uint32_t sentinel;
-#endif
 	uint32_t nevents;
 	uint32_t curarg;
 	uint32_t nargs;
@@ -115,19 +112,5 @@ int32_t compat_parse_readv_writev_bufs(struct event_filler_arguments *args,
                                        int64_t retval,
                                        int flags);
 #endif
-
-static inline int add_sentinel(struct event_filler_arguments *args) {
-#ifdef PPM_ENABLE_SENTINEL
-	if(likely(args->arg_data_size >= sizeof(uint32_t))) {
-		*(uint32_t *)(args->buffer + args->arg_data_offset) = args->sentinel;
-		args->arg_data_offset += 4;
-		args->arg_data_size -= 4;
-		return PPM_SUCCESS;
-	}
-	return PPM_FAILURE_BUFFER_FULL;
-#else
-	return PPM_SUCCESS;
-#endif
-}
 
 #endif /* EVENTS_H_ */

@@ -60,12 +60,6 @@ uint64_t scap_event_get_ts(scap_evt *e) {
 	return e->ts;
 }
 
-#ifdef PPM_ENABLE_SENTINEL
-uint32_t scap_event_get_sentinel_begin(scap_evt *e) {
-	return e->sentinel_begin;
-}
-#endif
-
 const struct ppm_event_info *scap_event_getinfo(const scap_evt *e) {
 	return &(g_event_info[e->type]);
 }
@@ -327,14 +321,6 @@ int32_t scap_event_encode_params_v(const struct scap_sized_buffer event_buf,
 		}
 		len = len + param.size;
 	}
-
-#ifdef PPM_ENABLE_SENTINEL
-	if(scap_buffer_can_fit(event_buf, len + sizeof(uint32_t))) {
-		event->sentinel_begin = 0x01020304;
-		memcpy(((char *)event_buf.buf + len), &event->sentinel_begin, sizeof(uint32_t));
-	}
-	len = len + sizeof(uint32_t);
-#endif
 
 	if(event_size != NULL) {
 		*event_size = len;
