@@ -607,6 +607,9 @@ public:
 				 * 5 = strlen("<NA>") + `\0`.
 				 */
 				params[j].buf = (void*)"<NA>";
+				// todo!: attention here, we are altering the len of this param so probably we
+				// need to update also the global len. check it. it would be better to handle 0 size
+				// in our code.
 				params[j].size = 5;
 			}
 

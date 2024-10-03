@@ -41,7 +41,7 @@ int BPF_PROG(sched_p_fork, struct task_struct *parent, struct task_struct *child
 	 */
 	pid_t child_pid = 0;
 	READ_TASK_FIELD_INTO(&child_pid, child, pid);
-	struct ppm_evt_hdr *hdr = (struct ppm_evt_hdr *)auxmap->data;
+	struct new_evt_hdr *hdr = (struct new_evt_hdr *)auxmap->data;
 	hdr->tid = (uint64_t)child_pid;
 
 	/* Parameter 1: res (type: PT_ERRNO) */

@@ -147,6 +147,7 @@ int64_t sinsp_evt::get_fd_num() const {
 	}
 }
 
+// todo!: this should be uint8_t
 uint32_t sinsp_evt::get_num_params() {
 	if((m_flags & sinsp_evt::SINSP_EF_PARAMS_LOADED) == 0) {
 		load_params();
@@ -156,6 +157,8 @@ uint32_t sinsp_evt::get_num_params() {
 	return (uint32_t)m_params.size();
 }
 
+// If we try to access something greater than the number of parameters in the event table we will
+// crash.
 const sinsp_evt_param *sinsp_evt::get_param(uint32_t id) {
 	if((m_flags & sinsp_evt::SINSP_EF_PARAMS_LOADED) == 0) {
 		load_params();

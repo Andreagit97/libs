@@ -22,7 +22,7 @@ limitations under the License.
 #include <string>
 #include <unordered_set>
 
-typedef struct ppm_evt_hdr scap_evt;
+typedef struct new_evt_hdr scap_evt;
 
 namespace libsinsp {
 

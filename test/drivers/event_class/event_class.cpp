@@ -223,8 +223,8 @@ void event_test::clear_ring_buffers() {
 	}
 }
 
-ppm_evt_hdr* event_test::get_event_from_ringbuffer(uint16_t* cpu_id) {
-	ppm_evt_hdr* hdr = NULL;
+scap_evt* event_test::get_event_from_ringbuffer(uint16_t* cpu_id) {
+	scap_evt* hdr = NULL;
 	uint16_t attempts = 0;
 	int32_t res = 0;
 	uint32_t flags = 0;

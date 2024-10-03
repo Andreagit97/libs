@@ -734,6 +734,7 @@ TEST_F(sys_call_test, forking_main_thread_exit) {
 		if(param.m_evt->get_type() == PPME_SYSCALL_OPEN_X) {
 			if(param.m_evt->get_param_value_str("name") == "/etc/passwd") {
 				EXPECT_EQ("<f>/etc/passwd", param.m_evt->get_param_value_str("fd"));
+				// todo!: we need to fix this otherwise we
 				fd = *(int64_t*)param.m_evt->get_param(0)->m_val;
 				++callnum;
 			}

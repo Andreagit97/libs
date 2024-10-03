@@ -45,8 +45,7 @@ struct capture_settings {
 struct auxiliary_map {
 	uint8_t data[AUXILIARY_MAP_SIZE]; /* raw space to save our variable-size event. */
 	uint64_t payload_pos;             /* position of the first empty byte in the `data` buf. */
-	uint8_t lengths_pos; /* position the first empty slot into the lengths array of the event. */
-	uint16_t event_type; /* event type we want to send to userspace */
+	uint64_t lengths_pos;             // todo!: check if we need it
 };
 
 /* These per-cpu maps are used to carry the number of drops and

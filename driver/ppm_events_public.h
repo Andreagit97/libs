@@ -2188,6 +2188,13 @@ struct ppm_evt_hdr {
 };
 #pragma pack(pop)
 
+struct new_evt_hdr {
+	uint16_t type;
+	uint16_t len;
+	int32_t tid;
+	uint64_t ts;
+};
+
 /*
  * IOCTL codes
  */
@@ -2333,6 +2340,7 @@ struct syscall_evt_pair {
  * parameters in the event. It shouldn't cause issues since typically
  * snaplen is much lower than this.
  */
+// todo!: check if we still need this or we can share the definition with the modern ebpf
 #define PPM_MAX_ARG_SIZE 65000
 
 struct event_filler_arguments;

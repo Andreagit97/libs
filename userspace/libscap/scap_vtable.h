@@ -30,7 +30,7 @@ extern "C" {
 struct scap_stats;
 typedef struct scap scap_t;
 struct metrics_v2;
-typedef struct ppm_evt_hdr scap_evt;
+typedef struct new_evt_hdr scap_evt;
 struct scap_proclist;
 
 enum scap_ppm_sc_mask_op {

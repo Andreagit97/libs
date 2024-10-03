@@ -205,8 +205,8 @@ static int32_t calibrate_socket_file_ops(struct scap_engine_handle engine) {
 				continue;
 			}
 
-			/* BPF side we send this special event with nparams = 0 */
-			if(pevent->nparams == 0) {
+			/* BPF side we send this special event with len = 0 */
+			if(pevent->len == 0) {
 				/* We don't want to stop here because we want to clean all the buffers. */
 				found = true;
 			}

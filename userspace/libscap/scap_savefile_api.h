@@ -49,7 +49,7 @@ typedef struct scap_dumper {
 } scap_dumper_t;
 
 struct scap_threadinfo;
-typedef struct ppm_evt_hdr scap_evt;
+typedef struct new_evt_hdr scap_evt;
 struct iovec;
 
 /*!

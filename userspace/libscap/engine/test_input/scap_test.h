@@ -24,7 +24,7 @@ limitations under the License.
 // Structs used for testing
 //
 
-struct ppm_evt_hdr;
+struct new_evt_hdr;
 struct scap_threadinfo;
 struct scap_fdinfo;
 
@@ -36,7 +36,7 @@ struct scap_test_fdinfo_data {
 typedef struct scap_test_thread_data scap_test_thread_data;
 
 struct scap_test_input_data {
-	struct ppm_evt_hdr **events;
+	struct new_evt_hdr **events;
 	size_t event_count;
 
 	struct scap_threadinfo *threads;

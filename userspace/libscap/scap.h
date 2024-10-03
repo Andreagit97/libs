@@ -54,7 +54,10 @@ extern "C" {
 // Forward declarations
 //
 typedef struct scap scap_t;
-typedef struct ppm_evt_hdr scap_evt;
+// typedef struct new_evt_hdr scap_evt;
+
+typedef struct new_evt_hdr scap_evt;
+
 struct scap_platform;
 struct scap_vtable;
 
@@ -815,7 +818,7 @@ bool scap_check_current_engine(scap_t* handle, const char* engine_name);
   \param params An array large enough to contain at least one entry per event parameter (which is at
   most PPM_MAX_EVENT_PARAMS).
  */
-uint32_t scap_event_decode_params(const scap_evt* e, struct scap_sized_buffer* params);
+uint8_t scap_event_decode_params(const scap_evt* e, struct scap_sized_buffer* params);
 
 /*!
   \brief Create an event from the parameters given as arguments.

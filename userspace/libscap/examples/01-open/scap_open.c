@@ -987,6 +987,9 @@ int main(int argc, char** argv) {
 			return -1;
 		}
 
+		// check in the event table the flags, if we are a syscall or a tracepoint
+		// if yes we suppose all the events have the same format.
+
 		if(ev->type == evt_type) {
 			print_event(ev);
 		}

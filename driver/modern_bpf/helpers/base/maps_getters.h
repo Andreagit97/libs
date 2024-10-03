@@ -110,6 +110,7 @@ static __always_inline uint32_t maps__ia32_to_64(uint32_t syscall_id) {
 
 /*=============================== EVENT NUM PARAMS TABLE ===========================*/
 
+// todo!: remove it, with all the others tables like `g_event_params_table`
 static __always_inline uint8_t maps__get_event_num_params(uint32_t event_id) {
 	if(event_id < 0 || event_id >= PPM_EVENT_MAX) {
 		return 0;

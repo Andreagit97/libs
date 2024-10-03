@@ -15,10 +15,13 @@
  */
 
 #define PARAM_LEN 2
-#define HEADER_LEN sizeof(struct ppm_evt_hdr)
+#define HEADER_LEN sizeof(struct new_evt_hdr)
 
 /// TODO: We have to move these in the event_table.c. Right now we don't
 /// want to touch scap tables.
+
+// todo!: we need to update these, with the new real len, we don't have anymore the vector of
+// lengths
 
 /* Syscall events */
 #define GENERIC_E_SIZE HEADER_LEN + sizeof(uint16_t) * 2 + PARAM_LEN * 2

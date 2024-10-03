@@ -275,10 +275,10 @@ static inline void *ringbuf__get_first_ring_event(struct ring *r, int pos) {
 }
 
 static void ringbuf__consume_first_event(struct ring_buffer *rb,
-                                         struct ppm_evt_hdr **event_ptr,
+                                         struct new_evt_hdr **event_ptr,
                                          int16_t *buffer_id) {
 	uint64_t min_ts = 0xffffffffffffffffLL;
-	struct ppm_evt_hdr *tmp_pointer = NULL;
+	struct new_evt_hdr *tmp_pointer = NULL;
 	int tmp_ring = -1;
 	unsigned long tmp_cons_increment = 0;
 
@@ -318,5 +318,5 @@ static void ringbuf__consume_first_event(struct ring_buffer *rb,
 
 /* Consume */
 void pman_consume_first_event(void **event_ptr, int16_t *buffer_id) {
-	ringbuf__consume_first_event(g_state.rb_manager, (struct ppm_evt_hdr **)event_ptr, buffer_id);
+	ringbuf__consume_first_event(g_state.rb_manager, (struct new_evt_hdr **)event_ptr, buffer_id);
 }

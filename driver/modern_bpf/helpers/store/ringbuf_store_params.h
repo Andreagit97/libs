@@ -19,16 +19,13 @@
 #define CHECK_RINGBUF_SPACE(pos, reserved_size) \
 	pos >= reserved_size ? reserved_size - sizeof(uint64_t) : pos
 
-#define PUSH_FIXED_SIZE_TO_RINGBUF(ringbuf, param, size)                                         \
-	__builtin_memcpy(&ringbuf->data[CHECK_RINGBUF_SPACE(ringbuf->payload_pos,                    \
-	                                                    ringbuf->reserved_event_size)],          \
-	                 &param,                                                                     \
-	                 size);                                                                      \
-	ringbuf->payload_pos += size;                                                                \
-	*((uint16_t *)&ringbuf                                                                       \
-	          ->data[CHECK_RINGBUF_SPACE(ringbuf->lengths_pos, ringbuf->reserved_event_size)]) = \
-	        size;                                                                                \
-	ringbuf->lengths_pos += sizeof(uint16_t);
+// todo!: check if we can use the sizeof in this macro instead of passing the size!
+#define PUSH_FIXED_SIZE_TO_RINGBUF(ringbuf, param, size)                                \
+	__builtin_memcpy(&ringbuf->data[CHECK_RINGBUF_SPACE(ringbuf->payload_pos,           \
+	                                                    ringbuf->reserved_event_size)], \
+	                 &param,                                                            \
+	                 size);                                                             \
+	ringbuf->payload_pos += size;
 
 /* Concept of ringbuf(ring buffer):
  *
@@ -70,9 +67,8 @@
  */
 
 struct ringbuf_struct {
-	uint8_t *data;        /* pointer to the space reserved in the ring buffer. */
-	uint64_t payload_pos; /* position of the first empty byte in the `data` buf.*/
-	uint8_t lengths_pos;  /* position the first empty slot into the lengths array of the event. */
+	uint8_t *data;                /* pointer to the space reserved in the ring buffer. */
+	uint64_t payload_pos;         /* position of the first empty byte in the `data` buf.*/
 	uint16_t reserved_event_size; /* reserved size in the ringbuf. */
 	uint16_t event_type;          /* event type we want to send to userspace */
 };
@@ -140,23 +136,19 @@ static __always_inline uint32_t ringbuf__reserve_space(struct ringbuf_struct *ri
  * @param ringbuf pointer to the `ringbuf_struct`.
  */
 static __always_inline void ringbuf__store_event_header(struct ringbuf_struct *ringbuf) {
-	struct ppm_evt_hdr *hdr = (struct ppm_evt_hdr *)ringbuf->data;
-	uint8_t nparams = maps__get_event_num_params(ringbuf->event_type);
-	hdr->ts = maps__get_boot_time() + bpf_ktime_get_boot_ns();
-	hdr->tid = bpf_get_current_pid_tgid() & 0xffffffff;
+	struct new_evt_hdr *hdr = (struct new_evt_hdr *)ringbuf->data;
 	hdr->type = ringbuf->event_type;
-	hdr->nparams = nparams;
 	hdr->len = ringbuf->reserved_event_size;
-
-	ringbuf->payload_pos = sizeof(struct ppm_evt_hdr) + nparams * sizeof(uint16_t);
-	ringbuf->lengths_pos = sizeof(struct ppm_evt_hdr);
+	hdr->tid = bpf_get_current_pid_tgid() & 0xffffffff;
+	hdr->ts = maps__get_boot_time() + bpf_ktime_get_boot_ns();
+	ringbuf->payload_pos = sizeof(struct new_evt_hdr);
 }
 
 static __always_inline void ringbuf__rewrite_header_for_calibration(struct ringbuf_struct *ringbuf,
                                                                     pid_t vtid) {
-	struct ppm_evt_hdr *hdr = (struct ppm_evt_hdr *)ringbuf->data;
+	struct new_evt_hdr *hdr = (struct new_evt_hdr *)ringbuf->data;
 	/* we set this to 0 to recognize this calibration event */
-	hdr->nparams = 0;
+	hdr->len = 0;
 	/* we cannot send the tid seen by the init namespace we need to send the tid seen by the current
 	 * pid namespace to be compliant with what scap expects.
 	 */

@@ -27,12 +27,11 @@
  *
  * (1) Fixed-size header (ppm_hdr):
  *
- * struct ppm_evt_hdr {
- *    uint64_t ts;       timestamp, in nanoseconds from epoch
- *    uint64_t tid;	     the tid of the thread that generated this event
- *    uint32_t len;	     the event len, including the header
- *    uint16_t type;	 the event type
- *    uint32_t nparams;  the number of parameters of the event
+ * struct new_evt_hdr {
+ *    uint16_t type;
+ *    uint16_t len;
+ *    int32_t tid;
+ *    uint64_t ts;
  * };
  *
  * (2) Array with "nparams" elements (lengths_arr).
@@ -132,41 +131,6 @@ static __always_inline void push__param_len(uint8_t *data, uint8_t *lengths_pos,
 ///////////////////////////
 // PUSH FIXED DIMENSIONS
 ///////////////////////////
-
-static __always_inline void push__u8(uint8_t *data, uint64_t *payload_pos, uint8_t param) {
-	*((uint8_t *)&data[SAFE_ACCESS(*payload_pos)]) = param;
-	*payload_pos += sizeof(uint8_t);
-}
-
-static __always_inline void push__u16(uint8_t *data, uint64_t *payload_pos, uint16_t param) {
-	*((uint16_t *)&data[SAFE_ACCESS(*payload_pos)]) = param;
-	*payload_pos += sizeof(uint16_t);
-}
-
-static __always_inline void push__u32(uint8_t *data, uint64_t *payload_pos, uint32_t param) {
-	*((uint32_t *)&data[SAFE_ACCESS(*payload_pos)]) = param;
-	*payload_pos += sizeof(uint32_t);
-}
-
-static __always_inline void push__u64(uint8_t *data, uint64_t *payload_pos, uint64_t param) {
-	*((uint64_t *)&data[SAFE_ACCESS(*payload_pos)]) = param;
-	*payload_pos += sizeof(uint64_t);
-}
-
-static __always_inline void push__s16(uint8_t *data, uint64_t *payload_pos, int16_t param) {
-	*((int16_t *)&data[SAFE_ACCESS(*payload_pos)]) = param;
-	*payload_pos += sizeof(int16_t);
-}
-
-static __always_inline void push__s32(uint8_t *data, uint64_t *payload_pos, int32_t param) {
-	*((int32_t *)&data[SAFE_ACCESS(*payload_pos)]) = param;
-	*payload_pos += sizeof(int32_t);
-}
-
-static __always_inline void push__s64(uint8_t *data, uint64_t *payload_pos, int64_t param) {
-	*((int64_t *)&data[SAFE_ACCESS(*payload_pos)]) = param;
-	*payload_pos += sizeof(int64_t);
-}
 
 static __always_inline void push__ipv6(uint8_t *data, uint64_t *payload_pos, uint32_t ipv6[4]) {
 	__builtin_memcpy(&data[SAFE_ACCESS(*payload_pos)], ipv6, 16);

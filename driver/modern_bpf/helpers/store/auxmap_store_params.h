@@ -55,6 +55,10 @@
  * phase the entire event will be discarded!
  */
 
+#define PUSH_FIXED_SIZE_TO_AUXMAP(p)                                                  \
+	__builtin_memcpy(&auxmap->data[SAFE_ACCESS(auxmap->payload_pos)], &p, sizeof(p)); \
+	auxmap->payload_pos += sizeof(p);
+
 /////////////////////////////////
 // GET AUXILIARY MAP
 ////////////////////////////////
@@ -86,15 +90,11 @@ static __always_inline struct auxiliary_map *auxmap__get() {
  */
 static __always_inline void auxmap__preload_event_header(struct auxiliary_map *auxmap,
                                                          uint16_t event_type) {
-	struct ppm_evt_hdr *hdr = (struct ppm_evt_hdr *)auxmap->data;
-	uint8_t nparams = maps__get_event_num_params(event_type);
-	hdr->ts = maps__get_boot_time() + bpf_ktime_get_boot_ns();
-	hdr->tid = bpf_get_current_pid_tgid() & 0xffffffff;
+	struct new_evt_hdr *hdr = (struct new_evt_hdr *)auxmap->data;
 	hdr->type = event_type;
-	hdr->nparams = nparams;
-	auxmap->payload_pos = sizeof(struct ppm_evt_hdr) + nparams * sizeof(uint16_t);
-	auxmap->lengths_pos = sizeof(struct ppm_evt_hdr);
-	auxmap->event_type = event_type;
+	hdr->tid = bpf_get_current_pid_tgid() & 0xffffffff;
+	hdr->ts = maps__get_boot_time() + bpf_ktime_get_boot_ns();
+	auxmap->payload_pos = sizeof(struct new_evt_hdr);
 }
 
 /**
@@ -103,8 +103,36 @@ static __always_inline void auxmap__preload_event_header(struct auxiliary_map *a
  * @param auxmap pointer to the auxmap in which we are writing our event header.
  */
 static __always_inline void auxmap__finalize_event_header(struct auxiliary_map *auxmap) {
-	struct ppm_evt_hdr *hdr = (struct ppm_evt_hdr *)auxmap->data;
+	struct new_evt_hdr *hdr = (struct new_evt_hdr *)auxmap->data;
 	hdr->len = auxmap->payload_pos;
+}
+
+static __always_inline void auxmap__reserve_len_space(struct auxiliary_map *auxmap) {
+	auxmap->lengths_pos = auxmap->payload_pos;
+	auxmap->payload_pos += sizeof(uint16_t);
+}
+
+// todo!: rename into auxmap__store_len
+static __always_inline void auxmap__store_param_len(struct auxiliary_map *auxmap, uint16_t len) {
+	PUSH_FIXED_SIZE_TO_AUXMAP(len);
+}
+
+static __always_inline void auxmap__store_param_len_at_reserved(struct auxiliary_map *auxmap,
+                                                                uint16_t len) {
+	__builtin_memcpy(&auxmap->data[SAFE_ACCESS(auxmap->lengths_pos)], &len, sizeof(uint16_t));
+	// The space should be already reserved by the caller so we don't need to increment the payload
+	// pos.
+}
+
+/**
+ * @brief This function must be used when we are not able to correctly
+ * collect the param. This is used only for variable lenght parameters. We simply write a param
+ * length of 0 to the first 16 bits, so the userspace can easely understand that the param is empty.
+ *
+ * @param auxmap pointer to the auxmap in which we are storing the param.
+ */
+static __always_inline void auxmap__store_empty_param(struct auxiliary_map *auxmap) {
+	auxmap__store_param_len(auxmap, 0);
 }
 
 /////////////////////////////////
@@ -147,7 +175,8 @@ static __always_inline void auxmap__submit_event(struct auxiliary_map *auxmap, v
 	int err = bpf_ringbuf_output(rb, auxmap->data, auxmap->payload_pos, BPF_RB_NO_WAKEUP);
 	if(err) {
 		counter->n_drops_buffer++;
-		compute_event_types_stats(auxmap->event_type, counter);
+		struct new_evt_hdr *hdr = (struct new_evt_hdr *)auxmap->data;
+		compute_event_types_stats(hdr->type, counter);
 	}
 }
 
@@ -165,18 +194,6 @@ static __always_inline void auxmap__submit_event(struct auxiliary_map *auxmap, v
  */
 
 /**
- * @brief This function must be used when we are not able to correctly
- * collect the param. We simply put the param length to 0 into the
- * `lengths_array` of the event, so the userspace can easely understand
- * that the param is empty.
- *
- * @param auxmap pointer to the auxmap in which we are storing the param.
- */
-static __always_inline void auxmap__store_empty_param(struct auxiliary_map *auxmap) {
-	push__param_len(auxmap->data, &auxmap->lengths_pos, 0);
-}
-
-/**
  * @brief This helper should be used to store signed 32 bit params.
  * The following types are compatible with this helper:
  * - PT_INT32
@@ -184,9 +201,9 @@ static __always_inline void auxmap__store_empty_param(struct auxiliary_map *auxm
  * @param auxmap pointer to the auxmap in which we are storing the param.
  * @param param param to store
  */
+// todo!: rename into auxmap__store_s32 without param
 static __always_inline void auxmap__store_s32_param(struct auxiliary_map *auxmap, int32_t param) {
-	push__s32(auxmap->data, &auxmap->payload_pos, param);
-	push__param_len(auxmap->data, &auxmap->lengths_pos, sizeof(int32_t));
+	PUSH_FIXED_SIZE_TO_AUXMAP(param);
 }
 
 /**
@@ -200,8 +217,7 @@ static __always_inline void auxmap__store_s32_param(struct auxiliary_map *auxmap
  * @param param param to store
  */
 static __always_inline void auxmap__store_s64_param(struct auxiliary_map *auxmap, int64_t param) {
-	push__s64(auxmap->data, &auxmap->payload_pos, param);
-	push__param_len(auxmap->data, &auxmap->lengths_pos, sizeof(int64_t));
+	PUSH_FIXED_SIZE_TO_AUXMAP(param);
 }
 
 /**
@@ -216,8 +232,7 @@ static __always_inline void auxmap__store_s64_param(struct auxiliary_map *auxmap
  * @param param param to store
  */
 static __always_inline void auxmap__store_u8_param(struct auxiliary_map *auxmap, uint8_t param) {
-	push__u8(auxmap->data, &auxmap->payload_pos, param);
-	push__param_len(auxmap->data, &auxmap->lengths_pos, sizeof(uint8_t));
+	PUSH_FIXED_SIZE_TO_AUXMAP(param);
 }
 
 /**
@@ -229,8 +244,7 @@ static __always_inline void auxmap__store_u8_param(struct auxiliary_map *auxmap,
  * @param param param to store
  */
 static __always_inline void auxmap__store_u16_param(struct auxiliary_map *auxmap, uint16_t param) {
-	push__u16(auxmap->data, &auxmap->payload_pos, param);
-	push__param_len(auxmap->data, &auxmap->lengths_pos, sizeof(uint16_t));
+	PUSH_FIXED_SIZE_TO_AUXMAP(param);
 }
 
 /**
@@ -248,8 +262,7 @@ static __always_inline void auxmap__store_u16_param(struct auxiliary_map *auxmap
  * @param param param to store
  */
 static __always_inline void auxmap__store_u32_param(struct auxiliary_map *auxmap, uint32_t param) {
-	push__u32(auxmap->data, &auxmap->payload_pos, param);
-	push__param_len(auxmap->data, &auxmap->lengths_pos, sizeof(uint32_t));
+	PUSH_FIXED_SIZE_TO_AUXMAP(param);
 }
 
 /**
@@ -263,16 +276,18 @@ static __always_inline void auxmap__store_u32_param(struct auxiliary_map *auxmap
  * @param param param to store
  */
 static __always_inline void auxmap__store_u64_param(struct auxiliary_map *auxmap, uint64_t param) {
-	push__u64(auxmap->data, &auxmap->payload_pos, param);
-	push__param_len(auxmap->data, &auxmap->lengths_pos, sizeof(uint64_t));
+	PUSH_FIXED_SIZE_TO_AUXMAP(param);
+}
+
+static __always_inline void auxmap__store_s16_param(struct auxiliary_map *auxmap, int16_t param) {
+	PUSH_FIXED_SIZE_TO_AUXMAP(param);
 }
 
 /**
  * @brief This helper stores the charbuf pointed by `charbuf_pointer`
  * into the auxmap. We read until we find a `\0`, if the charbuf length
  * is greater than `len_to_read`, we read up to `len_to_read-1` bytes
- * and add the `\0`. For more details, look at the underlying
- * `push__charbuf` method
+ * and add the `\0`.
  *
  * @param auxmap pointer to the auxmap in which we are storing the param.
  * @param charbuf_pointer pointer to the charbuf to store.
@@ -285,6 +300,7 @@ static __always_inline uint16_t auxmap__store_charbuf_param(struct auxiliary_map
                                                             uint16_t len_to_read,
                                                             enum read_memory mem) {
 	uint16_t charbuf_len = 0;
+	auxmap__reserve_len_space(auxmap);
 	/* This check is just for performance reasons. Is useless to check
 	 * `len_to_read > 0` here, since `len_to_read` is just the upper bound.
 	 */
@@ -299,7 +315,7 @@ static __always_inline uint16_t auxmap__store_charbuf_param(struct auxiliary_map
 	 * `charbuf_len` will be equal to `0` so we will send an
 	 * empty param to userspace.
 	 */
-	push__param_len(auxmap->data, &auxmap->lengths_pos, charbuf_len);
+	auxmap__store_param_len_at_reserved(auxmap, charbuf_len);
 	return charbuf_len;
 }
 
@@ -320,6 +336,7 @@ static __always_inline uint16_t auxmap__store_bytebuf_param(struct auxiliary_map
                                                             uint16_t len_to_read,
                                                             enum read_memory mem) {
 	uint16_t bytebuf_len = 0;
+	auxmap__reserve_len_space(auxmap);
 	/* This check is just for performance reasons. */
 	if(bytebuf_pointer && len_to_read > 0) {
 		bytebuf_len = push__bytebuf(auxmap->data,
@@ -332,8 +349,13 @@ static __always_inline uint16_t auxmap__store_bytebuf_param(struct auxiliary_map
 	 * `bytebuf_len` will be equal to `0` so we will send an
 	 * empty param to userspace.
 	 */
-	push__param_len(auxmap->data, &auxmap->lengths_pos, bytebuf_len);
+	auxmap__store_param_len_at_reserved(auxmap, bytebuf_len);
 	return bytebuf_len;
+}
+
+static __always_inline void auxmap__store_null_terminator(struct auxiliary_map *auxmap) {
+	auxmap__store_param_len(auxmap, sizeof(char));
+	push__new_character(auxmap->data, &auxmap->payload_pos, '\0');
 }
 
 /**
@@ -375,6 +397,8 @@ static __always_inline void auxmap__store_charbufarray_as_bytebuf(struct auxilia
  * @param auxmap pointer to the auxmap in which we are storing the param.
  * @param charbuf pointer array, obtained directly from the syscall (`argv`).
  */
+// todo!: we need to rework this helper to be more flexible and to be able to store the `exe` and
+// the `args` together in just one param. Same for the env
 static __always_inline void auxmap__store_exe_args_failure(struct auxiliary_map *auxmap,
                                                            char **array) {
 	unsigned long charbuf_pointer = 0;
@@ -385,9 +409,10 @@ static __always_inline void auxmap__store_exe_args_failure(struct auxiliary_map 
 		 * To be compliant with other drivers we send an empty string as exe not a param with
 		 * len==0.
 		 */
-		push__new_character(auxmap->data, &auxmap->payload_pos, '\0');
-		push__param_len(auxmap->data, &auxmap->lengths_pos, sizeof(char));
+		/* exe */
+		auxmap__store_null_terminator(auxmap);
 
+		/* args */
 		auxmap__store_empty_param(auxmap);
 		return;
 	}
@@ -395,16 +420,13 @@ static __always_inline void auxmap__store_exe_args_failure(struct auxiliary_map 
 	/* Here we read the pointer to `exe` and we store it */
 	if(bpf_probe_read_user(&charbuf_pointer, sizeof(charbuf_pointer), &array[0])) {
 		/* we cannot read the pointer so `exe` will be `0` */
-		push__param_len(auxmap->data, &auxmap->lengths_pos, 0);
+		auxmap__store_empty_param(auxmap);
 	} else {
 		/* we push the `exe` as a separate arg. */
-		exe_len = push__charbuf(auxmap->data,
-		                        &auxmap->payload_pos,
-		                        charbuf_pointer,
-		                        MAX_PROC_EXE,
-		                        USER);
-		push__param_len(auxmap->data, &auxmap->lengths_pos, exe_len);
+		exe_len = auxmap__store_charbuf_param(auxmap, charbuf_pointer, MAX_PROC_EXE, USER);
 	}
+
+	auxmap__reserve_len_space(auxmap);
 
 	/* Here we read the pointers to `args` and we store it.
 	 * `payload_pos` points after `exe`
@@ -438,7 +460,7 @@ static __always_inline void auxmap__store_exe_args_failure(struct auxiliary_map 
 		auxmap->payload_pos = initial_payload_pos + args_len;
 		push__previous_character(auxmap->data, &auxmap->payload_pos, '\0');
 	}
-	push__param_len(auxmap->data, &auxmap->lengths_pos, args_len);
+	auxmap__store_param_len_at_reserved(auxmap, args_len);
 }
 
 /**
@@ -466,6 +488,8 @@ static __always_inline void auxmap__store_env_failure(struct auxiliary_map *auxm
 		return;
 	}
 
+	auxmap__reserve_len_space(auxmap);
+
 	for(uint8_t index = 0; index < MAX_CHARBUF_POINTERS; ++index) {
 		if(bpf_probe_read_user(&charbuf_pointer, sizeof(charbuf_pointer), &array[index])) {
 			break;
@@ -491,7 +515,7 @@ static __always_inline void auxmap__store_env_failure(struct auxiliary_map *auxm
 
 	auxmap->payload_pos = initial_payload_pos + total_len;
 	push__previous_character(auxmap->data, &auxmap->payload_pos, '\0');
-	push__param_len(auxmap->data, &auxmap->lengths_pos, total_len);
+	auxmap__store_param_len_at_reserved(auxmap, total_len);
 }
 
 /**
@@ -542,13 +566,15 @@ static __always_inline void auxmap__store_sockaddr_param(struct auxiliary_map *a
 	                       SAFE_ACCESS(addrlen),
 	                       (void *)sockaddr_pointer) ||
 	   addrlen == 0) {
-		push__param_len(auxmap->data, &auxmap->lengths_pos, 0);
+		auxmap__store_empty_param(auxmap);
 		return;
 	}
 
 	/* Save the pointer to the sockaddr struct in the stack. */
 	struct sockaddr *sockaddr = (struct sockaddr *)&auxmap->data[MAX_PARAM_SIZE];
 	uint16_t socket_family = sockaddr->sa_family;
+
+	auxmap__reserve_len_space(auxmap);
 
 	switch(socket_family) {
 	case AF_INET: {
@@ -564,9 +590,9 @@ static __always_inline void auxmap__store_sockaddr_param(struct auxiliary_map *a
 		 * - ipv4.
 		 * - port.
 		 */
-		push__u8(auxmap->data, &auxmap->payload_pos, socket_family_to_scap(socket_family));
-		push__u32(auxmap->data, &auxmap->payload_pos, ipv4);
-		push__u16(auxmap->data, &auxmap->payload_pos, ntohs(port));
+		auxmap__store_u8_param(auxmap, socket_family_to_scap(socket_family));
+		auxmap__store_u32_param(auxmap, ipv4);
+		auxmap__store_u16_param(auxmap, ntohs(port));
 		final_param_len = FAMILY_SIZE + IPV4_SIZE + PORT_SIZE;
 		break;
 	}
@@ -585,9 +611,9 @@ static __always_inline void auxmap__store_sockaddr_param(struct auxiliary_map *a
 		 * - dest_ipv6.
 		 * - dest_port.
 		 */
-		push__u8(auxmap->data, &auxmap->payload_pos, socket_family_to_scap(socket_family));
+		auxmap__store_u8_param(auxmap, socket_family_to_scap(socket_family));
 		push__ipv6(auxmap->data, &auxmap->payload_pos, ipv6);
-		push__u16(auxmap->data, &auxmap->payload_pos, ntohs(port));
+		auxmap__store_u16_param(auxmap, ntohs(port));
 		final_param_len = FAMILY_SIZE + IPV6_SIZE + PORT_SIZE;
 		break;
 	}
@@ -622,7 +648,7 @@ static __always_inline void auxmap__store_sockaddr_param(struct auxiliary_map *a
 		 * - socket family.
 		 * - socket_unix_path (sun_path).
 		 */
-		push__u8(auxmap->data, &auxmap->payload_pos, socket_family_to_scap(socket_family));
+		auxmap__store_u8_param(auxmap, socket_family_to_scap(socket_family));
 		uint16_t written_bytes = push__charbuf(auxmap->data,
 		                                       &auxmap->payload_pos,
 		                                       start_reading_point,
@@ -636,7 +662,7 @@ static __always_inline void auxmap__store_sockaddr_param(struct auxiliary_map *a
 		final_param_len = 0;
 		break;
 	}
-	push__param_len(auxmap->data, &auxmap->lengths_pos, final_param_len);
+	auxmap__store_param_len_at_reserved(auxmap, final_param_len);
 }
 
 /**
@@ -674,6 +700,8 @@ static __always_inline void auxmap__store_socktuple_param(struct auxiliary_map *
 	}
 	BPF_CORE_READ_INTO(&socket_family, sk, __sk_common.skc_family);
 
+	auxmap__reserve_len_space(auxmap);
+
 	switch(socket_family) {
 	case AF_INET: {
 		struct inet_sock *inet = (struct inet_sock *)sk;
@@ -706,18 +734,18 @@ static __always_inline void auxmap__store_socktuple_param(struct auxiliary_map *
 		 * - dest_ipv4
 		 * - dest_port
 		 */
-		push__u8(auxmap->data, &auxmap->payload_pos, socket_family_to_scap(socket_family));
+		auxmap__store_u8_param(auxmap, socket_family_to_scap(socket_family));
 
 		if(direction == OUTBOUND) {
-			push__u32(auxmap->data, &auxmap->payload_pos, ipv4_local);
-			push__u16(auxmap->data, &auxmap->payload_pos, ntohs(port_local));
-			push__u32(auxmap->data, &auxmap->payload_pos, ipv4_remote);
-			push__u16(auxmap->data, &auxmap->payload_pos, ntohs(port_remote));
+			auxmap__store_u32_param(auxmap, ipv4_local);
+			auxmap__store_u16_param(auxmap, ntohs(port_local));
+			auxmap__store_u32_param(auxmap, ipv4_remote);
+			auxmap__store_u16_param(auxmap, ntohs(port_remote));
 		} else {
-			push__u32(auxmap->data, &auxmap->payload_pos, ipv4_remote);
-			push__u16(auxmap->data, &auxmap->payload_pos, ntohs(port_remote));
-			push__u32(auxmap->data, &auxmap->payload_pos, ipv4_local);
-			push__u16(auxmap->data, &auxmap->payload_pos, ntohs(port_local));
+			auxmap__store_u32_param(auxmap, ipv4_remote);
+			auxmap__store_u16_param(auxmap, ntohs(port_remote));
+			auxmap__store_u32_param(auxmap, ipv4_local);
+			auxmap__store_u16_param(auxmap, ntohs(port_local));
 		}
 
 		final_param_len = FAMILY_SIZE + IPV4_SIZE + PORT_SIZE + IPV4_SIZE + PORT_SIZE;
@@ -758,18 +786,18 @@ static __always_inline void auxmap__store_socktuple_param(struct auxiliary_map *
 		 * - dest_ipv6
 		 * - dest_port
 		 */
-		push__u8(auxmap->data, &auxmap->payload_pos, socket_family_to_scap(socket_family));
+		auxmap__store_u8_param(auxmap, socket_family_to_scap(socket_family));
 
 		if(direction == OUTBOUND) {
 			push__ipv6(auxmap->data, &auxmap->payload_pos, ipv6_local);
-			push__u16(auxmap->data, &auxmap->payload_pos, ntohs(port_local));
+			auxmap__store_u16_param(auxmap, ntohs(port_local));
 			push__ipv6(auxmap->data, &auxmap->payload_pos, ipv6_remote);
-			push__u16(auxmap->data, &auxmap->payload_pos, ntohs(port_remote));
+			auxmap__store_u16_param(auxmap, ntohs(port_remote));
 		} else {
 			push__ipv6(auxmap->data, &auxmap->payload_pos, ipv6_remote);
-			push__u16(auxmap->data, &auxmap->payload_pos, ntohs(port_remote));
+			auxmap__store_u16_param(auxmap, ntohs(port_remote));
 			push__ipv6(auxmap->data, &auxmap->payload_pos, ipv6_local);
-			push__u16(auxmap->data, &auxmap->payload_pos, ntohs(port_local));
+			auxmap__store_u16_param(auxmap, ntohs(port_local));
 		}
 		final_param_len = FAMILY_SIZE + IPV6_SIZE + PORT_SIZE + IPV6_SIZE + PORT_SIZE;
 		break;
@@ -786,14 +814,14 @@ static __always_inline void auxmap__store_socktuple_param(struct auxiliary_map *
 		 * - src OS pointer.
 		 * - dest unix_path.
 		 */
-		push__u8(auxmap->data, &auxmap->payload_pos, socket_family_to_scap(socket_family));
+		auxmap__store_u8_param(auxmap, socket_family_to_scap(socket_family));
 		if(direction == OUTBOUND) {
-			push__u64(auxmap->data, &auxmap->payload_pos, (uint64_t)socket_remote);
-			push__u64(auxmap->data, &auxmap->payload_pos, (uint64_t)socket_local);
+			auxmap__store_u64_param(auxmap, (uint64_t)socket_remote);
+			auxmap__store_u64_param(auxmap, (uint64_t)socket_local);
 			path = BPF_CORE_READ(socket_remote, addr, name[0].sun_path);
 		} else {
-			push__u64(auxmap->data, &auxmap->payload_pos, (uint64_t)socket_local);
-			push__u64(auxmap->data, &auxmap->payload_pos, (uint64_t)socket_remote);
+			auxmap__store_u64_param(auxmap, (uint64_t)socket_local);
+			auxmap__store_u64_param(auxmap, (uint64_t)socket_remote);
 			path = BPF_CORE_READ(socket_local, addr, name[0].sun_path);
 		}
 
@@ -829,7 +857,7 @@ static __always_inline void auxmap__store_socktuple_param(struct auxiliary_map *
 	}
 
 	// if we are not able to catch correct programs we push an empty param.
-	push__param_len(auxmap->data, &auxmap->lengths_pos, final_param_len);
+	auxmap__store_param_len_at_reserved(auxmap, final_param_len);
 }
 
 /**
@@ -845,6 +873,7 @@ static __always_inline void auxmap__store_socktuple_param(struct auxiliary_map *
  * @param option_len actual len of the option
  * @param optval pointer to the option value
  */
+// todo!: see if we can avoid this PT_DYN param and just send a u64
 static __always_inline void auxmap__store_sockopt_param(struct auxiliary_map *auxmap,
                                                         int level,
                                                         int optname,
@@ -856,22 +885,24 @@ static __always_inline void auxmap__store_sockopt_param(struct auxiliary_map *au
 	struct modern_bpf__kernel_timex_timeval tv;
 	uint16_t total_size_to_push = sizeof(uint8_t); /* 1 byte for the PPM type. */
 
+	auxmap__reserve_len_space(auxmap);
+
 	/* Levels different from `SOL_SOCKET` are not supported
 	 * right now.
 	 */
 	if(level != SOL_SOCKET) {
-		push__u8(auxmap->data, &auxmap->payload_pos, PPM_SOCKOPT_IDX_UNKNOWN);
+		auxmap__store_u8_param(auxmap, PPM_SOCKOPT_IDX_UNKNOWN);
 		total_size_to_push +=
 		        push__bytebuf(auxmap->data, &auxmap->payload_pos, optval, option_len, USER);
-		push__param_len(auxmap->data, &auxmap->lengths_pos, total_size_to_push);
+		auxmap__store_param_len_at_reserved(auxmap, total_size_to_push);
 		return;
 	}
 
 	switch(optname) {
 	case SO_ERROR:
-		push__u8(auxmap->data, &auxmap->payload_pos, PPM_SOCKOPT_IDX_ERRNO);
+		auxmap__store_u8_param(auxmap, PPM_SOCKOPT_IDX_ERRNO);
 		bpf_probe_read_user((void *)&val32, sizeof(val32), (void *)optval);
-		push__s64(auxmap->data, &auxmap->payload_pos, (int64_t)-val32);
+		auxmap__store_s64_param(auxmap, (int64_t)-val32);
 		total_size_to_push += sizeof(int64_t);
 		break;
 
@@ -879,18 +910,16 @@ static __always_inline void auxmap__store_sockopt_param(struct auxiliary_map *au
 	case SO_RCVTIMEO_NEW:
 	case SO_SNDTIMEO_OLD:
 	case SO_SNDTIMEO_NEW:
-		push__u8(auxmap->data, &auxmap->payload_pos, PPM_SOCKOPT_IDX_TIMEVAL);
+		auxmap__store_u8_param(auxmap, PPM_SOCKOPT_IDX_TIMEVAL);
 		bpf_probe_read_user((void *)&tv, sizeof(tv), (void *)optval);
-		push__u64(auxmap->data,
-		          &auxmap->payload_pos,
-		          tv.tv_sec * SEC_FACTOR + tv.tv_usec * USEC_FACTOR);
+		auxmap__store_u64_param(auxmap, tv.tv_sec * SEC_FACTOR + tv.tv_usec * USEC_FACTOR);
 		total_size_to_push += sizeof(uint64_t);
 		break;
 
 	case SO_COOKIE:
-		push__u8(auxmap->data, &auxmap->payload_pos, PPM_SOCKOPT_IDX_UINT64);
+		auxmap__store_u8_param(auxmap, PPM_SOCKOPT_IDX_UINT64);
 		bpf_probe_read_user((void *)&val64, sizeof(val64), (void *)optval);
-		push__u64(auxmap->data, &auxmap->payload_pos, val64);
+		auxmap__store_u64_param(auxmap, val64);
 		total_size_to_push += sizeof(uint64_t);
 		break;
 
@@ -936,20 +965,20 @@ static __always_inline void auxmap__store_sockopt_param(struct auxiliary_map *au
 	case SO_MAX_PACING_RATE:
 	case SO_BPF_EXTENSIONS:
 	case SO_INCOMING_CPU:
-		push__u8(auxmap->data, &auxmap->payload_pos, PPM_SOCKOPT_IDX_UINT32);
+		auxmap__store_u8_param(auxmap, PPM_SOCKOPT_IDX_UINT32);
 		bpf_probe_read_user((void *)&val32, sizeof(val32), (void *)optval);
-		push__u32(auxmap->data, &auxmap->payload_pos, val32);
+		auxmap__store_u32_param(auxmap, val32);
 		total_size_to_push += sizeof(uint32_t);
 		break;
 
 	default:
-		push__u8(auxmap->data, &auxmap->payload_pos, PPM_SOCKOPT_IDX_UNKNOWN);
+		auxmap__store_u8_param(auxmap, PPM_SOCKOPT_IDX_UNKNOWN);
 		total_size_to_push +=
 		        push__bytebuf(auxmap->data, &auxmap->payload_pos, optval, option_len, USER);
 		break;
 	}
 
-	push__param_len(auxmap->data, &auxmap->lengths_pos, total_size_to_push);
+	auxmap__store_param_len_at_reserved(auxmap, total_size_to_push);
 }
 
 /**
@@ -1005,11 +1034,12 @@ static __always_inline void auxmap__store_iovec_data_param_64(struct auxiliary_m
 	                       SAFE_ACCESS(total_iovec_size),
 	                       (void *)iov_pointer)) {
 		/* in case of NULL iovec vector we return an empty param */
-		push__param_len(auxmap->data, &auxmap->lengths_pos, 0);
+		auxmap__store_empty_param(auxmap);
 		return;
 	}
 
 	unsigned long total_size_to_read = 0;
+	auxmap__reserve_len_space(auxmap);
 
 	/* Pointer to iovec structs */
 	const struct iovec *iovec = (const struct iovec *)&auxmap->data[MAX_PARAM_SIZE];
@@ -1033,14 +1063,14 @@ static __always_inline void auxmap__store_iovec_data_param_64(struct auxiliary_m
 		                                    iovec[j].iov_len,
 		                                    USER);
 		if(!bytes_read) {
-			push__param_len(auxmap->data, &auxmap->lengths_pos, total_size_to_read);
+			auxmap__store_param_len_at_reserved(auxmap, total_size_to_read);
 			return;
 		}
 		total_size_to_read += bytes_read;
 	}
 	/* We need this enforcement to be sure that we don't overcome the max `len_to_read` */
 	auxmap->payload_pos = initial_payload_pos + total_size_to_read;
-	push__param_len(auxmap->data, &auxmap->lengths_pos, total_size_to_read);
+	auxmap__store_param_len_at_reserved(auxmap, total_size_to_read);
 }
 
 static __always_inline void auxmap__store_iovec_data_param_32(struct auxiliary_map *auxmap,
@@ -1054,11 +1084,12 @@ static __always_inline void auxmap__store_iovec_data_param_32(struct auxiliary_m
 	                       SAFE_ACCESS(total_iovec_size),
 	                       (void *)iov_pointer)) {
 		/* in case of NULL iovec vector we return an empty param */
-		push__param_len(auxmap->data, &auxmap->lengths_pos, 0);
+		auxmap__store_empty_param(auxmap);
 		return;
 	}
 
 	unsigned long total_size_to_read = 0;
+	auxmap__reserve_len_space(auxmap);
 
 	/* Pointer to iovec structs */
 	const struct compat_iovec *compat_iovec =
@@ -1083,14 +1114,14 @@ static __always_inline void auxmap__store_iovec_data_param_32(struct auxiliary_m
 		                                    compat_iovec[j].iov_len,
 		                                    USER);
 		if(!bytes_read) {
-			push__param_len(auxmap->data, &auxmap->lengths_pos, total_size_to_read);
+			auxmap__store_param_len_at_reserved(auxmap, total_size_to_read);
 			return;
 		}
 		total_size_to_read += bytes_read;
 	}
 	/* We need this enforcement to be sure that we don't overcome the max `len_to_read` */
 	auxmap->payload_pos = initial_payload_pos + total_size_to_read;
-	push__param_len(auxmap->data, &auxmap->lengths_pos, total_size_to_read);
+	auxmap__store_param_len_at_reserved(auxmap, total_size_to_read);
 }
 
 static __always_inline void auxmap__store_iovec_data_param(struct auxiliary_map *auxmap,
@@ -1149,7 +1180,7 @@ static __always_inline struct user_msghdr auxmap__store_msghdr_data_param(
 	                       bpf_core_type_size(struct user_msghdr),
 	                       (void *)msghdr_pointer)) {
 		/* in case of NULL msghdr we return an empty param */
-		push__param_len(auxmap->data, &auxmap->lengths_pos, 0);
+		auxmap__store_empty_param(auxmap);
 		return msghdr;
 	}
 
@@ -1174,17 +1205,18 @@ static __always_inline struct user_msghdr auxmap__store_msghdr_data_param(
 static __always_inline void auxmap__store_ptrace_addr_param(struct auxiliary_map *auxmap,
                                                             long ret,
                                                             uint64_t addr_pointer) {
-	push__u8(auxmap->data, &auxmap->payload_pos, PPM_PTRACE_IDX_UINT64);
+	// We store the len and then the payload
+	auxmap__store_param_len(auxmap, sizeof(uint8_t) + sizeof(uint64_t));
+	auxmap__store_u8_param(auxmap, PPM_PTRACE_IDX_UINT64);
 
 	/* The syscall is failed. */
 	if(ret < 0) {
 		/* We push `0` in case of failure. */
-		push__u64(auxmap->data, &auxmap->payload_pos, 0);
+		auxmap__store_u64_param(auxmap, 0);
 	} else {
 		/* We send the addr pointer as a uint64_t */
-		push__u64(auxmap->data, &auxmap->payload_pos, addr_pointer);
+		auxmap__store_u64_param(auxmap, addr_pointer);
 	}
-	push__param_len(auxmap->data, &auxmap->lengths_pos, sizeof(uint8_t) + sizeof(uint64_t));
 }
 
 /**
@@ -1198,6 +1230,7 @@ static __always_inline void auxmap__store_ptrace_addr_param(struct auxiliary_map
  * @param ptrace_req ptrace request converted in the scap format.
  * @param data_pointer pointer to the `data` param taken from syscall registers.
  */
+// todo!: this doesn't need to be PT_DYN, we can just send a u64 + u8
 static __always_inline void auxmap__store_ptrace_data_param(struct auxiliary_map *auxmap,
                                                             long ret,
                                                             uint16_t ptrace_req,
@@ -1205,21 +1238,22 @@ static __always_inline void auxmap__store_ptrace_data_param(struct auxiliary_map
 	/* The syscall is failed. */
 	if(ret < 0) {
 		/* We push `0` in case of failure. */
-		push__u8(auxmap->data, &auxmap->payload_pos, PPM_PTRACE_IDX_UINT64);
-		push__u64(auxmap->data, &auxmap->payload_pos, 0);
-		push__param_len(auxmap->data, &auxmap->lengths_pos, sizeof(uint8_t) + sizeof(uint64_t));
+		auxmap__store_param_len(auxmap, sizeof(uint8_t) + sizeof(uint64_t));
+		auxmap__store_u8_param(auxmap, PPM_PTRACE_IDX_UINT64);
+		auxmap__store_u64_param(auxmap, 0);
 		return;
 	}
 
 	uint64_t dest = 0;
+	auxmap__reserve_len_space(auxmap);
 	uint16_t total_size_to_push = sizeof(uint8_t); /* 1 byte for the PPM type. */
 	switch(ptrace_req) {
 	case PPM_PTRACE_PEEKTEXT:
 	case PPM_PTRACE_PEEKDATA:
 	case PPM_PTRACE_PEEKUSR:
-		push__u8(auxmap->data, &auxmap->payload_pos, PPM_PTRACE_IDX_UINT64);
+		auxmap__store_u8_param(auxmap, PPM_PTRACE_IDX_UINT64);
 		bpf_probe_read_user((void *)&dest, sizeof(dest), (void *)data_pointer);
-		push__u64(auxmap->data, &auxmap->payload_pos, dest);
+		auxmap__store_u64_param(auxmap, dest);
 		total_size_to_push += sizeof(uint64_t);
 		break;
 
@@ -1227,8 +1261,8 @@ static __always_inline void auxmap__store_ptrace_data_param(struct auxiliary_map
 	case PPM_PTRACE_SINGLESTEP:
 	case PPM_PTRACE_DETACH:
 	case PPM_PTRACE_SYSCALL:
-		push__u8(auxmap->data, &auxmap->payload_pos, PPM_PTRACE_IDX_SIGTYPE);
-		push__u8(auxmap->data, &auxmap->payload_pos, data_pointer);
+		auxmap__store_u8_param(auxmap, PPM_PTRACE_IDX_SIGTYPE);
+		auxmap__store_u8_param(auxmap, data_pointer);
 		total_size_to_push += sizeof(uint8_t);
 		break;
 
@@ -1238,12 +1272,12 @@ static __always_inline void auxmap__store_ptrace_data_param(struct auxiliary_map
 	case PPM_PTRACE_POKEDATA:
 	case PPM_PTRACE_POKEUSR:
 	default:
-		push__u8(auxmap->data, &auxmap->payload_pos, PPM_PTRACE_IDX_UINT64);
-		push__u64(auxmap->data, &auxmap->payload_pos, data_pointer);
+		auxmap__store_u8_param(auxmap, PPM_PTRACE_IDX_UINT64);
+		auxmap__store_u64_param(auxmap, data_pointer);
 		total_size_to_push += sizeof(uint64_t);
 		break;
 	}
-	push__param_len(auxmap->data, &auxmap->lengths_pos, total_size_to_push);
+	auxmap__store_param_len_at_reserved(auxmap, total_size_to_push);
 }
 
 /**
@@ -1375,6 +1409,8 @@ static __always_inline uint16_t store_cgroup_subsys(struct auxiliary_map *auxmap
  */
 static __always_inline void auxmap__store_cgroups_param(struct auxiliary_map *auxmap,
                                                         struct task_struct *task) {
+	auxmap__reserve_len_space(auxmap);
+
 	uint16_t total_croups_len = 0;
 	if(bpf_core_enum_value_exists(enum cgroup_subsys_id, cpuset_cgrp_id)) {
 		total_croups_len +=
@@ -1406,13 +1442,15 @@ static __always_inline void auxmap__store_cgroups_param(struct auxiliary_map *au
 		                            task,
 		                            bpf_core_enum_value(enum cgroup_subsys_id, memory_cgrp_id));
 	}
-	push__param_len(auxmap->data, &auxmap->lengths_pos, total_croups_len);
+	auxmap__store_param_len_at_reserved(auxmap, total_croups_len);
 }
 
 static __always_inline void auxmap__store_fdlist_param(struct auxiliary_map *auxmap,
                                                        unsigned long fds_pointer,
                                                        uint32_t nfds,
                                                        enum poll_events_direction dir) {
+	auxmap__reserve_len_space(auxmap);
+
 	/* In this helper we push data in this format:
 	 *  - number of `fd + flags` pairs  -> (uint16_t)
 	 *  - first pair (`fd + flags`)     -> (int64_t + int16_t)
@@ -1431,12 +1469,13 @@ static __always_inline void auxmap__store_fdlist_param(struct auxiliary_map *aux
 	                       (void *)fds_pointer)) {
 		/* pair's number equal to `0` */
 		auxmap__store_u16_param(auxmap, 0);
+		auxmap__store_param_len_at_reserved(auxmap, sizeof(uint16_t));
 		return;
 	}
 
 	/* The pair's number is equal to `nfds` if it is `<=MAX_POLLFD` otherwise it is `MAX_POLLFD` */
 	uint32_t num_pairs = nfds <= MAX_POLLFD ? nfds : MAX_POLLFD;
-	push__u16(auxmap->data, &auxmap->payload_pos, num_pairs);
+	auxmap__store_u16_param(auxmap, num_pairs);
 
 	/* Pointer to `pollfd` structs */
 	const struct pollfd *fds = (const struct pollfd *)&auxmap->data[MAX_PARAM_SIZE];
@@ -1448,23 +1487,19 @@ static __always_inline void auxmap__store_fdlist_param(struct auxiliary_map *aux
 		}
 
 		/* Push `fd` on 64 bit */
-		push__s64(auxmap->data, &auxmap->payload_pos, (int64_t)fds[j].fd);
+		auxmap__store_s64_param(auxmap, (int64_t)fds[j].fd);
 
 		/* Push `flags` according to the direction */
 		if(dir == REQUESTED_EVENTS) {
-			push__s16(auxmap->data,
-			          &auxmap->payload_pos,
-			          (int16_t)poll_events_to_scap(fds[j].events));
+			auxmap__store_s16_param(auxmap, (int16_t)poll_events_to_scap(fds[j].events));
 		} else {
-			push__s16(auxmap->data,
-			          &auxmap->payload_pos,
-			          (int16_t)poll_events_to_scap(fds[j].revents));
+			auxmap__store_s16_param(auxmap, (int16_t)poll_events_to_scap(fds[j].revents));
 		}
 	}
 	/* The param size is: 16 bit for the number of pairs + size of the pairs */
-	push__param_len(auxmap->data,
-	                &auxmap->lengths_pos,
-	                sizeof(uint16_t) + (num_pairs * (sizeof(int64_t) + sizeof(int16_t))));
+	auxmap__store_param_len_at_reserved(
+	        auxmap,
+	        sizeof(uint16_t) + (num_pairs * (sizeof(int64_t) + sizeof(int16_t))));
 }
 
 static __always_inline void apply_dynamic_snaplen(struct pt_regs *regs,

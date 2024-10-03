@@ -22,7 +22,7 @@ limitations under the License.
 #include <libscap/scap_vtable.h>
 
 typedef struct scap scap_t;
-typedef struct ppm_evt_hdr scap_evt;
+typedef struct new_evt_hdr scap_evt;
 typedef struct scap_stats scap_stats;
 typedef struct metrics_v2 metrics_v2;
 
