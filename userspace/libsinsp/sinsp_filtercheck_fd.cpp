@@ -374,16 +374,16 @@ int32_t sinsp_filter_check_fd::parse_field_name(std::string_view val,
 	return sinsp_filter_check::parse_field_name(val, alloc_state, needed_for_filtering);
 }
 
-bool sinsp_filter_check_fd::extract_fdname_from_creator(sinsp_evt *evt,
-                                                        uint32_t *len,
-                                                        bool sanitize_strings,
-                                                        bool fd_nameraw) {
-	const char *resolved_argstr;
+// todo!: probably we could also remove the sanitize_strings parameter and use it directly outside
+// this method
+bool sinsp_filter_check_fd::extract_fdname_from_event(sinsp_evt *evt,
+                                                      bool sanitize_strings,
+                                                      bool fd_nameraw) {
 	uint16_t etype = evt->get_type();
-
 	if(PPME_IS_ENTER(etype)) {
 		return false;
 	}
+	const char *resolved_argstr = NULL;
 
 	switch(etype) {
 	case PPME_SYSCALL_OPEN_X:
@@ -469,124 +469,59 @@ bool sinsp_filter_check_fd::extract_fdname_from_creator(sinsp_evt *evt,
 	}
 }
 
-uint8_t *sinsp_filter_check_fd::extract_from_null_fd(sinsp_evt *evt,
-                                                     uint32_t *len,
-                                                     bool sanitize_strings) {
-	*len = 0;
-	//
-	// Even is there's no fd, we still try to extract a name from exit events that create
-	// one. With these events, the fact that there's no FD means that the call failed,
-	// but even if that happened we still want to collect the name.
-	//
-	switch(m_field_id) {
-	case TYPE_FDNAME: {
-		if(extract_fdname_from_creator(evt, len, sanitize_strings) == true) {
-			RETURN_EXTRACT_STRING(m_tstr);
-		} else {
-			return NULL;
-		}
-	}
-	case TYPE_CONTAINERNAME: {
-		if(extract_fdname_from_creator(evt, len, sanitize_strings) == true) {
-			m_tstr = m_tinfo->m_container_id + ':' + m_tstr;
-			RETURN_EXTRACT_STRING(m_tstr);
-		} else {
-			return NULL;
-		}
-	}
-	case TYPE_DIRECTORY:
-	case TYPE_CONTAINERDIRECTORY: {
-		if(extract_fdname_from_creator(evt, len, sanitize_strings) == true) {
-			if(sanitize_strings) {
-				sanitize_string(m_tstr);
-			}
-
-			size_t pos = m_tstr.rfind('/');
-			if(pos != string::npos && pos != 0) {
-				if(pos < m_tstr.size() - 1) {
-					m_tstr.resize(pos);
-				}
-			} else {
-				m_tstr = "/";
-			}
-
-			if(m_field_id == TYPE_CONTAINERDIRECTORY) {
-				m_tstr = m_tinfo->m_container_id + ':' + m_tstr;
-			}
-
-			RETURN_EXTRACT_STRING(m_tstr);
-		} else {
-			return NULL;
-		}
-	}
-	case TYPE_FILENAME: {
-		return NULL;
-	}
-	case TYPE_FDTYPECHAR:
-		*len = 1;
-		switch(PPME_MAKE_ENTER(evt->get_type())) {
-		case PPME_SYSCALL_OPEN_E:
-		case PPME_SYSCALL_OPENAT_E:
-		case PPME_SYSCALL_OPENAT_2_E:
-		case PPME_SYSCALL_OPENAT2_E:
-		case PPME_SYSCALL_CREAT_E:
-			m_tcstr[0] = CHAR_FD_FILE;
-			m_tcstr[1] = 0;
-			return m_tcstr;
-		case PPME_SOCKET_SOCKET_E:
-		case PPME_SOCKET_ACCEPT_E:
-		case PPME_SOCKET_ACCEPT_5_E:
-		case PPME_SOCKET_ACCEPT4_E:
-		case PPME_SOCKET_ACCEPT4_5_E:
-		case PPME_SOCKET_ACCEPT4_6_E:
-			//
-			// Note, this is not accurate, because it always
-			// returns IPv4 even if this could be IPv6 or unix.
-			// For the moment, I assume it's better than nothing, and doing
-			// real event parsing here would be a pain.
-			//
-			m_tcstr[0] = CHAR_FD_IPV4_SOCK;
-			m_tcstr[1] = 0;
-			return m_tcstr;
-		case PPME_SYSCALL_PIPE_E:
-		case PPME_SYSCALL_PIPE2_E:
-			m_tcstr[0] = CHAR_FD_FIFO;
-			m_tcstr[1] = 0;
-			return m_tcstr;
-		case PPME_SYSCALL_EVENTFD_E:
-		case PPME_SYSCALL_EVENTFD2_E:
-			m_tcstr[0] = CHAR_FD_EVENT;
-			m_tcstr[1] = 0;
-			return m_tcstr;
-		case PPME_SYSCALL_SIGNALFD_E:
-		case PPME_SYSCALL_SIGNALFD4_E:
-			m_tcstr[0] = CHAR_FD_SIGNAL;
-			m_tcstr[1] = 0;
-			return m_tcstr;
-		case PPME_SYSCALL_TIMERFD_CREATE_E:
-			m_tcstr[0] = CHAR_FD_TIMERFD;
-			m_tcstr[1] = 0;
-			return m_tcstr;
-		case PPME_SYSCALL_INOTIFY_INIT_E:
-		case PPME_SYSCALL_INOTIFY_INIT1_E:
-			m_tcstr[0] = CHAR_FD_INOTIFY;
-			m_tcstr[1] = 0;
-			return m_tcstr;
-		default:
-			m_tcstr[0] = 'o';
-			m_tcstr[1] = 0;
-			return m_tcstr;
-		}
-	case TYPE_FDNAMERAW: {
-		if(extract_fdname_from_creator(evt, len, sanitize_strings, true) == true) {
-			remove_duplicate_path_separators(m_tstr);
-			RETURN_EXTRACT_STRING(m_tstr);
-		} else {
-			return NULL;
-		}
-	}
+uint8_t *sinsp_filter_check_fd::extract_typechar_from_event(sinsp_evt *evt) {
+	switch(PPME_MAKE_ENTER(evt->get_type())) {
+	case PPME_SYSCALL_OPEN_E:
+	case PPME_SYSCALL_OPENAT_E:
+	case PPME_SYSCALL_OPENAT_2_E:
+	case PPME_SYSCALL_OPENAT2_E:
+	case PPME_SYSCALL_CREAT_E:
+		m_tcstr[0] = CHAR_FD_FILE;
+		m_tcstr[1] = 0;
+		return m_tcstr;
+	case PPME_SOCKET_SOCKET_E:
+	case PPME_SOCKET_ACCEPT_E:
+	case PPME_SOCKET_ACCEPT_5_E:
+	case PPME_SOCKET_ACCEPT4_E:
+	case PPME_SOCKET_ACCEPT4_5_E:
+	case PPME_SOCKET_ACCEPT4_6_E:
+		//
+		// Note, this is not accurate, because it always
+		// returns IPv4 even if this could be IPv6 or unix.
+		// For the moment, I assume it's better than nothing, and doing
+		// real event parsing here would be a pain.
+		//
+		m_tcstr[0] = CHAR_FD_IPV4_SOCK;
+		m_tcstr[1] = 0;
+		return m_tcstr;
+	case PPME_SYSCALL_PIPE_E:
+	case PPME_SYSCALL_PIPE2_E:
+		m_tcstr[0] = CHAR_FD_FIFO;
+		m_tcstr[1] = 0;
+		return m_tcstr;
+	case PPME_SYSCALL_EVENTFD_E:
+	case PPME_SYSCALL_EVENTFD2_E:
+		m_tcstr[0] = CHAR_FD_EVENT;
+		m_tcstr[1] = 0;
+		return m_tcstr;
+	case PPME_SYSCALL_SIGNALFD_E:
+	case PPME_SYSCALL_SIGNALFD4_E:
+		m_tcstr[0] = CHAR_FD_SIGNAL;
+		m_tcstr[1] = 0;
+		return m_tcstr;
+	case PPME_SYSCALL_TIMERFD_CREATE_E:
+		m_tcstr[0] = CHAR_FD_TIMERFD;
+		m_tcstr[1] = 0;
+		return m_tcstr;
+	case PPME_SYSCALL_INOTIFY_INIT_E:
+	case PPME_SYSCALL_INOTIFY_INIT1_E:
+		m_tcstr[0] = CHAR_FD_INOTIFY;
+		m_tcstr[1] = 0;
+		return m_tcstr;
 	default:
-		return NULL;
+		m_tcstr[0] = 'o';
+		m_tcstr[1] = 0;
+		return m_tcstr;
 	}
 }
 
@@ -655,23 +590,32 @@ uint8_t *sinsp_filter_check_fd::extract_single(sinsp_evt *evt,
 	switch(m_field_id) {
 	case TYPE_FDNAME:
 	case TYPE_CONTAINERNAME:
-		if(m_fdinfo == NULL) {
-			return extract_from_null_fd(evt, len, sanitize_strings);
-		}
-
 		if(evt->get_type() == PPME_SOCKET_CONNECT_X) {
 			int64_t retval = evt->get_param(0)->as<int64_t>();
-
+			// this is a weird behavior, see the `net_connect_exit_event_fails` test for more info
 			if(retval < 0) {
-				return extract_from_null_fd(evt, len, sanitize_strings);
+				if(!extract_fdname_from_event(evt, sanitize_strings)) {
+					return NULL;
+				}
+				if(m_field_id == TYPE_CONTAINERNAME) {
+					ASSERT(m_tinfo != NULL);
+					m_tstr = m_tinfo->m_container_id + ':' + m_tstr;
+				}
+				RETURN_EXTRACT_STRING(m_tstr);
 			}
+		}
+
+		if(m_fdinfo == NULL) {
+			if(!extract_fdname_from_event(evt, sanitize_strings)) {
+				return NULL;
+			}
+		} else {
+			m_tstr = m_fdinfo->m_name;
 		}
 
 		if(m_field_id == TYPE_CONTAINERNAME) {
 			ASSERT(m_tinfo != NULL);
-			m_tstr = m_tinfo->m_container_id + ':' + m_fdinfo->m_name;
-		} else {
-			m_tstr = m_fdinfo->m_name;
+			m_tstr = m_tinfo->m_container_id + ':' + m_tstr;
 		}
 
 		if(sanitize_strings) {
@@ -691,19 +635,20 @@ uint8_t *sinsp_filter_check_fd::extract_single(sinsp_evt *evt,
 	case TYPE_DIRECTORY:
 	case TYPE_CONTAINERDIRECTORY: {
 		if(m_fdinfo == NULL) {
-			return extract_from_null_fd(evt, len, sanitize_strings);
-		}
-
-		if(!(m_fdinfo->is_file() || m_fdinfo->is_directory())) {
+			if(!extract_fdname_from_event(evt, sanitize_strings)) {
+				return NULL;
+			}
+		} else if(!(m_fdinfo->is_file() || m_fdinfo->is_directory())) {
 			return NULL;
+		} else {
+			m_tstr = m_fdinfo->m_name;
 		}
 
-		m_tstr = m_fdinfo->m_name;
 		if(sanitize_strings) {
 			sanitize_string(m_tstr);
 		}
 
-		if(m_fdinfo->is_file()) {
+		if(m_fdinfo != NULL && m_fdinfo->is_file()) {
 			size_t pos = m_tstr.rfind('/');
 			if(pos != string::npos && pos != 0) {
 				if(pos < m_tstr.size() - 1) {
@@ -722,7 +667,7 @@ uint8_t *sinsp_filter_check_fd::extract_single(sinsp_evt *evt,
 	} break;
 	case TYPE_FILENAME: {
 		if(m_fdinfo == NULL) {
-			return extract_from_null_fd(evt, len, sanitize_strings);
+			return NULL;
 		}
 
 		if(!m_fdinfo->is_file()) {
@@ -746,11 +691,10 @@ uint8_t *sinsp_filter_check_fd::extract_single(sinsp_evt *evt,
 		RETURN_EXTRACT_STRING(m_tstr);
 	} break;
 	case TYPE_FDTYPECHAR:
-		if(m_fdinfo == NULL) {
-			return extract_from_null_fd(evt, len, sanitize_strings);
-		}
-
 		*len = 1;
+		if(m_fdinfo == NULL) {
+			return extract_typechar_from_event(evt);
+		}
 		m_tcstr[0] = m_fdinfo->get_typechar();
 		m_tcstr[1] = 0;
 		return m_tcstr;
@@ -1338,10 +1282,12 @@ uint8_t *sinsp_filter_check_fd::extract_single(sinsp_evt *evt,
 	} break;
 	case TYPE_FDNAMERAW: {
 		if(m_fdinfo == NULL) {
-			return extract_from_null_fd(evt, len, sanitize_strings);
+			if(!extract_fdname_from_event(evt, sanitize_strings, true)) {
+				return NULL;
+			}
+		} else {
+			m_tstr = m_fdinfo->m_name_raw;
 		}
-
-		m_tstr = m_fdinfo->m_name_raw;
 		remove_duplicate_path_separators(m_tstr);
 		RETURN_EXTRACT_STRING(m_tstr);
 	} break;
