@@ -210,7 +210,7 @@ HSET: 47684.90 requests per second, p50=0.535 msec
 * We see a slowdown both in `scap-open` and in `redis`.
   * scap-open now takes `227 s` instead of `194 s`.
   * we have a decrease of `7000/8000` requests/sec in Redis.
-* We send to userspace `2.8` GB in `227` s. Without enter events we should send almost the half, even if enter events are usually smaller than the exit ones, so it's not completely true.
+* We send to userspace `2.8` GB in `227` s.
 
 ### Big syscall set
 
