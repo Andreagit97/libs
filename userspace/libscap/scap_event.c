@@ -266,6 +266,7 @@ int32_t scap_event_encode_params_v(const struct scap_sized_buffer event_buf,
 		case PT_MAX:
 			break;  // Nothing to do
 		default:    // Unsupported event
+			ASSERT(false);
 			snprintf(error,
 			         SCAP_LASTERR_SIZE,
 			         "event param %d (param type %d) is unsupported",
