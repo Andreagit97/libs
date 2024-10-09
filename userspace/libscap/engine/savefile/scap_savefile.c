@@ -42,6 +42,10 @@ struct iovec {
 
 #include <libscap/strl.h>
 
+#define MAX_EVENT_SIZE 64 * 1024
+// 50 consecutive conversions on the same event should be more than enough
+#define MAX_CONVERSION_BOUNDARY 50
+
 //
 // Read the section header block
 //
@@ -1803,6 +1807,175 @@ static int32_t scap_read_init(struct savefile_engine *handle,
 	return SCAP_SUCCESS;
 }
 
+static void change_param_len_from_s64_to_s32(scap_evt *e, uint8_t param_idx) {
+	uint16_t off_len = sizeof(scap_evt);
+	uint16_t tot_len = 0;
+
+	for(int i = 0; i < param_idx; i++) {
+		uint16_t len = 0;
+		memcpy(&len, &e[off_len], sizeof(uint16_t));
+		off_len += sizeof(uint16_t);
+		tot_len += len;
+	}
+
+	// 16 bits are enough, see MAX_EVENT_SIZE
+	uint16_t param_offset = sizeof(scap_evt) + sizeof(uint16_t) * e->nparams + tot_len;
+
+	int64_t old_param = 0;
+	memcpy(&old_param, &e[param_offset], sizeof(int64_t));
+
+	int32_t new_param = (int32_t)old_param;
+	memcpy(&e[param_offset], &new_param, sizeof(int32_t));
+
+	memmove(&e[param_offset + sizeof(int32_t)],
+	        &e[param_offset + sizeof(int64_t)],
+	        e->len - (param_offset + sizeof(int64_t)));
+
+	// Store the new param len
+	static uint16_t new_len = 4;
+	memcpy(&e[off_len], &new_len, sizeof(uint16_t));
+
+	// Store the new event len
+	e->len -= sizeof(int32_t);
+}
+
+static int32_t convert_to_latest_event(struct savefile_engine *handle, scap_evt **pe) {
+	// todo!: i would avoid this here to not impact scap-files that don't need any conversion.
+	memcpy(handle->m_final_evt, *pe, (*pe)->len);
+
+	int conv_num = 0;
+	bool continue_conversion = true;
+
+	for(conv_num = 0; conv_num < MAX_CONVERSION_BOUNDARY && continue_conversion; conv_num++) {
+		switch(handle->m_final_evt->type) {
+		case PPME_SYSCALL_OPEN_X:
+
+			// Known event versions
+			if((handle->m_final_evt->nparams != 4) || (handle->m_final_evt->nparams != 6)) {
+				snprintf(handle->m_lasterr,
+				         SCAP_LASTERR_SIZE,
+				         "Unknown number of parametes '%d' for event '%d'.",
+				         handle->m_final_evt->nparams,
+				         handle->m_final_evt->type);
+				return SCAP_FAILURE;
+			}
+
+			if(handle->m_final_evt->nparams == 4) {
+				// - Event: 3 (open)
+				// - Num params: 4
+				// - param(0): fd, param(1): name, param(2): flags, param(3): mode
+
+				// todo!: we could modify the event in place to avoid the tmp_storage...
+				const struct ppm_event_info *event_info = NULL;
+
+				// Before each conversion we copy the final event into the tmp_storage
+				memcpy(handle->m_evt_storage,
+				       handle->m_final_evt,
+				       ((scap_evt *)handle->m_final_evt)->len);
+
+				// First open event had just 4 parameters: fd, name, flags, mode.
+				// Copy the header and the len array
+				memcpy(handle->m_final_evt,
+				       handle->m_evt_storage,
+				       sizeof(scap_evt) + sizeof(uint16_t) * 4);
+				int offset = sizeof(scap_evt) + sizeof(uint16_t) * 4;
+				event_info = &(g_event_info[PPME_SYSCALL_OPEN_X]);
+
+				// Add the last 2 parameters len
+				uint16_t len = scap_get_size_bytes_from_type(event_info->params[4].type);
+				memcpy(&handle->m_final_evt[offset], &len, sizeof(uint16_t));
+				offset += sizeof(uint16_t);
+
+				len = scap_get_size_bytes_from_type(event_info->params[5].type);
+				memcpy(&handle->m_final_evt[offset], &len, sizeof(uint16_t));
+				offset += sizeof(uint16_t);
+
+				// Copy the rest of the event and add the last 2 parameters
+				memcpy(&handle->m_final_evt[offset],
+				       handle->m_evt_storage + sizeof(scap_evt) + sizeof(uint16_t) * 4,
+				       handle->m_evt_storage->len - (sizeof(scap_evt) + sizeof(uint16_t) * 4));
+				offset += (handle->m_evt_storage->len - (sizeof(scap_evt) + sizeof(uint16_t) * 4));
+
+				// Add the last 2 parameters
+				char *value = scap_get_default_value_from_type(event_info->params[4].type);
+				memcpy(&handle->m_final_evt[offset],
+				       value,
+				       scap_get_size_bytes_from_type(event_info->params[4].type));
+				offset += scap_get_size_bytes_from_type(event_info->params[4].type);
+
+				value = scap_get_default_value_from_type(event_info->params[5].type);
+				memcpy(&handle->m_final_evt[offset],
+				       value,
+				       scap_get_size_bytes_from_type(event_info->params[5].type));
+				offset += scap_get_size_bytes_from_type(event_info->params[5].type);
+
+				// `m_final_evt` contains the converted event
+			}
+
+			if(handle->m_final_evt->nparams == 6) {
+				// - Event: 3 (open)
+				// - Num params: 6
+				// - param(0): fd, param(1): name, param(2): flags, param(3): mode, param(4): dev,
+				// param(5): ino
+
+				// Change the dimension of a parameter
+				change_param_len_from_s64_to_s32(handle->m_final_evt, 0);
+
+				// Change the event type
+				handle->m_final_evt->type = PPME_SYSCALL_OPEN;
+			}
+			break;
+
+		default:
+			continue_conversion = false;
+			break;
+		}
+	}
+
+	if(conv_num == MAX_CONVERSION_BOUNDARY) {
+		// We forgot to end the conversion somewhere
+		snprintf(handle->m_lasterr,
+		         SCAP_LASTERR_SIZE,
+		         "reached '%d' conversions with evt (%d) without reaching an end",
+		         MAX_CONVERSION_BOUNDARY,
+		         handle->m_final_evt->type);
+		return SCAP_FAILURE;
+	}
+
+	if(conv_num > 1) {
+		// At least one conversion was done, we need to change the pointer
+		*pe = handle->m_final_evt;
+	}
+
+	// todo!: enable it at the end of the work
+	// we shouldn't have syscall events with an event type < PPME_SYSCALL_OPEN
+
+	// if((*pe)->type < PPME_SYSCALL_OPEN) {
+	// 	// We need to store the event to handle the TOCTOU
+	// 	snprintf(handle->m_lasterr,
+	// 	         SCAP_LASTERR_SIZE,
+	// 	         "Invalid event type '%d' after '%d' conversions",
+	// 	         (*pe)->type,
+	// 	         conv_num);
+	// 	return SCAP_FAILURE;
+	// }
+
+	return PPM_SUCCESS;
+}
+
+// Old events are no more necessary to be converted to the latest version
+static bool skip_old_event(uint16_t type) {
+	// Here we receive a random old event and we need to convert it to the latest version
+	switch(type) {
+	case PPME_SYSCALL_OPEN_E:
+		// todo!: probably we should store the event and use it in the exit to handle the TOCTOU...
+		return true;
+
+	default:
+		return false;
+	}
+}
+
 //
 // Read an event from disk
 //
@@ -1930,7 +2103,7 @@ static int32_t next(struct scap_engine_handle engine,
 			*pevent = (struct ppm_evt_hdr *)(handle->m_reader_evt_buf + sizeof(uint16_t));
 		}
 
-		if((*pevent)->type >= PPM_EVENT_MAX) {
+		if(skip_old_event((*pevent)->type) || (*pevent)->type >= PPM_EVENT_MAX) {
 			//
 			// We're reading a capture that contains new syscalls.
 			// We can't do anything else that skips them.
@@ -2011,7 +2184,7 @@ static int32_t next(struct scap_engine_handle engine,
 		break;
 	}
 
-	return SCAP_SUCCESS;
+	return convert_to_latest_event(handle, pevent);
 }
 
 uint64_t scap_savefile_ftell(struct scap_engine_handle engine) {
@@ -2157,6 +2330,10 @@ static int32_t init(struct scap *main_handle, struct scap_open_args *oargs) {
 		}
 	}
 
+	// todo!: We should initialize them only if at least a conversion is needed not here
+	handle->m_final_evt = calloc(1, MAX_EVENT_SIZE);
+	handle->m_evt_storage = calloc(1, MAX_EVENT_SIZE);
+
 	return SCAP_SUCCESS;
 }
 
@@ -2174,6 +2351,16 @@ static int32_t scap_savefile_close(struct scap_engine_handle engine) {
 	if(handle->m_reader_evt_buf) {
 		free(handle->m_reader_evt_buf);
 		handle->m_reader_evt_buf = NULL;
+	}
+
+	if(handle->m_final_evt) {
+		free(handle->m_final_evt);
+		handle->m_final_evt = NULL;
+	}
+
+	if(handle->m_evt_storage) {
+		free(handle->m_evt_storage);
+		handle->m_evt_storage = NULL;
 	}
 
 	return SCAP_SUCCESS;

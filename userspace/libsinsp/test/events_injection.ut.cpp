@@ -20,10 +20,10 @@ TEST_F(sinsp_with_test_input, event_async_queue) {
 
 	// create test input event
 	auto* scap_evt0 = add_event(increasing_ts(),
-	                            1,
-	                            PPME_SYSCALL_OPEN_X,
+	                            INIT_TID,
+	                            PPME_SYSCALL_OPEN,
 	                            6,
-	                            (uint64_t)3,
+	                            (int32_t)3,
 	                            "/tmp/the_file",
 	                            PPM_O_RDWR,
 	                            0,
@@ -54,10 +54,10 @@ TEST_F(sinsp_with_test_input, event_async_queue) {
 
 	// create input[1] ivent
 	auto* scap_evt1 = add_event(increasing_ts(),
-	                            1,
-	                            PPME_SYSCALL_OPEN_X,
+	                            INIT_TID,
+	                            PPME_SYSCALL_OPEN,
 	                            6,
-	                            (uint64_t)3,
+	                            (int32_t)3,
 	                            "/tmp/the_file",
 	                            PPM_O_RDWR,
 	                            0,

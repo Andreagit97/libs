@@ -215,7 +215,8 @@ const libsinsp::events::set<ppm_event_code> expected_sinsp_state_event_set = {
         PPME_SYSCALL_SETREUID_E,
         PPME_SYSCALL_SETREUID_X,
         PPME_SYSCALL_SETREGID_E,
-        PPME_SYSCALL_SETREGID_X};
+        PPME_SYSCALL_SETREGID_X,
+        PPME_SYSCALL_OPEN};
 
 const libsinsp::events::set<ppm_sc_code> expected_sinsp_state_sc_set = {
         PPM_SC_ACCEPT,         PPM_SC_ACCEPT4,
@@ -779,7 +780,6 @@ TEST(ppm_sc_API, from_event_names_to_event_names_with_information_loss) {
 	ASSERT_NAMES_EQ(event_names_with_all_generics, expected_events_names);
 }
 
-/// todo(@Andreagit97) remove duplicated
 TEST(ppm_sc_API, event_set_to_names_misc) {
 	auto event_codes = libsinsp::events::set<ppm_event_code>{PPME_GENERIC_E,
 	                                                         PPME_GENERIC_X,
@@ -794,6 +794,7 @@ TEST(ppm_sc_API, event_set_to_names_misc) {
 	event_codes.insert((ppm_event_code)PPME_SYSCALL_OPEN_X);
 	event_codes.insert((ppm_event_code)PPME_SYSCALL_OPENAT_E);
 	event_codes.insert((ppm_event_code)PPME_SYSCALL_OPENAT_2_X);
+	event_codes.insert((ppm_event_code)PPME_SYSCALL_OPEN);
 	ASSERT_PPM_EVENT_CODES_EQ(event_codes, event_codes_again);
 }
 

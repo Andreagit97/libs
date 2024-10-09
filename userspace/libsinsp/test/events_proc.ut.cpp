@@ -38,17 +38,7 @@ TEST_F(sinsp_with_test_input, execveat_empty_path_flag) {
 	 */
 	int64_t dirfd = 3;
 	const char *file_to_run = "/tmp/file_to_run";
-	add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 3, file_to_run, 0, 0);
-	add_event_advance_ts(increasing_ts(),
-	                     1,
-	                     PPME_SYSCALL_OPEN_X,
-	                     6,
-	                     dirfd,
-	                     file_to_run,
-	                     0,
-	                     0,
-	                     0,
-	                     (uint64_t)0);
+	generate_open_event(sinsp_test_input::open_params{.fd = (int32_t)dirfd, .path = file_to_run});
 
 	/* Now we call the `execveat_e` event,`sinsp` will store this enter
 	 * event in the thread storage, in this way the exit event can use it.
@@ -117,17 +107,7 @@ TEST_F(sinsp_with_test_input, execveat_relative_path) {
 	 */
 	int64_t dirfd = 3;
 	const char *directory = "/tmp/dir";
-	add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 3, directory, 0, 0);
-	add_event_advance_ts(increasing_ts(),
-	                     1,
-	                     PPME_SYSCALL_OPEN_X,
-	                     6,
-	                     dirfd,
-	                     directory,
-	                     0,
-	                     0,
-	                     0,
-	                     (uint64_t)0);
+	generate_open_event(sinsp_test_input::open_params{.fd = (int32_t)dirfd, .path = directory});
 
 	/* Now we call the `execveat_e` event,`sinsp` will store this enter
 	 * event in the thread storage, in this way the exit event can use it.
@@ -193,17 +173,7 @@ TEST_F(sinsp_with_test_input, execveat_invalid_path) {
 	 */
 	int64_t dirfd = 3;
 	const char *directory = "/tmp/dir";
-	add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 3, directory, 0, 0);
-	add_event_advance_ts(increasing_ts(),
-	                     1,
-	                     PPME_SYSCALL_OPEN_X,
-	                     6,
-	                     dirfd,
-	                     directory,
-	                     0,
-	                     0,
-	                     0,
-	                     (uint64_t)0);
+	generate_open_event(sinsp_test_input::open_params{.fd = (int32_t)dirfd, .path = directory});
 
 	/* Now we call the `execveat_e` event,`sinsp` will store this enter
 	 * event in the thread storage, in this way the exit event can use it.
@@ -327,17 +297,7 @@ TEST_F(sinsp_with_test_input, execveat_empty_path_flag_s390) {
 	 */
 	int64_t dirfd = 3;
 	const char *file_to_run = "/tmp/s390x/file_to_run";
-	add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 3, file_to_run, 0, 0);
-	add_event_advance_ts(increasing_ts(),
-	                     1,
-	                     PPME_SYSCALL_OPEN_X,
-	                     6,
-	                     dirfd,
-	                     file_to_run,
-	                     0,
-	                     0,
-	                     0,
-	                     (uint64_t)0);
+	generate_open_event(sinsp_test_input::open_params{.fd = (int32_t)dirfd, .path = file_to_run});
 
 	/* Now we call the `execveat_e` event,`sinsp` will store this enter
 	 * event in the thread storage, in this way the exit event can use it.
@@ -403,17 +363,7 @@ TEST_F(sinsp_with_test_input, execveat_relative_path_s390) {
 	 */
 	int64_t dirfd = 3;
 	const char *directory = "/tmp/s390x/dir";
-	add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 3, directory, 0, 0);
-	add_event_advance_ts(increasing_ts(),
-	                     1,
-	                     PPME_SYSCALL_OPEN_X,
-	                     6,
-	                     dirfd,
-	                     directory,
-	                     0,
-	                     0,
-	                     0,
-	                     (uint64_t)0);
+	generate_open_event(sinsp_test_input::open_params{.fd = (int32_t)dirfd, .path = directory});
 
 	/* Now we call the `execveat_e` event,`sinsp` will store this enter
 	 * event in the thread storage, in this way the exit event can use it.
@@ -534,17 +484,7 @@ TEST_F(sinsp_with_test_input, execveat_invalid_path_s390) {
 	 */
 	int64_t dirfd = 3;
 	const char *directory = "/tmp/s390/dir";
-	add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 3, directory, 0, 0);
-	add_event_advance_ts(increasing_ts(),
-	                     1,
-	                     PPME_SYSCALL_OPEN_X,
-	                     6,
-	                     dirfd,
-	                     directory,
-	                     0,
-	                     0,
-	                     0,
-	                     (uint64_t)0);
+	generate_open_event(sinsp_test_input::open_params{.fd = (int32_t)dirfd, .path = directory});
 
 	/* Now we call the `execveat_e` event,`sinsp` will store this enter
 	 * event in the thread storage, in this way the exit event can use it.
@@ -983,23 +923,8 @@ TEST_F(sinsp_with_test_input, chdir_fchdir) {
 
 	// generate a fd associated with the directory we wish to change to
 	int64_t dirfd = 3, test_errno = 0;
-	add_event_advance_ts(increasing_ts(),
-	                     1,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/target-directory-fd",
-	                     0,
-	                     0);
-	add_event_advance_ts(increasing_ts(),
-	                     1,
-	                     PPME_SYSCALL_OPEN_X,
-	                     6,
-	                     dirfd,
-	                     "/tmp/target-directory-fd",
-	                     (uint32_t)0,
-	                     (uint32_t)0,
-	                     (uint32_t)0,
-	                     (uint64_t)0);
+	generate_open_event(sinsp_test_input::open_params{.fd = (int32_t)dirfd,
+	                                                  .path = "/tmp/target-directory-fd"});
 
 	add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_FCHDIR_E, 1, dirfd);
 	evt = add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_FCHDIR_X, 1, test_errno);

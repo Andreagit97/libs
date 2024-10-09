@@ -172,187 +172,187 @@ TEST_F(sinsp_with_test_input, sockaddr_empty_param) {
 	ASSERT_EQ(param->m_len, 0);
 }
 
-TEST_F(sinsp_with_test_input, filename_toctou) {
-	// for more information see
-	// https://github.com/falcosecurity/falco/security/advisories/GHSA-6v9j-2vm2-ghf7
+// todo!: TOCTOU tests will be moved driver side.
+// TEST_F(sinsp_with_test_input, filename_toctou) {
+// 	// for more information see
+// 	// https://github.com/falcosecurity/falco/security/advisories/GHSA-6v9j-2vm2-ghf7
 
-	add_default_init_thread();
+// 	add_default_init_thread();
 
-	sinsp_evt* evt;
-	open_inspector();
+// 	sinsp_evt* evt;
+// 	open_inspector();
 
-	int64_t fd = 1, dirfd = 3;
+// 	int64_t fd = 1, dirfd = 3;
 
-	add_event(increasing_ts(), 3, PPME_SYSCALL_OPEN_E, 3, "/tmp/the_file", 0, 0);
-	evt = add_event_advance_ts(increasing_ts(),
-	                           3,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           fd,
-	                           "/tmp/some_other_file",
-	                           0,
-	                           0,
-	                           0,
-	                           (uint64_t)0);
-	ASSERT_EQ(get_field_as_string(evt, "fd.name"), "/tmp/the_file");
+// 	add_event(increasing_ts(), 3, PPME_SYSCALL_OPEN_E, 3, "/tmp/the_file", 0, 0);
+// 	evt = add_event_advance_ts(increasing_ts(),
+// 	                           3,
+// 	                           PPME_SYSCALL_OPEN_X,
+// 	                           6,
+// 	                           fd,
+// 	                           "/tmp/some_other_file",
+// 	                           0,
+// 	                           0,
+// 	                           0,
+// 	                           (uint64_t)0);
+// 	ASSERT_EQ(get_field_as_string(evt, "fd.name"), "/tmp/the_file");
 
-	fd = 2;
-	add_event(increasing_ts(), 1, PPME_SYSCALL_OPENAT_2_E, 4, dirfd, "/tmp/the_file", 0, 0);
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPENAT_2_X,
-	                           7,
-	                           fd,
-	                           dirfd,
-	                           "/tmp/some_other_file",
-	                           0,
-	                           0,
-	                           0,
-	                           (uint64_t)0);
-	ASSERT_EQ(get_field_as_string(evt, "fd.name"), "/tmp/the_file");
+// 	fd = 2;
+// 	add_event(increasing_ts(), 1, PPME_SYSCALL_OPENAT_2_E, 4, dirfd, "/tmp/the_file", 0, 0);
+// 	evt = add_event_advance_ts(increasing_ts(),
+// 	                           1,
+// 	                           PPME_SYSCALL_OPENAT_2_X,
+// 	                           7,
+// 	                           fd,
+// 	                           dirfd,
+// 	                           "/tmp/some_other_file",
+// 	                           0,
+// 	                           0,
+// 	                           0,
+// 	                           (uint64_t)0);
+// 	ASSERT_EQ(get_field_as_string(evt, "fd.name"), "/tmp/the_file");
 
-	fd = 4;
-	add_event(increasing_ts(), 2, PPME_SYSCALL_CREAT_E, 2, "/tmp/the_file", 0);
-	evt = add_event_advance_ts(increasing_ts(),
-	                           2,
-	                           PPME_SYSCALL_CREAT_X,
-	                           6,
-	                           fd,
-	                           "/tmp/some_other_file",
-	                           0,
-	                           0,
-	                           (uint64_t)0,
-	                           (uint16_t)PPM_FD_LOWER_LAYER_CREAT);
-	ASSERT_EQ(get_field_as_string(evt, "fd.name"), "/tmp/the_file");
-}
+// 	fd = 4;
+// 	add_event(increasing_ts(), 2, PPME_SYSCALL_CREAT_E, 2, "/tmp/the_file", 0);
+// 	evt = add_event_advance_ts(increasing_ts(),
+// 	                           2,
+// 	                           PPME_SYSCALL_CREAT_X,
+// 	                           6,
+// 	                           fd,
+// 	                           "/tmp/some_other_file",
+// 	                           0,
+// 	                           0,
+// 	                           (uint64_t)0,
+// 	                           (uint16_t)PPM_FD_LOWER_LAYER_CREAT);
+// 	ASSERT_EQ(get_field_as_string(evt, "fd.name"), "/tmp/the_file");
+// }
 
-/* Assert that invalid params in enter events are not considered in the TOCTOU prevention logic. */
-TEST_F(sinsp_with_test_input, enter_event_retrieval) {
-	add_default_init_thread();
+// TEST_F(sinsp_with_test_input, enter_event_retrieval) {
+// 	add_default_init_thread();
 
-	open_inspector();
-	sinsp_evt* evt = NULL;
-	const char* expected_string = "/tmp/the_file";
-	uint64_t dirfd = 3;
-	uint64_t new_fd = 100;
+// 	open_inspector();
+// 	sinsp_evt* evt = NULL;
+// 	const char* expected_string = "/tmp/the_file";
+// 	uint64_t dirfd = 3;
+// 	uint64_t new_fd = 100;
 
-	std::vector<const char*> invalid_inputs = {"<NA>", "(NULL)", NULL};
+// 	std::vector<const char*> invalid_inputs = {"<NA>", "(NULL)", NULL};
 
-	/* Check `openat` syscall.
-	 * `(NULL)` should be converted to `<NA>` and recognized as an invalid param.
-	 */
-	for(const char* enter_filename : invalid_inputs) {
-		std::string test_context =
-		        std::string("openat with filename ") + test_utils::describe_string(enter_filename);
+// 	/* Check `openat` syscall.
+// 	 * `(NULL)` should be converted to `<NA>` and recognized as an invalid param.
+// 	 */
+// 	for(const char* enter_filename : invalid_inputs) {
+// 		std::string test_context =
+// 		        std::string("openat with filename ") + test_utils::describe_string(enter_filename);
 
-		add_event_advance_ts(increasing_ts(),
-		                     1,
-		                     PPME_SYSCALL_OPENAT_2_E,
-		                     4,
-		                     dirfd,
-		                     enter_filename,
-		                     0,
-		                     0);
-		evt = add_event_advance_ts(increasing_ts(),
-		                           1,
-		                           PPME_SYSCALL_OPENAT_2_X,
-		                           7,
-		                           new_fd,
-		                           dirfd,
-		                           expected_string,
-		                           0,
-		                           0,
-		                           0,
-		                           (uint64_t)0);
+// 		add_event_advance_ts(increasing_ts(),
+// 		                     1,
+// 		                     PPME_SYSCALL_OPENAT_2_E,
+// 		                     4,
+// 		                     dirfd,
+// 		                     enter_filename,
+// 		                     0,
+// 		                     0);
+// 		evt = add_event_advance_ts(increasing_ts(),
+// 		                           1,
+// 		                           PPME_SYSCALL_OPENAT_2_X,
+// 		                           7,
+// 		                           new_fd,
+// 		                           dirfd,
+// 		                           expected_string,
+// 		                           0,
+// 		                           0,
+// 		                           0,
+// 		                           (uint64_t)0);
 
-		ASSERT_NE(evt->get_thread_info(), nullptr) << test_context;
-		ASSERT_NE(evt->get_thread_info()->get_fd(new_fd), nullptr) << test_context;
+// 		ASSERT_NE(evt->get_thread_info(), nullptr) << test_context;
+// 		ASSERT_NE(evt->get_thread_info()->get_fd(new_fd), nullptr) << test_context;
 
-		ASSERT_EQ(evt->get_thread_info()->get_fd(new_fd)->m_name, expected_string) << test_context;
-		ASSERT_EQ(get_field_as_string(evt, "fd.name"), expected_string) << test_context;
+// 		ASSERT_EQ(evt->get_thread_info()->get_fd(new_fd)->m_name, expected_string) << test_context;
+// 		ASSERT_EQ(get_field_as_string(evt, "fd.name"), expected_string) << test_context;
 
-		dirfd++;
-		new_fd++;
-	}
+// 		dirfd++;
+// 		new_fd++;
+// 	}
 
-	/* Check `openat2` syscall. */
-	for(const char* enter_filename : invalid_inputs) {
-		std::string test_context =
-		        std::string("openat2 with filename ") + test_utils::describe_string(enter_filename);
+// 	/* Check `openat2` syscall. */
+// 	for(const char* enter_filename : invalid_inputs) {
+// 		std::string test_context =
+// 		        std::string("openat2 with filename ") + test_utils::describe_string(enter_filename);
 
-		add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPENAT2_E, 5, dirfd, "<NA>", 0, 0, 0);
-		evt = add_event_advance_ts(increasing_ts(),
-		                           1,
-		                           PPME_SYSCALL_OPENAT2_X,
-		                           6,
-		                           new_fd,
-		                           dirfd,
-		                           expected_string,
-		                           0,
-		                           0,
-		                           0);
+// 		add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPENAT2_E, 5, dirfd, "<NA>", 0, 0, 0);
+// 		evt = add_event_advance_ts(increasing_ts(),
+// 		                           1,
+// 		                           PPME_SYSCALL_OPENAT2_X,
+// 		                           6,
+// 		                           new_fd,
+// 		                           dirfd,
+// 		                           expected_string,
+// 		                           0,
+// 		                           0,
+// 		                           0);
 
-		ASSERT_NE(evt->get_thread_info(), nullptr) << test_context;
-		ASSERT_NE(evt->get_thread_info()->get_fd(new_fd), nullptr) << test_context;
+// 		ASSERT_NE(evt->get_thread_info(), nullptr) << test_context;
+// 		ASSERT_NE(evt->get_thread_info()->get_fd(new_fd), nullptr) << test_context;
 
-		ASSERT_EQ(evt->get_thread_info()->get_fd(new_fd)->m_name, expected_string) << test_context;
-		ASSERT_EQ(get_field_as_string(evt, "fd.name"), expected_string) << test_context;
+// 		ASSERT_EQ(evt->get_thread_info()->get_fd(new_fd)->m_name, expected_string) << test_context;
+// 		ASSERT_EQ(get_field_as_string(evt, "fd.name"), expected_string) << test_context;
 
-		dirfd++;
-		new_fd++;
-	}
+// 		dirfd++;
+// 		new_fd++;
+// 	}
 
-	/* Check `open` syscall. */
-	for(const char* enter_filename : invalid_inputs) {
-		std::string test_context =
-		        std::string("open with filename ") + test_utils::describe_string(enter_filename);
+// 	/* Check `open` syscall. */
+// 	for(const char* enter_filename : invalid_inputs) {
+// 		std::string test_context =
+// 		        std::string("open with filename ") + test_utils::describe_string(enter_filename);
 
-		add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 3, NULL, 0, 0);
-		evt = add_event_advance_ts(increasing_ts(),
-		                           1,
-		                           PPME_SYSCALL_OPEN_X,
-		                           6,
-		                           new_fd,
-		                           expected_string,
-		                           0,
-		                           0,
-		                           0,
-		                           (uint64_t)0);
+// 		add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 3, NULL, 0, 0);
+// 		evt = add_event_advance_ts(increasing_ts(),
+// 		                           1,
+// 		                           PPME_SYSCALL_OPEN_X,
+// 		                           6,
+// 		                           new_fd,
+// 		                           expected_string,
+// 		                           0,
+// 		                           0,
+// 		                           0,
+// 		                           (uint64_t)0);
 
-		ASSERT_NE(evt->get_thread_info(), nullptr) << test_context;
-		ASSERT_NE(evt->get_thread_info()->get_fd(new_fd), nullptr) << test_context;
+// 		ASSERT_NE(evt->get_thread_info(), nullptr) << test_context;
+// 		ASSERT_NE(evt->get_thread_info()->get_fd(new_fd), nullptr) << test_context;
 
-		ASSERT_EQ(evt->get_thread_info()->get_fd(new_fd)->m_name, expected_string) << test_context;
-		ASSERT_EQ(get_field_as_string(evt, "fd.name"), expected_string) << test_context;
+// 		ASSERT_EQ(evt->get_thread_info()->get_fd(new_fd)->m_name, expected_string) << test_context;
+// 		ASSERT_EQ(get_field_as_string(evt, "fd.name"), expected_string) << test_context;
 
-		new_fd++;
-	}
+// 		new_fd++;
+// 	}
 
-	/* Check `creat` syscall. */
-	for(const char* enter_filename : invalid_inputs) {
-		std::string test_context =
-		        std::string("creat with filename ") + test_utils::describe_string(enter_filename);
+// 	/* Check `creat` syscall. */
+// 	for(const char* enter_filename : invalid_inputs) {
+// 		std::string test_context =
+// 		        std::string("creat with filename ") + test_utils::describe_string(enter_filename);
 
-		add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_CREAT_E, 2, NULL, 0);
-		evt = add_event_advance_ts(increasing_ts(),
-		                           1,
-		                           PPME_SYSCALL_CREAT_X,
-		                           5,
-		                           new_fd,
-		                           expected_string,
-		                           0,
-		                           0,
-		                           (uint64_t)0);
+// 		add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_CREAT_E, 2, NULL, 0);
+// 		evt = add_event_advance_ts(increasing_ts(),
+// 		                           1,
+// 		                           PPME_SYSCALL_CREAT_X,
+// 		                           5,
+// 		                           new_fd,
+// 		                           expected_string,
+// 		                           0,
+// 		                           0,
+// 		                           (uint64_t)0);
 
-		ASSERT_NE(evt->get_thread_info(), nullptr) << test_context;
-		ASSERT_NE(evt->get_thread_info()->get_fd(new_fd), nullptr) << test_context;
+// 		ASSERT_NE(evt->get_thread_info(), nullptr) << test_context;
+// 		ASSERT_NE(evt->get_thread_info()->get_fd(new_fd), nullptr) << test_context;
 
-		ASSERT_EQ(evt->get_thread_info()->get_fd(new_fd)->m_name, expected_string) << test_context;
-		ASSERT_EQ(get_field_as_string(evt, "fd.name"), expected_string) << test_context;
+// 		ASSERT_EQ(evt->get_thread_info()->get_fd(new_fd)->m_name, expected_string) << test_context;
+// 		ASSERT_EQ(get_field_as_string(evt, "fd.name"), expected_string) << test_context;
 
-		new_fd++;
-	}
-}
+// 		new_fd++;
+// 	}
+// }
 
 // Check that the path in case of execve is correctly overwritten in case it was not possible to
 // collect it from the entry event but it is possible to collect it from the exit event

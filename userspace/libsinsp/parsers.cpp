@@ -130,7 +130,6 @@ void sinsp_parser::process_event(sinsp_evt *evt) {
 		}
 
 		// FALLTHRU
-	case PPME_SYSCALL_OPEN_E:
 	case PPME_SYSCALL_CREAT_E:
 	case PPME_SYSCALL_OPENAT_E:
 	case PPME_SYSCALL_OPENAT_2_E:
@@ -195,7 +194,7 @@ void sinsp_parser::process_event(sinsp_evt *evt) {
 	case PPME_SYSCALL_SENDFILE_X:
 		parse_sendfile_exit(evt);
 		break;
-	case PPME_SYSCALL_OPEN_X:
+	case PPME_SYSCALL_OPEN:
 	case PPME_SYSCALL_CREAT_X:
 	case PPME_SYSCALL_OPENAT_2_X:
 	case PPME_SYSCALL_OPENAT2_X:
@@ -2391,7 +2390,7 @@ std::string sinsp_parser::parse_dirfd(sinsp_evt *evt, std::string_view name, int
 }
 
 void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt) {
-	int64_t fd;
+	int64_t fd = 0;
 	std::string_view name;
 	std::string_view enter_evt_name;
 	uint32_t flags;
@@ -2401,55 +2400,35 @@ void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt) {
 	uint16_t etype = evt->get_type();
 	uint32_t dev = 0;
 	uint64_t ino = 0;
+	// todo!: remove this at the end
 	bool lastevent_retrieved = false;
 
 	if(evt->get_tinfo() == nullptr) {
 		return;
 	}
 
-	if(etype != PPME_SYSCALL_OPEN_BY_HANDLE_AT_X) {
-		//
-		// Load the enter event so we can access its arguments
-		//
-		lastevent_retrieved = retrieve_enter_event(enter_evt, evt);
-	}
-
 	//
 	// Check the return value
 	//
-	fd = evt->get_param(0)->as<int64_t>();
+	// todo!: remove it at the end of the rework
+	switch(etype) {
+	case PPME_SYSCALL_OPEN:
+		fd = evt->get_param(0)->as<int32_t>();
+		break;
+
+	default:
+		fd = evt->get_param(0)->as<int64_t>();
+		break;
+	}
 
 	//
 	// Parse the parameters, based on the event type
 	//
-	if(etype == PPME_SYSCALL_OPEN_X) {
+	if(etype == PPME_SYSCALL_OPEN) {
 		name = evt->get_param(1)->as<std::string_view>();
 		flags = evt->get_param(2)->as<uint32_t>();
-
-		if(evt->get_num_params() > 4) {
-			dev = evt->get_param(4)->as<uint32_t>();
-			if(evt->get_num_params() > 5) {
-				ino = evt->get_param(5)->as<uint64_t>();
-			}
-		}
-
-		//
-		// Compare with enter event parameters
-		//
-		if(lastevent_retrieved && enter_evt->get_num_params() >= 2) {
-			enter_evt_name = enter_evt->get_param(0)->as<std::string_view>();
-			enter_evt_flags = enter_evt->get_param(1)->as<uint32_t>();
-
-			if(enter_evt_name.data() != nullptr && enter_evt_name != "<NA>") {
-				name = enter_evt_name;
-
-				// keep flags added by the syscall exit probe if present
-				uint32_t mask = ~(PPM_O_F_CREATED - 1);
-				uint32_t added_flags = flags & mask;
-				flags = enter_evt_flags | added_flags;
-			}
-		}
-
+		dev = evt->get_param(4)->as<uint32_t>();
+		ino = evt->get_param(5)->as<uint64_t>();
 		sdir = evt->get_tinfo()->get_cwd();
 	} else if(etype == PPME_SYSCALL_CREAT_X) {
 		name = evt->get_param(1)->as<std::string_view>();
