@@ -856,6 +856,24 @@ int32_t scap_event_encode_params_v(struct scap_sized_buffer event_buf,
                                    uint32_t n,
                                    va_list args);
 
+uint8_t scap_get_size_bytes_from_type(enum ppm_param_type t);
+char* scap_get_default_value_from_type(enum ppm_param_type t);
+#define NO_TIMESTAMP_COMPARISON (uint64_t)(UINT64_MAX - 1)
+#define MAX_EVENT_SIZE 64 * 1024
+
+bool scap_compare_events(scap_evt* curr, scap_evt* expected, char* error);
+
+typedef enum conversion_result {
+	CONVERSION_CONTINUE,
+	CONVERSION_COMPLETED,
+	CONVERSION_SKIP,
+	CONVERSION_ERROR
+} conversion_result;
+
+// Todo!: we can move it inside the scap-file engine if we find a great way to expose it for tests.
+conversion_result scap_convert_event(scap_evt* new_evt, scap_evt* evt_to_convert, char* error);
+void scap_print_event(scap_evt* ev);
+
 /*@}*/
 
 ///////////////////////////////////////////////////////////////////////////////

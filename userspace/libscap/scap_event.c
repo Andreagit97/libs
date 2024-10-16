@@ -215,6 +215,7 @@ int32_t scap_event_encode_params_v(const struct scap_sized_buffer event_buf,
 		case PT_SIGSET:
 		case PT_MODE:
 		case PT_ENUMFLAGS32:
+		case PT_FD32:
 			u32_arg = va_arg(args, uint32_t);
 			param.buf = &u32_arg;
 			param.size = sizeof(uint32_t);
@@ -354,4 +355,643 @@ int32_t scap_event_encode_params_v(const struct scap_sized_buffer event_buf,
 	event->len = len;
 
 	return SCAP_SUCCESS;
+}
+
+uint8_t scap_get_size_bytes_from_type(enum ppm_param_type t) {
+	switch(t) {
+	case PT_INT8:
+	case PT_UINT8:
+	case PT_FLAGS8:
+	case PT_ENUMFLAGS8:
+		return 1;
+
+	case PT_INT16:
+	case PT_UINT16:
+	case PT_FLAGS16:
+	case PT_ENUMFLAGS16:
+	case PT_SYSCALLID:
+		return 2;
+
+	case PT_INT32:
+	case PT_UINT32:
+	case PT_FLAGS32:
+	case PT_ENUMFLAGS32:
+	case PT_UID:
+	case PT_GID:
+	case PT_MODE:
+	case PT_FD32:
+		return 4;
+
+	case PT_INT64:
+	case PT_UINT64:
+	case PT_RELTIME:
+	case PT_ABSTIME:
+	case PT_ERRNO:
+	case PT_FD:
+	case PT_PID:
+		return 8;
+
+	case PT_BYTEBUF:
+	case PT_CHARBUF:
+	case PT_SOCKADDR:
+	case PT_SOCKTUPLE:
+	case PT_FDLIST:
+	case PT_FSPATH:
+	case PT_CHARBUFARRAY:
+	case PT_CHARBUF_PAIR_ARRAY:
+	case PT_FSRELPATH:
+	case PT_DYN:
+		return 0;
+
+	default:
+		// We forgot to handle something
+		ASSERT(false);
+		break;
+	}
+	return 0;
+}
+
+/*=============================== PRINT EVENT PARAMS ===========================*/
+
+// void print_ipv4(int starting_index) {
+// 	char ipv4_string[50];
+// 	uint8_t *ipv4 = (uint8_t *)(valptr + starting_index);
+// 	snprintf(ipv4_string, sizeof(ipv4_string), "%d.%d.%d.%d", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
+// 	printf("- ipv4: %s\n", ipv4_string);
+// }
+
+// void print_ipv6(int starting_index) {
+// 	uint32_t ipv6[4] = {0, 0, 0, 0};
+// 	ipv6[0] = *(uint32_t *)(valptr + starting_index);
+// 	ipv6[1] = *(uint32_t *)(valptr + starting_index + 4);
+// 	ipv6[2] = *(uint32_t *)(valptr + starting_index + 8);
+// 	ipv6[3] = *(uint32_t *)(valptr + starting_index + 12);
+
+// 	char ipv6_string[150];
+// 	inet_ntop(AF_INET6, ipv6, ipv6_string, 150);
+// 	printf("- ipv6: %s\n", ipv6_string);
+// }
+
+// void print_unix_path(int starting_index) {
+// 	printf("- unix path: %s\n", (char *)(valptr + starting_index));
+// }
+
+// void print_port(int starting_index) {
+// 	printf("- port: %d\n", *(uint16_t *)(valptr + starting_index));
+// }
+
+void print_parameter(int16_t num_param, scap_evt *ev) {
+	uint16_t *lens16 = (uint16_t *)((char *)ev + sizeof(struct ppm_evt_hdr));
+	char *valptr = (char *)lens16 + ev->nparams * sizeof(uint16_t);
+
+	int16_t len = lens16[num_param];
+
+	if(len == 0) {
+		printf("PARAM %d: is empty\n", num_param);
+		return;
+	}
+
+	switch(g_event_info[ev->type].params[num_param].type) {
+	case PT_FLAGS8:
+		printf("PARAM %d: %X\n", num_param, *(uint8_t *)(valptr));
+		break;
+
+	case PT_FLAGS16:
+		printf("PARAM %d: %X\n", num_param, *(uint16_t *)(valptr));
+		break;
+
+	case PT_FLAGS32:
+		printf("PARAM %d: %X\n", num_param, *(uint32_t *)(valptr));
+		break;
+
+	case PT_INT8:
+		printf("PARAM %d: %d\n", num_param, *(int8_t *)(valptr));
+		break;
+
+	case PT_INT16:
+		printf("PARAM %d: %d\n", num_param, *(int16_t *)(valptr));
+		break;
+
+	case PT_INT32:
+		printf("PARAM %d: %d\n", num_param, *(int32_t *)(valptr));
+		break;
+
+	case PT_INT64:
+	case PT_ERRNO:
+	case PT_PID:
+		printf("PARAM %d: %ld\n", num_param, *(int64_t *)(valptr));
+		break;
+
+	case PT_UINT8:
+	case PT_SIGTYPE:
+	case PT_ENUMFLAGS8:
+		printf("PARAM %d: %d\n", num_param, *(uint8_t *)(valptr));
+		break;
+
+	case PT_UINT16:
+	case PT_SYSCALLID:
+	case PT_ENUMFLAGS16:
+		printf("PARAM %d: %d\n", num_param, *(uint16_t *)(valptr));
+		break;
+
+	case PT_UINT32:
+	case PT_UID:
+	case PT_GID:
+	case PT_SIGSET:
+	case PT_MODE:
+	case PT_ENUMFLAGS32:
+		printf("PARAM %d: %d\n", num_param, *(uint32_t *)(valptr));
+		break;
+
+	case PT_UINT64:
+	case PT_RELTIME:
+	case PT_ABSTIME:
+		printf("PARAM %d: %lu\n", num_param, *(uint64_t *)(valptr));
+		break;
+
+	case PT_FD:
+		printf("PARAM %d: %d\n", num_param, *(int32_t *)(valptr));
+		break;
+
+		// case PT_SOCKADDR: {
+		// 	printf("PARAM %d:\n", num_param);
+		// 	uint8_t sock_family = *(uint8_t *)(valptr);
+		// 	printf("- sock_family: %d\n", sock_family);
+		// 	switch(sock_family) {
+		// 	case PPM_AF_INET:
+		// 		/* ipv4 dest. */
+		// 		print_ipv4(1);
+
+		// 		/* port dest. */
+		// 		print_port(5);
+		// 		break;
+
+		// 	case PPM_AF_INET6:
+		// 		/* ipv6 dest. */
+		// 		print_ipv6(1);
+
+		// 		/* port dest. */
+		// 		print_port(17);
+		// 		break;
+
+		// 	case PPM_AF_UNIX:
+		// 		/* unix_path. */
+		// 		print_unix_path(1);
+		// 		break;
+
+		// 	default:
+		// 		printf("-  error\n");
+		// 		break;
+		// 	}
+		// 	break;
+		// }
+
+		// case PT_SOCKTUPLE: {
+		// 	printf("PARAM %d:\n", num_param);
+		// 	uint8_t sock_family = *(uint8_t *)(valptr);
+		// 	printf("- sock_family: %d\n", sock_family);
+		// 	switch(sock_family) {
+		// 	case PPM_AF_INET:
+		// 		/* ipv4 src. */
+		// 		print_ipv4(1);
+
+		// 		/* ipv4 dest. */
+		// 		print_ipv4(5);
+
+		// 		/* port src. */
+		// 		print_port(9);
+
+		// 		/* port dest. */
+		// 		print_port(11);
+		// 		break;
+
+		// 	case PPM_AF_INET6:
+		// 		/* ipv6 src. */
+		// 		print_ipv6(1);
+
+		// 		/* ipv6 dest. */
+		// 		print_ipv6(17);
+
+		// 		/* port src. */
+		// 		print_port(33);
+
+		// 		/* port dest. */
+		// 		print_port(35);
+		// 		break;
+
+		// 	case PPM_AF_UNIX:
+		// 		/* Here there are also some kernel pointers but right
+		// 		 * now we are not interested in catching them.
+		// 		 * 8 + 8 = 16 bytes
+		// 		 */
+
+		// 		/* unix_path. */
+		// 		print_unix_path(17);
+		// 		break;
+
+		// 	default:
+		// 		printf("-  error\n");
+		// 		break;
+		// 	}
+		// 	break;
+		// }
+
+	case PT_CHARBUF:
+	case PT_BYTEBUF:
+	case PT_FSPATH:
+	case PT_CHARBUFARRAY:
+	case PT_FSRELPATH:
+		printf("PARAM %d: ", num_param);
+		for(int j = 0; j < len; j++) {
+			printf("%c", *(char *)(valptr + j));
+		}
+		printf("\n");
+		break;
+
+	default:
+		printf("PARAM %d: TYPE NOT KNOWN\n", num_param);
+		break;
+	}
+	valptr += len;
+}
+
+void scap_print_event(scap_evt *ev) {
+	printf("------ HEADER\n");
+	printf("timestamp: %lu\n", ev->ts);
+	printf("tid: %lu\n", ev->tid);
+	printf("len: %d\n", ev->len);
+	printf("type: %d\n", ev->type);
+	printf("num params: %d\n", ev->nparams);
+	printf("------\n");
+
+	printf("------ LEN ARRAY\n");
+	uint16_t *lens16 = (uint16_t *)((char *)ev + sizeof(struct ppm_evt_hdr));
+	for(int i = 0; i < ev->nparams; i++) {
+		printf("param %d len: %d\n", i, lens16[i]);
+	}
+	if(ev->nparams == 0) {
+		printf("- This event has no parameter\n");
+	}
+	printf("------\n");
+
+	printf("------ PARAMS\n");
+	for(int i = 0; i < ev->nparams; i++) {
+		print_parameter(i, ev);
+	}
+	if(ev->nparams == 0) {
+		printf("- This event has no parameter\n");
+	}
+	printf("------\n");
+	printf("------------------\n");
+}
+
+/*=============================== PRINT EVENT PARAMS ===========================*/
+
+static char *get_event_name(ppm_event_code event_type) {
+	return (&g_event_info[event_type])->name;
+}
+
+static char get_direction_char(ppm_event_code event_type) {
+	if(event_type > PPME_SYSCALL_OPEN) {
+		return ' ';
+	}
+
+	if(PPME_IS_ENTER(event_type)) {
+		return 'E';
+	} else {
+		return 'X';
+	}
+}
+
+char *scap_get_default_value_from_type(enum ppm_param_type t) {
+	static uint8_t default_uint8 = 0;
+	static uint16_t default_uint16 = 0;
+	static uint32_t default_uint32 = 0;
+	static uint64_t default_uint64 = 0;
+
+	switch(t) {
+	case PT_INT8:
+	case PT_UINT8:
+	case PT_FLAGS8:
+	case PT_ENUMFLAGS8:
+		return (char *)&default_uint8;
+
+	case PT_INT16:
+	case PT_UINT16:
+	case PT_FLAGS16:
+	case PT_ENUMFLAGS16:
+	case PT_SYSCALLID:
+		return (char *)&default_uint16;
+
+	case PT_INT32:
+	case PT_UINT32:
+	case PT_FLAGS32:
+	case PT_ENUMFLAGS32:
+	case PT_UID:
+	case PT_GID:
+	case PT_MODE:
+	case PT_FD32:
+		return (char *)&default_uint32;
+
+	case PT_INT64:
+	case PT_UINT64:
+	case PT_RELTIME:
+	case PT_ABSTIME:
+	case PT_ERRNO:
+	case PT_FD:
+	case PT_PID:
+		return (char *)&default_uint64;
+
+	// Should be ok to return NULL since the len will be 0
+	case PT_BYTEBUF:
+	case PT_CHARBUF:
+	case PT_SOCKADDR:
+	case PT_SOCKTUPLE:
+	case PT_FDLIST:
+	case PT_FSPATH:
+	case PT_CHARBUFARRAY:
+	case PT_CHARBUF_PAIR_ARRAY:
+	case PT_FSRELPATH:
+	case PT_DYN:
+		return NULL;
+
+	default:
+		// We forgot to handle something
+		ASSERT(false);
+		break;
+	}
+	return 0;
+}
+
+// This should be only used for testing purposes in production we should use directly `memcmp` for
+// the whole event
+bool scap_compare_events(scap_evt *curr, scap_evt *expected, char *error) {
+	//////////////////////////////
+	// Start comparing the header
+	//////////////////////////////
+
+	// `NO_TIMESTAMP_COMPARISON` can be used to skip the comparison
+	if(expected->ts != NO_TIMESTAMP_COMPARISON && curr->ts != expected->ts) {
+		snprintf(error,
+		         SCAP_LASTERR_SIZE,
+		         "Event timestamp mismatch. Current (%ld) != expected (%ld)",
+		         curr->ts,
+		         expected->ts);
+		return false;
+	}
+
+	if(curr->tid != expected->tid) {
+		snprintf(error,
+		         SCAP_LASTERR_SIZE,
+		         "Event tid mismatch. Current (%ld) != expected (%ld)",
+		         curr->tid,
+		         expected->tid);
+		return false;
+	}
+
+	if(curr->type != expected->type) {
+		snprintf(error,
+		         SCAP_LASTERR_SIZE,
+		         "Event type mismatch. Current (%d) != expected (%d)",
+		         curr->type,
+		         expected->type);
+		return false;
+	}
+
+	if(curr->nparams != expected->nparams) {
+		snprintf(error,
+		         SCAP_LASTERR_SIZE,
+		         "Event nparams mismatch. Current (%d) != expected (%d)",
+		         curr->nparams,
+		         expected->nparams);
+		return false;
+	}
+
+	if(curr->len != expected->len) {
+		snprintf(error,
+		         SCAP_LASTERR_SIZE,
+		         "Event len mismatch. Current (%d) != expected (%d)",
+		         curr->len,
+		         expected->len);
+		return false;
+	}
+
+	//////////////////////////////
+	// Comparing the length of the parameters
+	//////////////////////////////
+
+	for(int i = 0; i < curr->nparams; i++) {
+		uint16_t curr_param_len = 0;
+		uint16_t expected_param_len = 0;
+
+		memcpy(&curr_param_len,
+		       (char *)curr + sizeof(struct ppm_evt_hdr) + sizeof(uint16_t) * i,
+		       sizeof(uint16_t));
+		memcpy(&expected_param_len,
+		       (char *)expected + sizeof(struct ppm_evt_hdr) + sizeof(uint16_t) * i,
+		       sizeof(uint16_t));
+
+		if(curr_param_len != expected_param_len) {
+			snprintf(error,
+			         SCAP_LASTERR_SIZE,
+			         "Param %d length mismatch. Current (%d) != expected (%d)",
+			         i,
+			         curr_param_len,
+			         expected_param_len);
+			return false;
+		}
+	}
+
+	//////////////////////////////
+	// Comparing each parameter
+	//////////////////////////////
+
+	char *curr_pos = (char *)curr + sizeof(struct ppm_evt_hdr) + sizeof(uint16_t) * curr->nparams;
+	char *expected_pos =
+	        (char *)expected + sizeof(struct ppm_evt_hdr) + sizeof(uint16_t) * curr->nparams;
+	for(int i = 0; i < curr->nparams; i++) {
+		uint16_t curr_param_len = 0;
+		memcpy(&curr_param_len,
+		       (char *)curr + sizeof(struct ppm_evt_hdr) + sizeof(uint16_t) * i,
+		       sizeof(uint16_t));
+
+		// todo!: we can improve this by printing the parameter for the specific type.
+		if(memcmp(curr_pos, expected_pos, curr_param_len) != 0) {
+			snprintf(error, SCAP_LASTERR_SIZE, "Param %d mismatch. Current != expected", i);
+			return false;
+		}
+		curr_pos += curr_param_len;
+		expected_pos += curr_param_len;
+	}
+
+	return true;
+}
+
+static void change_param_len_from_s64_to_s32(scap_evt *e, uint8_t param_idx) {
+	uint16_t off_len = sizeof(scap_evt);
+	uint16_t tot_len = 0;
+
+	for(int i = 0; i < param_idx; i++) {
+		uint16_t len = 0;
+		memcpy(&len, &e[off_len], sizeof(uint16_t));
+		off_len += sizeof(uint16_t);
+		tot_len += len;
+	}
+
+	// 16 bits are enough, see MAX_EVENT_SIZE
+	uint16_t param_offset = sizeof(scap_evt) + sizeof(uint16_t) * e->nparams + tot_len;
+
+	int64_t old_param = 0;
+	memcpy(&old_param, &e[param_offset], sizeof(int64_t));
+
+	int32_t new_param = (int32_t)old_param;
+	memcpy(&e[param_offset], &new_param, sizeof(int32_t));
+
+	memmove(&e[param_offset + sizeof(int32_t)],
+	        &e[param_offset + sizeof(int64_t)],
+	        e->len - (param_offset + sizeof(int64_t)));
+
+	// Store the new param len
+	static uint16_t new_len = 4;
+	memcpy(&e[off_len], &new_len, sizeof(uint16_t));
+
+	// Store the new event len
+	e->len -= sizeof(int32_t);
+}
+
+// Debugging Macros
+#define CONVERSION_DEBUGGING 1
+
+#if CONVERSION_DEBUGGING
+#define DBG_PRINT(...) printf("-- DBG: " __VA_ARGS__)
+#else
+#define DBG_PRINT(...)
+#endif
+
+conversion_result scap_convert_event(scap_evt *new_evt, scap_evt *evt_to_convert, char *error) {
+	switch(evt_to_convert->type) {
+	// todo!: maybe we could store the event and use it in the exit to handle the old TOCTOU fix but
+	// it seems a little bit an overkill for scap-files. At the moment we skip it
+	case PPME_SYSCALL_OPEN_E:
+		return CONVERSION_SKIP;
+
+	case PPME_SYSCALL_OPEN_X:
+
+		// Known event versions
+		// todo!: this could be come an helper function or a macro, since we need it for all events.
+		if((evt_to_convert->nparams != 4) && (evt_to_convert->nparams != 6)) {
+			snprintf(error,
+			         SCAP_LASTERR_SIZE,
+			         "Unknown number of parametes '%d' for event '%s_%c(num: %d)'.",
+			         evt_to_convert->nparams,
+			         get_event_name(evt_to_convert->type),
+			         get_direction_char(evt_to_convert->type),
+			         evt_to_convert->type);
+			return CONVERSION_ERROR;
+		}
+
+		if(evt_to_convert->nparams == 4) {
+			// - Num params: 4
+			// - param(0): fd, param(1): name, param(2): flags, param(3): mode
+			// We want to convert it to the new event with 6 parameters.
+
+			// todo!: we need to create some helpers methods
+
+			// We keep the header and the first 4 parameters: fd, name, flags, mode.
+			int offset = sizeof(scap_evt) + sizeof(uint16_t) * 4;
+			memcpy(new_evt, evt_to_convert, offset);
+
+			// But we need to add 2 new parameters
+			const struct ppm_event_info *event_info = &(g_event_info[evt_to_convert->type]);
+
+			// Add the last 2 parameters len
+			uint16_t len = scap_get_size_bytes_from_type(event_info->params[4].type);
+			DBG_PRINT("push len (%d) for param (%d, type: %d) at offest (%d)\n",
+			          len,
+			          4,
+			          event_info->params[4].type,
+			          offset);
+			memcpy(&new_evt[offset], &len, sizeof(uint16_t));
+			DBG_PRINT("pushed: %d\n", *((uint16_t *)&new_evt[offset]));
+			offset += sizeof(uint16_t);
+
+			len = scap_get_size_bytes_from_type(event_info->params[5].type);
+			DBG_PRINT("push len (%d) for param (%d, type: %d) at offest (%d)\n",
+			          len,
+			          5,
+			          event_info->params[5].type,
+			          offset);
+			memcpy(&new_evt[offset], &len, sizeof(uint16_t));
+			offset += sizeof(uint16_t);
+
+			// Copy the rest of the event to convert.
+			memcpy(&new_evt[offset],
+			       evt_to_convert + sizeof(scap_evt) + sizeof(uint16_t) * 4,
+			       evt_to_convert->len - (sizeof(scap_evt) + sizeof(uint16_t) * 4));
+			DBG_PRINT("copy the rest of the event (len: %d) at offest (%d)\n",
+			          evt_to_convert->len - (sizeof(scap_evt) + sizeof(uint16_t) * 4),
+			          offset);
+			offset += (evt_to_convert->len - (sizeof(scap_evt) + sizeof(uint16_t) * 4));
+
+			// Add the last 2 parameters
+			char *value = scap_get_default_value_from_type(event_info->params[4].type);
+			DBG_PRINT("push param (%d, type: %d) at offest (%d)\n",
+			          4,
+			          event_info->params[4].type,
+			          offset);
+			memcpy(&new_evt[offset],
+			       value,
+			       scap_get_size_bytes_from_type(event_info->params[4].type));
+			offset += scap_get_size_bytes_from_type(event_info->params[4].type);
+
+			value = scap_get_default_value_from_type(event_info->params[5].type);
+			DBG_PRINT("push param (%d, type: %d) at offest (%d)\n",
+			          5,
+			          event_info->params[5].type,
+			          offset);
+			memcpy(&new_evt[offset],
+			       value,
+			       scap_get_size_bytes_from_type(event_info->params[5].type));
+			offset += scap_get_size_bytes_from_type(event_info->params[5].type);
+
+			// Adjust the number of parameters
+			new_evt->nparams = 6;
+
+			// We need to adapt the new event len
+			new_evt->len = offset;
+
+			return CONVERSION_CONTINUE;
+		}
+
+		if(evt_to_convert->nparams == 6) {
+			// - Num params: 6
+			// - param(0): fd, param(1): name, param(2): flags, param(3): mode, param(4): dev,
+			// param(5): ino
+
+			// Copy the old event in the new one
+			memcpy(new_evt, evt_to_convert, evt_to_convert->len);
+
+			// Change the dimension of a parameter
+			change_param_len_from_s64_to_s32(new_evt, 0);
+
+			// Change the event type
+			new_evt->type = PPME_SYSCALL_OPEN;
+			return CONVERSION_COMPLETED;
+		}
+		// This should never happen
+		snprintf(error, SCAP_LASTERR_SIZE, "Reached unkown state for event '%d'.", new_evt->type);
+		return CONVERSION_ERROR;
+
+	default:
+		// For all the event we still need to support
+		memcpy(new_evt, evt_to_convert, evt_to_convert->len);
+		return CONVERSION_COMPLETED;
+		break;
+	}
+
+	snprintf(error,
+	         SCAP_LASTERR_SIZE,
+	         "Reached unkown state for event '%d'.",
+	         evt_to_convert->type);
+	return CONVERSION_ERROR;
 }

@@ -5,3 +5,5 @@ For each scap-file in this folder, we have a dedicated folder (called as the sca
 
 - the test file `.cpp`
 - a `README.md` file with the description of tests and a pstree-like output.
+
+todo!: we should move these tests at scap_level
