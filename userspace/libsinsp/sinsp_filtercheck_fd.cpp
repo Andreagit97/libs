@@ -386,7 +386,7 @@ bool sinsp_filter_check_fd::extract_fdname_from_event(sinsp_evt *evt,
 	const char *resolved_argstr = NULL;
 
 	switch(etype) {
-	case PPME_SYSCALL_OPEN_X:
+	case PPME_SYSCALL_OPEN:
 	case PPME_SOCKET_ACCEPT_X:
 	case PPME_SOCKET_ACCEPT_5_X:
 	case PPME_SOCKET_ACCEPT4_X:
@@ -470,8 +470,19 @@ bool sinsp_filter_check_fd::extract_fdname_from_event(sinsp_evt *evt,
 }
 
 uint8_t *sinsp_filter_check_fd::extract_typechar_from_event(sinsp_evt *evt) {
+	switch(evt->get_type()) {
+	case PPME_SYSCALL_OPEN:
+		m_tcstr[0] = CHAR_FD_FILE;
+		m_tcstr[1] = 0;
+		return m_tcstr;
+
+	default:
+		// at the moment we fallback to the following switch
+		break;
+	}
+
+	// todo!: remove this at the end
 	switch(PPME_MAKE_ENTER(evt->get_type())) {
-	case PPME_SYSCALL_OPEN_E:
 	case PPME_SYSCALL_OPENAT_E:
 	case PPME_SYSCALL_OPENAT_2_E:
 	case PPME_SYSCALL_OPENAT2_E:

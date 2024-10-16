@@ -53,7 +53,7 @@ int BPF_PROG(open_x, struct pt_regs *regs, long ret) {
 		return 0;
 	}
 
-	auxmap__preload_event_header(auxmap, PPME_SYSCALL_OPEN_X);
+	auxmap__preload_event_header(auxmap, PPME_SYSCALL_OPEN);
 
 	/*=============================== COLLECT PARAMETERS  ===========================*/
 
@@ -65,8 +65,8 @@ int BPF_PROG(open_x, struct pt_regs *regs, long ret) {
 		extract__dev_ino_overlay_from_fd(ret, &dev, &ino, &ol);
 	}
 
-	/* Parameter 1: ret (type: PT_FD) */
-	auxmap__store_s64_param(auxmap, ret);
+	/* Parameter 1: fd (type: PT_FD32) */
+	auxmap__store_s32_param(auxmap, ret);
 
 	/* Parameter 2: name (type: PT_FSPATH) */
 	unsigned long name_pointer = extract__syscall_argument(regs, 0);

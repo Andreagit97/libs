@@ -19,6 +19,7 @@ limitations under the License.
 
 #include <stdint.h>
 #include <stddef.h>
+#include <libscap/scap.h>
 #include <libscap/scap_const.h>
 #include <libscap/scap_limits.h>
 #include <libscap/engine/savefile/scap_reader.h>
@@ -110,4 +111,6 @@ struct savefile_engine {
 	size_t m_reader_evt_buf_size;
 	uint32_t m_last_evt_dump_flags;
 	struct scap_platform* m_platform;
+	scap_evt* m_new_evt;
+	scap_evt* m_to_convert_evt;
 };
