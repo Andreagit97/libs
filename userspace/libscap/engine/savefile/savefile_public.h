@@ -16,6 +16,13 @@ limitations under the License.
 
 #include <stdint.h>
 #include <libscap/scap_procs.h>
+// At the moment we expose it for testing purposes. There are other alternatives:
+// 1. We could create a custom small library for conversion but this would depend on scap or we need
+// to manually duplicate some methods
+// 2. We could put the conversion logic directly inside scap but it is used only by the savefile
+// engine.
+// 3. We could move the conversion logic directly in libsinsp.
+#include <libscap/engine/savefile/converter/event_converter.h>
 
 #define SAVEFILE_ENGINE "savefile"
 

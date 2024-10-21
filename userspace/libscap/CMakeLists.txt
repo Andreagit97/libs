@@ -93,6 +93,7 @@ target_link_libraries(scap PRIVATE scap_error "${ZLIB_LIB}")
 add_library(
 	scap_event_schema STATIC
 	scap_event.c
+	scap_print_event.c
 	ppm_sc_names.c
 	${LIBS_DIR}/driver/dynamic_params_table.c
 	${LIBS_DIR}/driver/event_table.c
