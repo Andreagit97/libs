@@ -98,17 +98,14 @@ protected:
 	}
 
 	void inject_open_event() {
-		sinsp_evt *evt = add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 0);
-		evt = add_event_advance_ts(increasing_ts(),
-		                           1,
-		                           PPME_SYSCALL_OPEN_X,
-		                           6,
-		                           fd,
-		                           path,
-		                           open_flags,
-		                           mode,
-		                           dev,
-		                           ino);
+		sinsp_evt *evt = generate_open_event(sinsp_test_input::open_params{
+		        .fd = (int32_t)fd,
+		        .path = path,
+		        .flags = (uint32_t)open_flags,
+		        .mode = mode,
+		        .dev = dev,
+		        .ino = ino,
+		});
 		ASSERT_STREQ(get_field_as_string(evt, "fd.name").c_str(), path);
 	}
 
@@ -178,7 +175,7 @@ protected:
 		switch(event_type) {
 		case PPME_SYSCALL_OPENAT_2_X:  // involves dirfd resolution
 		case PPME_SYSCALL_OPENAT2_X:   // involves dirfd resolution
-		case PPME_SYSCALL_OPEN_X:
+		case PPME_SYSCALL_OPEN:
 		case PPME_SYSCALL_OPEN_BY_HANDLE_AT_X: {
 			verify_fd_name_same_fs_path_name(evt);
 		} break;
@@ -352,21 +349,6 @@ TEST_F(fspath, unlinkat_2) {
 	               rel_name,
 	               flags);
 	test_failed_exit(PPME_SYSCALL_UNLINKAT_2_X, 4, failed_res, evt_dirfd, name, flags);
-}
-
-TEST_F(fspath, open) {
-	test_enter(PPME_SYSCALL_OPEN_E, 3, name, open_flags, mode);
-	test_exit_path(resolved_name,
-	               name,
-	               PPME_SYSCALL_OPEN_X,
-	               6,
-	               fd,
-	               name,
-	               open_flags,
-	               mode,
-	               dev,
-	               ino);
-	test_failed_exit(PPME_SYSCALL_OPEN_X, 6, failed_res, "<NA>", open_flags, mode, dev, ino);
 }
 
 TEST_F(fspath, openat) {

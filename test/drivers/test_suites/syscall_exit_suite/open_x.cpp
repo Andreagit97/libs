@@ -57,7 +57,7 @@ TEST(SyscallExit, openX_success) {
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: ret (type: PT_FD)*/
-	evt_test->assert_numeric_param(1, (int64_t)fd);
+	evt_test->assert_numeric_param(1, (int32_t)fd);
 
 	/* Parameter 2: name (type: PT_FSPATH) */
 	evt_test->assert_charbuf_param(2, pathname);
@@ -118,7 +118,7 @@ TEST(SyscallExit, openX_failure) {
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: ret (type: PT_FD)*/
-	evt_test->assert_numeric_param(1, (int64_t)errno_value);
+	evt_test->assert_numeric_param(1, (int32_t)errno_value);
 
 	/* Parameter 2: name (type: PT_FSPATH) */
 	evt_test->assert_charbuf_param(2, pathname);
@@ -176,7 +176,7 @@ TEST(SyscallExit, openX_create_success) {
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: ret (type: PT_FD)*/
-	evt_test->assert_numeric_param(1, (int64_t)fd);
+	evt_test->assert_numeric_param(1, (int32_t)fd);
 
 	/* Parameter 2: name (type: PT_FSPATH) */
 	evt_test->assert_charbuf_param(2, pathname);

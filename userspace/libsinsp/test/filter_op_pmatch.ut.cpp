@@ -26,17 +26,8 @@ TEST_F(sinsp_with_test_input, pmatch) {
 
 	open_inspector();
 
-	int64_t fd = 1;
-	sinsp_evt* evt = add_event_advance_ts(increasing_ts(),
-	                                      3,
-	                                      PPME_SYSCALL_OPEN_X,
-	                                      6,
-	                                      fd,
-	                                      "/opt/dir/subdir/file.txt",
-	                                      0,
-	                                      0,
-	                                      0,
-	                                      (uint64_t)0);
+	auto evt =
+	        generate_open_event(sinsp_test_input::open_params{.path = "/opt/dir/subdir/file.txt"});
 
 	EXPECT_TRUE(eval_filter(evt, "fd.name pmatch (/opt/dir)"));
 	EXPECT_TRUE(eval_filter(evt, "fd.name pmatch (/opt/dir/subdir)"));

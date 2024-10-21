@@ -26,18 +26,9 @@ TEST_F(sinsp_with_test_input, contains_icontains) {
 
 	open_inspector();
 
-	int64_t fd = 1;
-	sinsp_evt* evt = add_event_advance_ts(increasing_ts(),
-	                                      3,
-	                                      PPME_SYSCALL_OPEN_X,
-	                                      6,
-	                                      fd,
-	                                      "/opt/dir/SUBDIR/file.txt",
-	                                      PPM_O_RDWR | PPM_O_CREAT,
-	                                      0,
-	                                      0,
-	                                      (uint64_t)0);
-
+	auto evt =
+	        generate_open_event(sinsp_test_input::open_params{.path = "/opt/dir/SUBDIR/file.txt",
+	                                                          .flags = PPM_O_RDWR | PPM_O_CREAT});
 	EXPECT_TRUE(eval_filter(evt, "evt.arg.flags contains O_CREAT"));
 	EXPECT_FALSE(eval_filter(evt, "evt.arg.flags contains O_TMPFILE"));
 	EXPECT_TRUE(eval_filter(evt, "evt.arg.flags icontains O_CREAT"));

@@ -170,26 +170,9 @@ TEST_F(sinsp_with_test_input, plugin_syscall_extract) {
 	open_inspector();
 
 	// should extract legit values for non-ignored event codes
-	add_event_advance_ts(increasing_ts(),
-	                     1,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
-	auto evt = add_event_advance_ts(increasing_ts(),
-	                                1,
-	                                PPME_SYSCALL_OPEN_X,
-	                                (uint64_t)6,
-	                                (uint64_t)3,
-	                                "/tmp/the_file",
-	                                PPM_O_RDWR,
-	                                0,
-	                                5,
-	                                (uint64_t)123);
-	ASSERT_EQ(evt->get_source_idx(), syscall_source_idx);
+	auto evt = generate_open_event();
 	ASSERT_EQ(std::string(evt->get_source_name()), syscall_source_name);
-	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_OPEN_X);
+	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_OPEN);
 	ASSERT_EQ(get_field_as_string(evt, "sample.is_open", pl_flist), "1");
 	ASSERT_EQ(get_field_as_string(evt, "sample.proc_name", pl_flist), "init");
 	ASSERT_FALSE(field_has_value(evt, "sample.open_count", pl_flist));
@@ -320,7 +303,7 @@ TEST_F(sinsp_with_test_input, plugin_syscall_source) {
 
 	auto evt = next_event();
 	ASSERT_NE(evt, nullptr);
-	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_OPEN_X);
+	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_OPEN);
 	ASSERT_EQ(evt->get_source_idx(), syscall_source_idx);
 	ASSERT_EQ(evt->get_tid(), (uint64_t)1);
 	ASSERT_EQ(std::string(evt->get_source_name()), syscall_source_name);
@@ -396,7 +379,7 @@ TEST(sinsp_plugin, plugin_extract_compatibility) {
 	/* The plugin doesn't declare a list of event types and for this reason, it can extract only
 	 * from pluginevent_e */
 	ASSERT_TRUE(p->extract_event_codes().contains(PPME_PLUGINEVENT_E));
-	ASSERT_FALSE(p->extract_event_codes().contains(PPME_SYSCALL_OPEN_E));
+	ASSERT_FALSE(p->extract_event_codes().contains(PPME_SYSCALL_OPEN));
 
 	// compatible event sources specified, event types specified (config-altered)
 	api.get_name = []() { return "p1-2"; };
@@ -410,12 +393,12 @@ TEST(sinsp_plugin, plugin_extract_compatibility) {
 	ASSERT_EQ(p->extract_event_codes().size(), 2);
 	ASSERT_TRUE(p->extract_event_codes().contains(PPME_PLUGINEVENT_E));
 	ASSERT_TRUE(p->extract_event_codes().contains(PPME_ASYNCEVENT_E));
-	ASSERT_FALSE(p->extract_event_codes().contains(PPME_SYSCALL_OPEN_E));
+	ASSERT_FALSE(p->extract_event_codes().contains(PPME_SYSCALL_OPEN));
 
 	// compatible event sources specified, event types specified
 	api.get_name = []() { return "p2"; };
 	api.get_extract_event_types = [](uint32_t* n, ss_plugin_t* s) {
-		static uint16_t ret[] = {PPME_SYSCALL_OPEN_E};
+		static uint16_t ret[] = {PPME_SYSCALL_OPEN};
 		*n = sizeof(ret) / sizeof(uint16_t);
 		return &ret[0];
 	};
@@ -427,7 +410,7 @@ TEST(sinsp_plugin, plugin_extract_compatibility) {
 	                                                sinsp_syscall_event_source_name));
 	ASSERT_EQ(p->extract_event_codes().size(), 1);
 	ASSERT_FALSE(p->extract_event_codes().contains(PPME_PLUGINEVENT_E));
-	ASSERT_TRUE(p->extract_event_codes().contains(PPME_SYSCALL_OPEN_E));
+	ASSERT_TRUE(p->extract_event_codes().contains(PPME_SYSCALL_OPEN));
 
 	// compatible event sources not specified, event types not specified
 	api.get_name = []() { return "p3"; };
@@ -440,7 +423,7 @@ TEST(sinsp_plugin, plugin_extract_compatibility) {
 	ASSERT_TRUE(sinsp_plugin::is_source_compatible(p->extract_event_sources(),
 	                                               sinsp_syscall_event_source_name));
 	ASSERT_TRUE(p->extract_event_codes().contains(PPME_PLUGINEVENT_E));
-	ASSERT_TRUE(p->extract_event_codes().contains(PPME_SYSCALL_OPEN_E));
+	ASSERT_TRUE(p->extract_event_codes().contains(PPME_SYSCALL_OPEN));
 
 	// compatible event sources not specified, event types not specified,
 	// event sourcing capability is detected with specific event source
@@ -460,7 +443,7 @@ TEST(sinsp_plugin, plugin_extract_compatibility) {
 	                                                sinsp_syscall_event_source_name));
 	ASSERT_EQ(p->extract_event_codes().size(), 1);
 	ASSERT_TRUE(p->extract_event_codes().contains(PPME_PLUGINEVENT_E));
-	ASSERT_FALSE(p->extract_event_codes().contains(PPME_SYSCALL_OPEN_E));
+	ASSERT_FALSE(p->extract_event_codes().contains(PPME_SYSCALL_OPEN));
 }
 
 // scenario: a plugin with event parsing capability and one with field
@@ -482,28 +465,9 @@ TEST_F(sinsp_with_test_input, plugin_syscall_parse) {
 	open_inspector();
 
 	// should extract and parse regularly for non-ignored event codes
-	auto evt = add_event_advance_ts(increasing_ts(),
-	                                1,
-	                                PPME_SYSCALL_OPEN_E,
-	                                3,
-	                                "/tmp/the_file",
-	                                PPM_O_RDWR,
-	                                0);
-	ASSERT_EQ(get_field_as_string(evt, "sample.open_count", pl_flist), "1");
-	ASSERT_EQ(get_field_as_string(evt, "sample.evt_count", pl_flist), "1");
-	ASSERT_EQ(get_field_as_string(evt, "sample.tick", pl_flist), "false");
 
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           (uint64_t)3,
-	                           "/tmp/the_file",
-	                           PPM_O_RDWR,
-	                           0,
-	                           5,
-	                           (uint64_t)123);
-	ASSERT_EQ(get_field_as_string(evt, "sample.open_count", pl_flist), "2");
+	auto evt = generate_open_event();
+	ASSERT_EQ(get_field_as_string(evt, "sample.open_count", pl_flist), "1");
 	ASSERT_EQ(get_field_as_string(evt, "sample.evt_count", pl_flist), "1");
 	ASSERT_EQ(get_field_as_string(evt, "sample.tick", pl_flist), "false");
 
@@ -513,7 +477,7 @@ TEST_F(sinsp_with_test_input, plugin_syscall_parse) {
 	                           2,
 	                           (int64_t)12,
 	                           (uint16_t)32);
-	ASSERT_EQ(get_field_as_string(evt, "sample.open_count", pl_flist), "2");
+	ASSERT_EQ(get_field_as_string(evt, "sample.open_count", pl_flist), "1");
 	// the parsing plugin filters-out this kind of event, so there should be no counter for it
 	ASSERT_EQ(get_field_as_string(evt, "sample.evt_count", pl_flist), "0");
 	ASSERT_EQ(get_field_as_string(evt, "sample.tick", pl_flist), "false");
@@ -538,21 +502,12 @@ TEST_F(sinsp_with_test_input, plugin_syscall_parse) {
 	                           2,
 	                           (int64_t)12,
 	                           (uint16_t)32);
-	ASSERT_EQ(get_field_as_string(evt, "sample.open_count", pl_flist), "3");
+	ASSERT_EQ(get_field_as_string(evt, "sample.open_count", pl_flist), "2");
 	ASSERT_EQ(get_field_as_string(evt, "sample.evt_count", pl_flist), "0");
 	ASSERT_EQ(get_field_as_string(evt, "sample.tick", pl_flist), "false");
 
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           (uint64_t)4,
-	                           "/tmp/the_file",
-	                           PPM_O_RDWR,
-	                           0,
-	                           5,
-	                           (uint64_t)123);
-	ASSERT_EQ(get_field_as_string(evt, "sample.open_count", pl_flist), "4");
+	evt = generate_open_event();
+	ASSERT_EQ(get_field_as_string(evt, "sample.open_count", pl_flist), "3");
 	// this is the second time we see this event type
 	ASSERT_EQ(get_field_as_string(evt, "sample.evt_count", pl_flist), "2");
 	ASSERT_EQ(get_field_as_string(evt, "sample.tick", pl_flist), "false");
@@ -826,13 +781,9 @@ TEST_F(sinsp_with_test_input, plugin_subtables) {
 	open_inspector();
 
 	// step #0: the plugin should populate the fdtable
-	add_event_advance_ts(increasing_ts(),
-	                     0,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
+	// Generate by a thread with tid = 0
+	generate_open_event(sinsp_test_input::open_params{}, 0);
+
 	ASSERT_EQ(subtable->entries_count(), num_entries_from_plugin);
 
 	auto itt = [&](libsinsp::state::table_entry& e) -> bool {
@@ -847,23 +798,13 @@ TEST_F(sinsp_with_test_input, plugin_subtables) {
 	ASSERT_TRUE(subtable->foreach_entry(itt));
 
 	// step #1: the plugin should remove one entry from the fdtable
-	add_event_advance_ts(increasing_ts(),
-	                     0,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
+	generate_open_event(sinsp_test_input::open_params{}, 0);
+
 	ASSERT_EQ(subtable->entries_count(), num_entries_from_plugin - 1);
 
 	// step #2: the plugin should cleae the fdtable
-	add_event_advance_ts(increasing_ts(),
-	                     0,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
+	generate_open_event(sinsp_test_input::open_params{}, 0);
+
 	ASSERT_EQ(subtable->entries_count(), 0);
 }
 
@@ -921,13 +862,9 @@ TEST_F(sinsp_with_test_input, plugin_subtables_array) {
 	open_inspector();
 
 	// step #0: the plugin should populate the fdtable
-	add_event_advance_ts(increasing_ts(),
-	                     0,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
+	// Generate by a thread with tid = 0
+	generate_open_event(sinsp_test_input::open_params{}, 0);
+
 	ASSERT_EQ(subtable->entries_count(), num_entries_from_plugin);
 
 	auto itt = [&](libsinsp::state::table_entry& e) -> bool {
@@ -939,23 +876,13 @@ TEST_F(sinsp_with_test_input, plugin_subtables_array) {
 	ASSERT_TRUE(subtable->foreach_entry(itt));
 
 	// step #1: the plugin should remove one entry from the fdtable
-	add_event_advance_ts(increasing_ts(),
-	                     0,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
+	generate_open_event(sinsp_test_input::open_params{}, 0);
+
 	ASSERT_EQ(subtable->entries_count(), num_entries_from_plugin - 1);
 
 	// step #2: the plugin should cleae the fdtable
-	add_event_advance_ts(increasing_ts(),
-	                     0,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
+	generate_open_event(sinsp_test_input::open_params{}, 0);
+
 	ASSERT_EQ(subtable->entries_count(), 0);
 }
 
@@ -1035,13 +962,7 @@ TEST_F(sinsp_with_test_input, plugin_metrics) {
 
 	int events = 256;
 	for(int i = 0; i < events; i++) {
-		add_event_advance_ts(increasing_ts(),
-		                     0,
-		                     PPME_SYSCALL_OPEN_E,
-		                     3,
-		                     "/tmp/the_file",
-		                     PPM_O_RDWR,
-		                     0);
+		generate_open_event();
 	}
 
 	libs_metrics_collector.snapshot();
@@ -1071,46 +992,26 @@ TEST_F(sinsp_with_test_input, plugin_routines) {
 	ASSERT_EQ(routines_num, 1);
 
 	// step #1: the plugin subscribes another routine
-	add_event_advance_ts(increasing_ts(),
-	                     0,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
+	generate_open_event();
+
 	routines_num = tp->routines_num();
 	ASSERT_EQ(routines_num, 2);
 
 	// step #2: the plugin unsubscribes the previous routine
-	add_event_advance_ts(increasing_ts(),
-	                     0,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
+	generate_open_event();
+
 	routines_num = tp->routines_num();
 	ASSERT_EQ(routines_num, 1);
 
 	// step #3: the plugin subscribes another routine
-	add_event_advance_ts(increasing_ts(),
-	                     0,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
+	generate_open_event();
+
 	routines_num = tp->routines_num();
 	ASSERT_EQ(routines_num, 2);
 
 	// step #4: the plugin sets a flag that causes the previous routine to be unsubscibed
-	add_event_advance_ts(increasing_ts(),
-	                     0,
-	                     PPME_SYSCALL_OPEN_E,
-	                     3,
-	                     "/tmp/the_file",
-	                     PPM_O_RDWR,
-	                     0);
+	generate_open_event();
+
 	std::this_thread::sleep_for(
 	        std::chrono::milliseconds(100));  // wait for a bit to let routine finish
 	routines_num = tp->routines_num();

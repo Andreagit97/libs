@@ -262,21 +262,9 @@ TEST_F(sinsp_with_test_input, basename_transformer) {
 	add_default_init_thread();
 	open_inspector();
 
-	sinsp_evt *evt;
-
-	int64_t dirfd = 3;
-	const char *file_to_run = "/tmp/file_to_run";
-	add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 3, file_to_run, 0, 0);
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           dirfd,
-	                           file_to_run,
-	                           0,
-	                           0,
-	                           0,
-	                           (uint64_t)0);
+	auto evt = generate_open_event(sinsp_test_input::open_params{
+	        .path = "/tmp/file_to_run",
+	});
 
 	EXPECT_TRUE(eval_filter(evt, "basename(fd.name) = file_to_run"));
 	EXPECT_FALSE(eval_filter(evt, "basename(fd.name) = /tmp/file_to_run"));

@@ -120,17 +120,8 @@ TEST_F(sinsp_with_test_input, event_sources) {
 	ASSERT_NO_THROW(register_plugin_api(&m_inspector, mock_api));
 
 	// regular events have the "syscall" event source
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           (uint64_t)3,
-	                           "/tmp/the_file",
-	                           PPM_O_RDWR,
-	                           0,
-	                           5,
-	                           (uint64_t)123);
-	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_OPEN_X);
+	evt = generate_open_event();
+	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_OPEN);
 	ASSERT_EQ(evt->get_source_idx(), syscall_source_idx);
 	ASSERT_EQ(std::string(evt->get_source_name()), syscall_source_name);
 	ASSERT_EQ(get_field_as_string(evt, "evt.source"), syscall_source_name);

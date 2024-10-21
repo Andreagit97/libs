@@ -71,6 +71,7 @@ TEST_F(sinsp_with_test_input, event_category) {
 	ASSERT_EQ(get_field_as_string(evt, "evt.num"), "4");
 }
 
+// todo!: move these 2 tests into the 'evt.cpp` file
 TEST_F(sinsp_with_test_input, event_res) {
 	add_default_init_thread();
 
@@ -99,46 +100,12 @@ TEST_F(sinsp_with_test_input, event_res) {
 	EXPECT_EQ(get_field_as_string(evt, "evt.rawres"), "0");
 	EXPECT_EQ(get_field_as_string(evt, "evt.failed"), "false");
 
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_E,
-	                           3,
-	                           "/tmp/the_file.txt",
-	                           0,
-	                           0);
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           (int64_t)123,
-	                           "/tmp/the_file.txt",
-	                           0,
-	                           0,
-	                           0,
-	                           (uint64_t)0);
-
+	evt = generate_open_event(sinsp_test_input::open_params{.fd = 123});
 	EXPECT_EQ(get_field_as_string(evt, "evt.res"), "SUCCESS");
 	EXPECT_EQ(get_field_as_string(evt, "evt.rawres"), "123");
 	EXPECT_EQ(get_field_as_string(evt, "evt.failed"), "false");
 
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_E,
-	                           3,
-	                           "/tmp/the_file.txt",
-	                           0,
-	                           0);
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           (int64_t)-SE_EACCES,
-	                           "/tmp/the_file.txt",
-	                           0,
-	                           0,
-	                           0,
-	                           (uint64_t)0);
-
+	evt = generate_open_event(sinsp_test_input::open_params{.fd = -SE_EACCES});
 	EXPECT_EQ(get_field_as_string(evt, "evt.res"), "EACCES");
 	EXPECT_EQ(get_field_as_string(evt, "evt.rawres"), std::to_string(-SE_EACCES).c_str());
 	EXPECT_EQ(get_field_as_string(evt, "evt.failed"), "true");
@@ -159,22 +126,9 @@ TEST_F(sinsp_with_test_input, event_hostname) {
 	add_default_init_thread();
 
 	open_inspector(SINSP_MODE_LIVE);
-	sinsp_evt *evt = NULL;
 
-	/* Toy event example from a previous test. */
-	int64_t dirfd = 3;
-	const char *file_to_run = "/tmp/file_to_run";
-	add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_E, 3, file_to_run, 0, 0);
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           dirfd,
-	                           file_to_run,
-	                           0,
-	                           0,
-	                           0,
-	                           (uint64_t)0);
+	/* Generate a random event */
+	auto evt = generate_random_event();
 
 	/* Assert correct custom hostname. */
 	ASSERT_EQ(get_field_as_string(evt, "evt.hostname"), hostname);
