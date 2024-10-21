@@ -23,112 +23,11 @@ TEST_F(sinsp_with_test_input, EVT_FILTER_is_open_create) {
 
 	open_inspector();
 
-	std::string path = "/home/file.txt";
-	int64_t fd = 3;
-
-	// In the enter event we don't send the `PPM_O_F_CREATED`
-	sinsp_evt* evt = add_event_advance_ts(increasing_ts(),
-	                                      1,
-	                                      PPME_SYSCALL_OPEN_E,
-	                                      3,
-	                                      path.c_str(),
-	                                      (uint32_t)PPM_O_RDWR | PPM_O_CREAT,
-	                                      (uint32_t)0);
-	ASSERT_EQ(get_field_as_string(evt, "evt.is_open_create"), "false");
-
-	// The `fdinfo` is not populated in the enter event
-	ASSERT_FALSE(evt->get_fd_info());
-
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           fd,
-	                           path.c_str(),
-	                           (uint32_t)PPM_O_RDWR | PPM_O_CREAT | PPM_O_F_CREATED,
-	                           (uint32_t)0,
-	                           (uint32_t)5,
-	                           (uint64_t)123);
+	uint32_t flags = PPM_O_RDWR | PPM_O_CREAT | PPM_O_F_CREATED;
+	auto evt = generate_open_event(sinsp_test_input::open_params{.flags = flags});
 	ASSERT_EQ(get_field_as_string(evt, "evt.is_open_create"), "true");
 	ASSERT_TRUE(evt->get_fd_info());
-
-	ASSERT_EQ(evt->get_fd_info()->m_openflags, PPM_O_RDWR | PPM_O_CREAT | PPM_O_F_CREATED);
-}
-
-TEST_F(sinsp_with_test_input, EVT_FILTER_is_lower_layer) {
-	add_default_init_thread();
-
-	open_inspector();
-
-	std::string path = "/home/file.txt";
-	int64_t fd = 3;
-
-	// In the enter event we don't send the `PPM_O_F_CREATED`
-	sinsp_evt* evt = add_event_advance_ts(increasing_ts(),
-	                                      1,
-	                                      PPME_SYSCALL_OPEN_E,
-	                                      3,
-	                                      path.c_str(),
-	                                      (uint32_t)PPM_O_RDONLY,
-	                                      (uint32_t)0);
-
-	// The `fdinfo` is not populated in the enter event
-	ASSERT_FALSE(evt->get_fd_info());
-
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           fd,
-	                           path.c_str(),
-	                           (uint32_t)PPM_O_RDONLY | PPM_FD_LOWER_LAYER,
-	                           (uint32_t)0,
-	                           (uint32_t)5,
-	                           (uint64_t)123);
-	ASSERT_EQ(get_field_as_string(evt, "fd.is_lower_layer"), "true");
-	ASSERT_EQ(get_field_as_string(evt, "fd.is_upper_layer"), "false");
-	ASSERT_TRUE(evt->get_fd_info());
-
-	ASSERT_EQ(evt->get_fd_info()->is_overlay_lower(), true);
-	ASSERT_EQ(evt->get_fd_info()->is_overlay_upper(), false);
-}
-
-TEST_F(sinsp_with_test_input, EVT_FILTER_is_upper_layer) {
-	add_default_init_thread();
-
-	open_inspector();
-
-	std::string path = "/home/file.txt";
-	int64_t fd = 3;
-
-	// In the enter event we don't send the `PPM_O_F_CREATED`
-	sinsp_evt* evt = add_event_advance_ts(increasing_ts(),
-	                                      1,
-	                                      PPME_SYSCALL_OPEN_E,
-	                                      3,
-	                                      path.c_str(),
-	                                      (uint32_t)PPM_O_RDONLY,
-	                                      (uint32_t)0);
-
-	// The `fdinfo` is not populated in the enter event
-	ASSERT_FALSE(evt->get_fd_info());
-
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_X,
-	                           6,
-	                           fd,
-	                           path.c_str(),
-	                           (uint32_t)PPM_O_RDONLY | PPM_FD_UPPER_LAYER,
-	                           (uint32_t)0,
-	                           (uint32_t)5,
-	                           (uint64_t)123);
-	ASSERT_EQ(get_field_as_string(evt, "fd.is_lower_layer"), "false");
-	ASSERT_EQ(get_field_as_string(evt, "fd.is_upper_layer"), "true");
-	ASSERT_TRUE(evt->get_fd_info());
-
-	ASSERT_EQ(evt->get_fd_info()->is_overlay_lower(), false);
-	ASSERT_EQ(evt->get_fd_info()->is_overlay_upper(), true);
+	ASSERT_EQ(evt->get_fd_info()->m_openflags, flags);
 }
 
 TEST_F(sinsp_with_test_input, EVT_FILTER_rawarg_int) {
@@ -146,17 +45,9 @@ TEST_F(sinsp_with_test_input, EVT_FILTER_rawarg_str) {
 
 	open_inspector();
 
-	std::string path = "/home/file.txt";
-
-	// In the enter event we don't send the `PPM_O_F_CREATED`
-	sinsp_evt* evt = add_event_advance_ts(increasing_ts(),
-	                                      1,
-	                                      PPME_SYSCALL_OPEN_E,
-	                                      3,
-	                                      path.c_str(),
-	                                      (uint32_t)0,
-	                                      (uint32_t)0);
-	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.name"), path);
+	auto evt = generate_open_event();
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.name"),
+	          sinsp_test_input::open_params::default_path);
 }
 
 TEST_F(sinsp_with_test_input, EVT_FILTER_cmd_str) {

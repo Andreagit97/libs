@@ -30,7 +30,7 @@ namespace {
 /**
  * Example of plugin implementing only the event sourcing capability, which:
  * - Does not implement a specific event source, thus can create any syscall event
- * - Sources events of type PPME_SYSCALL_OPEN_X
+ * - Sources events of type PPME_SYSCALL_OPEN
  */
 struct plugin_state {
 	std::string lasterr;
@@ -125,9 +125,9 @@ ss_plugin_rc plugin_next_batch(ss_plugin_t* s,
 	        scap_event_encode_params(scap_sized_buffer{istate->evt, sizeof(istate->evt_buf)},
 	                                 nullptr,
 	                                 error,
-	                                 PPME_SYSCALL_OPEN_X,
+	                                 PPME_SYSCALL_OPEN,
 	                                 6,
-	                                 (uint64_t)3,
+	                                 (int32_t)3,
 	                                 "/tmp/the_file",
 	                                 ((1 << 0) | (1 << 1)),
 	                                 0,
