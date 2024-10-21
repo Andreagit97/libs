@@ -215,6 +215,7 @@ int32_t scap_event_encode_params_v(const struct scap_sized_buffer event_buf,
 		case PT_SIGSET:
 		case PT_MODE:
 		case PT_ENUMFLAGS32:
+		case PT_FD32:
 			u32_arg = va_arg(args, uint32_t);
 			param.buf = &u32_arg;
 			param.size = sizeof(uint32_t);
@@ -355,3 +356,118 @@ int32_t scap_event_encode_params_v(const struct scap_sized_buffer event_buf,
 
 	return SCAP_SUCCESS;
 }
+
+uint8_t scap_get_size_bytes_from_type(enum ppm_param_type t) {
+	switch(t) {
+	case PT_INT8:
+	case PT_UINT8:
+	case PT_FLAGS8:
+	case PT_ENUMFLAGS8:
+		return 1;
+
+	case PT_INT16:
+	case PT_UINT16:
+	case PT_FLAGS16:
+	case PT_ENUMFLAGS16:
+	case PT_SYSCALLID:
+		return 2;
+
+	case PT_INT32:
+	case PT_UINT32:
+	case PT_FLAGS32:
+	case PT_ENUMFLAGS32:
+	case PT_UID:
+	case PT_GID:
+	case PT_MODE:
+	case PT_FD32:
+		return 4;
+
+	case PT_INT64:
+	case PT_UINT64:
+	case PT_RELTIME:
+	case PT_ABSTIME:
+	case PT_ERRNO:
+	case PT_FD:
+	case PT_PID:
+		return 8;
+
+	case PT_BYTEBUF:
+	case PT_CHARBUF:
+	case PT_SOCKADDR:
+	case PT_SOCKTUPLE:
+	case PT_FDLIST:
+	case PT_FSPATH:
+	case PT_CHARBUFARRAY:
+	case PT_CHARBUF_PAIR_ARRAY:
+	case PT_FSRELPATH:
+	case PT_DYN:
+		return 0;
+
+	default:
+		// We forgot to handle something
+		ASSERT(false);
+		break;
+	}
+	return 0;
+}
+
+char *scap_get_default_value_from_type(enum ppm_param_type t) {
+	static uint8_t default_uint8 = 0;
+	static uint16_t default_uint16 = 0;
+	static uint32_t default_uint32 = 0;
+	static uint64_t default_uint64 = 0;
+
+	switch(t) {
+	case PT_INT8:
+	case PT_UINT8:
+	case PT_FLAGS8:
+	case PT_ENUMFLAGS8:
+		return (char *)&default_uint8;
+
+	case PT_INT16:
+	case PT_UINT16:
+	case PT_FLAGS16:
+	case PT_ENUMFLAGS16:
+	case PT_SYSCALLID:
+		return (char *)&default_uint16;
+
+	case PT_INT32:
+	case PT_UINT32:
+	case PT_FLAGS32:
+	case PT_ENUMFLAGS32:
+	case PT_UID:
+	case PT_GID:
+	case PT_MODE:
+	case PT_FD32:
+		return (char *)&default_uint32;
+
+	case PT_INT64:
+	case PT_UINT64:
+	case PT_RELTIME:
+	case PT_ABSTIME:
+	case PT_ERRNO:
+	case PT_FD:
+	case PT_PID:
+		return (char *)&default_uint64;
+
+	// Should be ok to return NULL since the len will be 0
+	case PT_BYTEBUF:
+	case PT_CHARBUF:
+	case PT_SOCKADDR:
+	case PT_SOCKTUPLE:
+	case PT_FDLIST:
+	case PT_FSPATH:
+	case PT_CHARBUFARRAY:
+	case PT_CHARBUF_PAIR_ARRAY:
+	case PT_FSRELPATH:
+	case PT_DYN:
+		return NULL;
+
+	default:
+		// We forgot to handle something
+		ASSERT(false);
+		break;
+	}
+	return 0;
+}
+

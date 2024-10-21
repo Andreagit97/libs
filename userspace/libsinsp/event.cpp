@@ -1675,7 +1675,7 @@ bool sinsp_evt::is_syscall_error() const {
 
 bool sinsp_evt::is_file_open_error() const {
 	return (m_fdinfo == nullptr) &&
-	       ((m_pevt->type == PPME_SYSCALL_OPEN_X) || (m_pevt->type == PPME_SYSCALL_CREAT_X) ||
+	       ((m_pevt->type == PPME_SYSCALL_OPEN) || (m_pevt->type == PPME_SYSCALL_CREAT_X) ||
 	        (m_pevt->type == PPME_SYSCALL_OPENAT_X) || (m_pevt->type == PPME_SYSCALL_OPENAT_2_X) ||
 	        (m_pevt->type == PPME_SYSCALL_OPENAT2_X) ||
 	        (m_pevt->type == PPME_SYSCALL_OPEN_BY_HANDLE_AT_X));

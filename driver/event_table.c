@@ -49,6 +49,7 @@ or GPL2.txt for full copies of the license.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 const struct ppm_event_info g_event_info[] = {
+        // todo!: manage the generic events
         [PPME_GENERIC_E] = {"syscall",
                             EC_OTHER | EC_SYSCALL,
                             EF_NONE,
@@ -58,14 +59,14 @@ const struct ppm_event_info g_event_info[] = {
                 {"syscall", EC_OTHER | EC_SYSCALL, EF_NONE, 1, {{"ID", PT_SYSCALLID, PF_DEC}}},
         [PPME_SYSCALL_OPEN_E] = {"open",
                                  EC_FILE | EC_SYSCALL,
-                                 EF_CREATES_FD | EF_MODIFIES_STATE,
+                                 EF_CREATES_FD | EF_MODIFIES_STATE | EF_OLD_VERSION,
                                  3,
                                  {{"name", PT_FSPATH, PF_NA},
                                   {"flags", PT_FLAGS32, PF_HEX, file_flags},
                                   {"mode", PT_UINT32, PF_OCT}}},
         [PPME_SYSCALL_OPEN_X] = {"open",
                                  EC_FILE | EC_SYSCALL,
-                                 EF_CREATES_FD | EF_MODIFIES_STATE,
+                                 EF_CREATES_FD | EF_MODIFIES_STATE | EF_OLD_VERSION,
                                  6,
                                  {{"fd", PT_FD, PF_DEC},
                                   {"name", PT_FSPATH, PF_NA},
@@ -2397,6 +2398,21 @@ const struct ppm_event_info g_event_info[] = {
                                      {{"res", PT_ERRNO, PF_DEC},
                                       {"rgid", PT_UID, PF_DEC},
                                       {"egid", PT_UID, PF_DEC}}},
+        ////////////////////
+        // New exit events
+        ////////////////////
+        [PPME_SYSCALL_OPEN] = {"open",
+                               EC_FILE | EC_SYSCALL,
+                               EF_CREATES_FD | EF_MODIFIES_STATE,
+                               6,
+                               // todo!: it would be great to rename this field to `res` but it is a
+                               // breaking change for the filterchecks...
+                               {{"fd", PT_FD32, PF_DEC},
+                                {"name", PT_FSPATH, PF_NA},
+                                {"flags", PT_FLAGS32, PF_HEX, file_flags},
+                                {"mode", PT_UINT32, PF_OCT},
+                                {"dev", PT_UINT32, PF_HEX},
+                                {"ino", PT_UINT64, PF_DEC}}},
 };
 #pragma GCC diagnostic pop
 

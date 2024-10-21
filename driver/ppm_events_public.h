@@ -1513,7 +1513,8 @@ typedef enum {
 	PPME_SYSCALL_SETREUID_X = 427,
 	PPME_SYSCALL_SETREGID_E = 428,
 	PPME_SYSCALL_SETREGID_X = 429,
-	PPM_EVENT_MAX = 430
+	PPME_SYSCALL_OPEN = 430,
+	PPM_EVENT_MAX = 431
 } ppm_event_code;
 /*@}*/
 
@@ -2121,7 +2122,8 @@ enum ppm_param_type {
 	                        contiguous values flag. */
 	PT_ENUMFLAGS32 = 46, /* this is an UINT32, but will be interpreted as an enum flag, ie:
 	                        contiguous values flag. */
-	PT_MAX = 47          /* array size */
+	PT_FD32 = 47,        /* An fd, but on 32bit like in the kernel */
+	PT_MAX = 48          /* array size */
 };
 
 enum ppm_print_format {

@@ -7,7 +7,7 @@ This file is dual licensed under either the MIT or GPL 2. See MIT.txt
 or GPL2.txt for full copies of the license.
 
 */
-
+// clang-format off
 #include "ppm_events_public.h"
 
 #if defined(__KERNEL__) && defined(__mips__)
@@ -23,7 +23,7 @@ or GPL2.txt for full copies of the license.
  */
 const struct syscall_evt_pair g_syscall_table[SYSCALL_TABLE_SIZE] = {
 #ifdef __NR_open
-	[__NR_open - SYSCALL_TABLE_ID0] =                       {UF_USED | UF_NEVER_DROP, PPME_SYSCALL_OPEN_E, PPME_SYSCALL_OPEN_X, PPM_SC_OPEN},
+	[__NR_open - SYSCALL_TABLE_ID0] =                       {UF_USED | UF_NEVER_DROP, PPME_SYSCALL_OPEN_E, PPME_SYSCALL_OPEN, PPM_SC_OPEN},
 #endif
 #ifdef __NR_creat
 	[__NR_creat - SYSCALL_TABLE_ID0] =                      {UF_USED | UF_NEVER_DROP, PPME_SYSCALL_CREAT_E, PPME_SYSCALL_CREAT_X, PPM_SC_CREAT},
@@ -1019,3 +1019,4 @@ const struct syscall_evt_pair g_syscall_table[SYSCALL_TABLE_SIZE] = {
 	[__NR_uretprobe - SYSCALL_TABLE_ID0] = {.ppm_sc = PPM_SC_URETPROBE},
 #endif
 };
+// clang-format on

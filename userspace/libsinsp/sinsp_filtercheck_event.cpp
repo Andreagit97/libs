@@ -820,32 +820,66 @@ Json::Value sinsp_filter_check_event::extract_as_js(sinsp_evt* evt, uint32_t* le
 	return Json::nullValue;
 }
 
+// we need to call it only for the exit events and for syscall events
+inline int64_t get_res_value_from_syscall_evt(sinsp_evt* evt) {
+	// todo!: safe checks that we need to remove at the end of the work
+	if(!libsinsp::events::is_syscall_event((ppm_event_code)evt->get_type()) ||
+	   (PPME_IS_ENTER(evt->get_type()) && evt->get_type() < PPME_SYSCALL_OPEN)) {
+		ASSERT(false);
+		return 0;
+	}
+
+	// The return value is always the first parameter
+	const sinsp_evt_param* p = evt->get_param(0);
+	if(p == NULL) {
+		ASSERT(false);
+		return 0;
+	}
+
+	// the only return values should be on 32 or 64 bits
+	switch(scap_get_size_bytes_from_type(p->get_info()->type)) {
+	case 4:
+		return (int64_t)p->as<int32_t>();
+	case 8:
+		return p->as<int64_t>();
+	default:
+		ASSERT(false);
+		return 0;
+	}
+
+	return 0;
+}
+
+// The `len` parameter is need for the macro `RETURN_EXTRACT_VAR`. todo!: we can probably cleanup.
 uint8_t* sinsp_filter_check_event::extract_error_count(sinsp_evt* evt, uint32_t* len) {
+	m_val.u32 = 0;
+	// This is a filtercheck we use only for syscalls so all other events should be considered
+	if(evt->get_type() >= PPME_SYSCALL_OPEN &&
+	   libsinsp::events::is_syscall_event((ppm_event_code)evt->get_type())) {
+		if(get_res_value_from_syscall_evt(evt) < 0) {
+			m_val.u32 = 1;
+		}
+		RETURN_EXTRACT_VAR(m_val.u32);
+	}
+
+	// todo!: Old logic should be deleted at the end of the work
 	const sinsp_evt_param* pi = evt->get_param_by_name("res");
 
 	if(pi != NULL) {
-		int64_t res = pi->as<int64_t>();
-		if(res < 0) {
+		if(pi->as<int64_t>() < 0) {
 			m_val.u32 = 1;
-			RETURN_EXTRACT_VAR(m_val.u32);
-		} else {
-			return NULL;
 		}
-	}
-
-	if((evt->get_info_flags() & EF_CREATES_FD) && PPME_IS_EXIT(evt->get_type())) {
+	} else if((evt->get_info_flags() & EF_CREATES_FD) && PPME_IS_EXIT(evt->get_type())) {
 		pi = evt->get_param_by_name("fd");
 
 		if(pi != NULL) {
-			int64_t res = pi->as<int64_t>();
-			if(res < 0) {
+			if(pi->as<int64_t>() < 0) {
 				m_val.u32 = 1;
-				RETURN_EXTRACT_VAR(m_val.u32);
 			}
 		}
 	}
 
-	return NULL;
+	RETURN_EXTRACT_VAR(m_val.u32);
 }
 
 uint8_t* sinsp_filter_check_event::extract_single(sinsp_evt* evt,
@@ -1287,6 +1321,13 @@ uint8_t* sinsp_filter_check_event::extract_single(sinsp_evt* evt,
 		}
 		break;
 	case TYPE_RESRAW: {
+		if(evt->get_type() >= PPME_SYSCALL_OPEN &&
+		   libsinsp::events::is_syscall_event((ppm_event_code)evt->get_type())) {
+			m_val.s64 = get_res_value_from_syscall_evt(evt);
+			RETURN_EXTRACT_VAR(m_val.s64);
+		}
+
+		// todo!: Old logic should be deleted at the end of the work
 		const sinsp_evt_param* pi = evt->get_param_by_name("res");
 
 		if(pi != NULL) {
@@ -1306,6 +1347,17 @@ uint8_t* sinsp_filter_check_event::extract_single(sinsp_evt* evt,
 		return NULL;
 	} break;
 	case TYPE_RESSTR: {
+		// This is a filtercheck we use only for syscalls so all other events should be considered
+		if(evt->get_type() >= PPME_SYSCALL_OPEN &&
+		   libsinsp::events::is_syscall_event((ppm_event_code)evt->get_type())) {
+			int64_t res = get_res_value_from_syscall_evt(evt);
+			if(res >= 0) {
+				RETURN_EXTRACT_CSTR("SUCCESS");
+			}
+			m_strstorage = sinsp_utils::errno_to_str((int32_t)res);
+			RETURN_EXTRACT_STRING(m_strstorage);
+		}
+		// todo!: Old logic should be deleted at the end of the work
 		const char* resolved_argstr;
 		const char* argstr;
 
@@ -1349,26 +1401,6 @@ uint8_t* sinsp_filter_check_event::extract_single(sinsp_evt* evt,
 		}
 
 		return NULL;
-	} break;
-	case TYPE_FAILED: {
-		m_val.u32 = 0;
-		const sinsp_evt_param* pi = evt->get_param_by_name("res");
-
-		if(pi != NULL) {
-			if(pi->as<int64_t>() < 0) {
-				m_val.u32 = 1;
-			}
-		} else if((evt->get_info_flags() & EF_CREATES_FD) && PPME_IS_EXIT(evt->get_type())) {
-			pi = evt->get_param_by_name("fd");
-
-			if(pi != NULL) {
-				if(pi->as<int64_t>() < 0) {
-					m_val.u32 = 1;
-				}
-			}
-		}
-
-		RETURN_EXTRACT_VAR(m_val.u32);
 	} break;
 	case TYPE_ISIO: {
 		ppm_event_flags eflags = evt->get_info_flags();
@@ -1455,6 +1487,7 @@ uint8_t* sinsp_filter_check_event::extract_single(sinsp_evt* evt,
 	case TYPE_COUNT:
 		m_val.u32 = 1;
 		RETURN_EXTRACT_VAR(m_val.u32);
+	case TYPE_FAILED:
 	case TYPE_COUNT_ERROR:
 		return extract_error_count(evt, len);
 	case TYPE_COUNT_ERROR_FILE: {
@@ -1468,7 +1501,7 @@ uint8_t* sinsp_filter_check_event::extract_single(sinsp_evt* evt,
 		} else {
 			uint16_t etype = evt->get_type();
 
-			if(etype == PPME_SYSCALL_OPEN_X || etype == PPME_SYSCALL_CREAT_X ||
+			if(etype == PPME_SYSCALL_OPEN || etype == PPME_SYSCALL_CREAT_X ||
 			   etype == PPME_SYSCALL_OPENAT_X || etype == PPME_SYSCALL_OPENAT_2_X ||
 			   etype == PPME_SYSCALL_OPENAT2_X || etype == PPME_SYSCALL_OPEN_BY_HANDLE_AT_X) {
 				return extract_error_count(evt, len);
@@ -1518,7 +1551,7 @@ uint8_t* sinsp_filter_check_event::extract_single(sinsp_evt* evt,
 		} else {
 			uint16_t etype = evt->get_type();
 
-			if(!(etype == PPME_SYSCALL_OPEN_X || etype == PPME_SYSCALL_CREAT_X ||
+			if(!(etype == PPME_SYSCALL_OPEN || etype == PPME_SYSCALL_CREAT_X ||
 			     etype == PPME_SYSCALL_OPENAT_X || etype == PPME_SYSCALL_OPENAT_2_X ||
 			     etype == PPME_SYSCALL_OPENAT2_X || etype == PPME_SYSCALL_OPEN_BY_HANDLE_AT_X ||
 			     etype == PPME_SOCKET_ACCEPT_X || etype == PPME_SOCKET_ACCEPT_5_X ||
@@ -1643,7 +1676,7 @@ uint8_t* sinsp_filter_check_event::extract_single(sinsp_evt* evt,
 		// If any of the exec bits is on, we consider this an open+exec
 		uint32_t is_exec_mask = (PPM_S_IXUSR | PPM_S_IXGRP | PPM_S_IXOTH);
 
-		if(etype == PPME_SYSCALL_OPEN_X || etype == PPME_SYSCALL_OPENAT_E ||
+		if(etype == PPME_SYSCALL_OPEN || etype == PPME_SYSCALL_OPENAT_E ||
 		   etype == PPME_SYSCALL_OPENAT_2_X || etype == PPME_SYSCALL_OPENAT2_X ||
 		   etype == PPME_SYSCALL_OPEN_BY_HANDLE_AT_X) {
 			bool is_new_version =
