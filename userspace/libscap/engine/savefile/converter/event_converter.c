@@ -17,6 +17,7 @@ limitations under the License.
 */
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <libscap/scap.h>
 #include <libscap/scap-int.h>
 #include <libscap/engine/savefile/converter/event_converter.h>
@@ -104,130 +105,159 @@ static char get_direction_char(ppm_event_code event_type) {
 	}
 }
 
+static conversion_result validate_nparams(scap_evt *evt, char *error, int num_valid_params, ...) {
+	va_list args;
+	va_start(args, num_valid_params);
+
+	for(int i = 0; i < num_valid_params; ++i) {
+		int valid_param = va_arg(args, int);
+		if(evt->nparams == valid_param) {
+			va_end(args);
+			return CONVERSION_CONTINUE;
+		}
+	}
+
+	va_end(args);
+	snprintf(error,
+	         SCAP_LASTERR_SIZE,
+	         "Unknown number of parameters '%d' for event '%s_%c(num: %d)'.",
+	         evt->nparams,
+	         get_event_name(evt->type),
+	         get_direction_char(evt->type),
+	         evt->type);
+	return CONVERSION_ERROR;
+}
+
+static conversion_result return_error(scap_evt *evt, char *error) {
+	// This should never happen
+	snprintf(error, SCAP_LASTERR_SIZE, "Reached unkown state for event '%d'.", evt->type);
+	return CONVERSION_ERROR;
+}
+
+// returns the `offset` of the new event
+static uint16_t copy_first_n_lengths_and_header(scap_evt *new_evt,
+                                                scap_evt *evt_to_convert,
+                                                uint16_t num_lengths) {
+	PRINT_MESSAGE("Event to convert:\n");
+	PRINT_EVENT(evt_to_convert, PRINT_FULL);
+
+	// We keep the header and the first n lengths.
+	uint16_t offset = sizeof(scap_evt) + sizeof(uint16_t) * num_lengths;
+	memcpy(new_evt, evt_to_convert, offset);
+
+	PRINT_MESSAGE("Copy header and first '%d' lengths. Tmp new event:\n", num_lengths);
+	PRINT_EVENT(new_evt, PRINT_HEADER_LENGTHS);
+	return offset;
+}
+
+static void fill_missing_lengths(scap_evt *new_evt, uint16_t *offset) {
+	// Please ensure that `new_evt->type` is already the final type you want to obtain.
+	// Otherwise we will access the wrong entry in the event table.
+	const struct ppm_event_info *event_info = &(g_event_info[new_evt->type]);
+
+	for(uint16_t i = new_evt->nparams; i < event_info->nparams; i++) {
+		uint16_t len = scap_get_size_bytes_from_type(event_info->params[i].type);
+		PRINT_MESSAGE("push len (%d) for param (%d, type: %d) at offest (%d)\n",
+		              len,
+		              i,
+		              event_info->params[i].type,
+		              *offset);
+		memcpy((char *)new_evt + *offset, &len, sizeof(uint16_t));
+		*offset += sizeof(uint16_t);
+	}
+}
+
+static void copy_params(scap_evt *new_evt,
+                        scap_evt *evt_to_convert,
+                        uint16_t num_lengths,
+                        uint16_t *offset) {
+	// This is where the params start inside the event to convert
+	uint16_t offset_evt_to_convert = sizeof(scap_evt) + sizeof(uint16_t) * num_lengths;
+	uint16_t len_to_copy = evt_to_convert->len - offset_evt_to_convert;
+
+	memcpy((char *)new_evt + *offset, (char *)evt_to_convert + offset_evt_to_convert, len_to_copy);
+
+	PRINT_MESSAGE(
+	        "copy the rest of the event to convert (len: %ld) in the new event at offest (%d)\n",
+	        len_to_copy,
+	        *offset);
+
+	*offset += len_to_copy;
+}
+
+static void fill_missing_parameters(scap_evt *new_evt, uint16_t *offset) {
+	// Please ensure that `new_evt->type` is already the final type you want to obtain.
+	// Otherwise we will access the wrong entry in the event table.
+	const struct ppm_event_info *event_info = &(g_event_info[new_evt->type]);
+
+	for(uint16_t i = new_evt->nparams; i < event_info->nparams; i++) {
+		// todo!: Please note that at the moment `value` can be also NULL, we could turn it into ""
+		// if necessary.
+		char *value = scap_get_default_value_from_type(event_info->params[i].type);
+		PRINT_MESSAGE("push param (%d, type: %d) at offest (%d)\n",
+		              i,
+		              event_info->params[i].type,
+		              *offset);
+		// if value is NULL, the len should be 0
+		memcpy((char *)new_evt + *offset,
+		       value,
+		       scap_get_size_bytes_from_type(event_info->params[i].type));
+		*offset += scap_get_size_bytes_from_type(event_info->params[i].type);
+	}
+
+	// Adjust the number of parameters
+	new_evt->nparams = event_info->nparams;
+	// Adjust the final length
+	new_evt->len = *offset;
+
+	PRINT_MESSAGE("Final event:\n");
+	PRINT_EVENT(new_evt, PRINT_FULL);
+}
+
 conversion_result scap_convert_event(scap_evt *new_evt, scap_evt *evt_to_convert, char *error) {
 	switch(evt_to_convert->type) {
-	// todo!: maybe we could store the event and use it in the exit to handle the old TOCTOU fix but
-	// it seems a little bit an overkill for scap-files. At the moment we skip it
+		////////////////////////
+		// SYSCALL OPEN
+		////////////////////////
 	case PPME_SYSCALL_OPEN_E:
+		// todo!: maybe we could store the event and use it in the exit to handle the old TOCTOU fix
+		// but it seems a little bit an overkill for scap-files. At the moment we skip it
 		return CONVERSION_SKIP;
 
 	case PPME_SYSCALL_OPEN_X:
-
-		// Known event versions
-		// todo!: this could be come an helper function or a macro, since we need it for all events.
-		if((evt_to_convert->nparams != 4) && (evt_to_convert->nparams != 6)) {
-			snprintf(error,
-			         SCAP_LASTERR_SIZE,
-			         "Unknown number of parametes '%d' for event '%s_%c(num: %d)'.",
-			         evt_to_convert->nparams,
-			         get_event_name(evt_to_convert->type),
-			         get_direction_char(evt_to_convert->type),
-			         evt_to_convert->type);
+		if(validate_nparams(evt_to_convert, error, 2, 4, 6) == CONVERSION_ERROR) {
 			return CONVERSION_ERROR;
 		}
 
 		if(evt_to_convert->nparams == 4) {
 			// - Num params: 4
 			// - p(0): fd, p(1): name, p(2): flags, p(3): mode
-			// We want to convert it to the new event with 6 parameters.
+			// We want to convert it to PPME_SYSCALL_OPEN_X with 6 parameters.
 
-			// todo!: we need to create some helpers methods
-
-			PRINT_MESSAGE("Event to convert:\n");
-			PRINT_EVENT(evt_to_convert, PRINT_FULL);
-
-			// We keep the header and the first 4 lengths: fd, name, flags, mode.
-			int offset = sizeof(scap_evt) + sizeof(uint16_t) * 4;
-			memcpy(new_evt, evt_to_convert, offset);
-
-			PRINT_MESSAGE("Copy header and first 4 length. Tmp new event:\n");
-			PRINT_EVENT(new_evt, PRINT_HEADER_LENGTHS);
-
-			// But we need to add 2 new parameters
-			const struct ppm_event_info *event_info = &(g_event_info[evt_to_convert->type]);
-
-			// Add the last 2 parameters len
-			uint16_t len = scap_get_size_bytes_from_type(event_info->params[4].type);
-			PRINT_MESSAGE("push len (%d) for param (%d, type: %d) at offest (%d)\n",
-			              len,
-			              4,
-			              event_info->params[4].type,
-			              offset);
-			memcpy((char *)new_evt + offset, &len, sizeof(uint16_t));
-			PRINT_MESSAGE("pushed: %d\n", *((uint16_t *)&new_evt[offset]));
-			offset += sizeof(uint16_t);
-
-			len = scap_get_size_bytes_from_type(event_info->params[5].type);
-			PRINT_MESSAGE("push len (%d) for param (%d, type: %d) at offest (%d)\n",
-			              len,
-			              5,
-			              event_info->params[5].type,
-			              offset);
-			memcpy((char *)new_evt + offset, &len, sizeof(uint16_t));
-			offset += sizeof(uint16_t);
-
-			// Adjust the number of parameters
-			new_evt->nparams = 6;
-
-			PRINT_MESSAGE("Added the last 2 parameters len. Print header + lengths:\n");
-			PRINT_EVENT(new_evt, PRINT_HEADER_LENGTHS);
-
-			// Copy the rest of the event to convert.
-			memcpy((char *)new_evt + offset,
-			       (char *)evt_to_convert + sizeof(scap_evt) + sizeof(uint16_t) * 4,
-			       evt_to_convert->len - (sizeof(scap_evt) + sizeof(uint16_t) * 4));
-			PRINT_MESSAGE("copy the rest of the event (len: %ld) at offest (%d)\n",
-			              evt_to_convert->len - (sizeof(scap_evt) + sizeof(uint16_t) * 4),
-			              offset);
-			offset += (evt_to_convert->len - (sizeof(scap_evt) + sizeof(uint16_t) * 4));
-
-			// Add the last 2 parameters
-			char *value = scap_get_default_value_from_type(event_info->params[4].type);
-			PRINT_MESSAGE("push param (%d, type: %d) at offest (%d)\n",
-			              4,
-			              event_info->params[4].type,
-			              offset);
-			memcpy((char *)new_evt + offset,
-			       value,
-			       scap_get_size_bytes_from_type(event_info->params[4].type));
-			offset += scap_get_size_bytes_from_type(event_info->params[4].type);
-
-			value = scap_get_default_value_from_type(event_info->params[5].type);
-			PRINT_MESSAGE("push param (%d, type: %d) at offest (%d)\n",
-			              5,
-			              event_info->params[5].type,
-			              offset);
-			memcpy((char *)new_evt + offset,
-			       value,
-			       scap_get_size_bytes_from_type(event_info->params[5].type));
-			offset += scap_get_size_bytes_from_type(event_info->params[5].type);
-
-			// We need to adapt the new event len
-			new_evt->len = offset;
-
-			PRINT_MESSAGE("Final event:\n");
-			PRINT_EVENT(new_evt, PRINT_FULL);
-
+			uint16_t offset = copy_first_n_lengths_and_header(new_evt, evt_to_convert, 4);
+			// Now we have header + lengths that are ready.
+			fill_missing_lengths(new_evt, &offset);
+			// Copy the rest of the parameters we need to keep
+			copy_params(new_evt, evt_to_convert, 4, &offset);
+			// Now we need to add the missing parameters
+			fill_missing_parameters(new_evt, &offset);
 			return CONVERSION_CONTINUE;
 		}
 
 		if(evt_to_convert->nparams == 6) {
 			// - Num params: 6
 			// - p(0): fd, p(1): name, p(2): flags, p(3): mode, p(4): dev, p(5): ino
+			// We want to convert it to PPME_SYSCALL_OPEN with 6 parameters.
 
 			// Copy the old event in the new one
 			copy_old_event(new_evt, evt_to_convert);
-
 			// Change the dimension of a parameter
 			change_param_len_from_s64_to_s32(new_evt, 0);
-
 			// Change the event type
 			change_event_type(new_evt, PPME_SYSCALL_OPEN);
 			return CONVERSION_COMPLETED;
 		}
-		// This should never happen
-		snprintf(error, SCAP_LASTERR_SIZE, "Reached unkown state for event '%d'.", new_evt->type);
-		return CONVERSION_ERROR;
+		return return_error(evt_to_convert, error);
 
 	default:
 		// For all the event we still need to support
