@@ -39,7 +39,7 @@ int BPF_PROG(brk_e, struct pt_regs *regs, long id) {
 SEC("tp_btf/sys_exit")
 int BPF_PROG(brk_x, struct pt_regs *regs, long ret) {
 	struct ringbuf_struct ringbuf;
-	if(!ringbuf__reserve_space(&ringbuf, ctx, BRK_X_SIZE, PPME_SYSCALL_BRK_4_X)) {
+	if(!ringbuf__reserve_space(&ringbuf, ctx, BRK_X_SIZE, PPME_SYSCALL_BRK)) {
 		return 0;
 	}
 
@@ -48,7 +48,7 @@ int BPF_PROG(brk_x, struct pt_regs *regs, long ret) {
 	/*=============================== COLLECT PARAMETERS  ===========================*/
 
 	/* Parameter 1: ret (type: PT_UINT64) */
-	/* the return value is the program break */
+	/* the return value is the program break, so a pointer on 64 bit */
 	ringbuf__store_u64(&ringbuf, ret);
 
 	struct task_struct *task = get_current_task();
@@ -67,6 +67,10 @@ int BPF_PROG(brk_x, struct pt_regs *regs, long ret) {
 
 	/* Parameter 4: vm_swap (type: PT_UINT32) */
 	ringbuf__store_u32(&ringbuf, swap_size);
+
+	/* Parameter 5: addr (type: PT_UINT64) */
+	unsigned long addr = extract__syscall_argument(regs, 0);
+	ringbuf__store_u64(&ringbuf, addr);
 
 	/*=============================== COLLECT PARAMETERS  ===========================*/
 

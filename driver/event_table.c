@@ -823,10 +823,10 @@ const struct ppm_event_info g_event_info[] = {
                                       {"uid", PT_UINT32, PF_DEC},
                                       {"gid", PT_UINT32, PF_DEC}}},
         [PPME_SYSCALL_BRK_4_E] =
-                {"brk", EC_MEMORY | EC_SYSCALL, EF_NONE, 1, {{"addr", PT_UINT64, PF_HEX}}},
+                {"brk", EC_MEMORY | EC_SYSCALL, EF_OLD_VERSION, 1, {{"addr", PT_UINT64, PF_HEX}}},
         [PPME_SYSCALL_BRK_4_X] = {"brk",
                                   EC_MEMORY | EC_SYSCALL,
-                                  EF_NONE,
+                                  EF_OLD_VERSION,
                                   4,
                                   {{"res", PT_UINT64, PF_HEX},
                                    {"vm_size", PT_UINT32, PF_DEC},
@@ -2414,6 +2414,15 @@ const struct ppm_event_info g_event_info[] = {
                                 {"mode", PT_UINT32, PF_OCT},
                                 {"dev", PT_UINT32, PF_HEX},
                                 {"ino", PT_UINT64, PF_DEC}}},
+        [PPME_SYSCALL_BRK] = {"brk",
+                              EC_MEMORY | EC_SYSCALL,
+                              EF_NONE,
+                              5,
+                              {{"res", PT_UINT64, PF_HEX},
+                               {"vm_size", PT_UINT32, PF_DEC},
+                               {"vm_rss", PT_UINT32, PF_DEC},
+                               {"vm_swap", PT_UINT32, PF_DEC},
+                               {"addr", PT_UINT64, PF_HEX}}},
 };
 #pragma GCC diagnostic pop
 
