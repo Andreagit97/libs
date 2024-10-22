@@ -664,6 +664,7 @@ bool sinsp_parser::reset(sinsp_evt *evt) {
 			// but there are exceptions, as is the case with mmap, mmap2
 			//
 			int fd_location = get_fd_location(etype);
+			// we will never have `PT_FD32` in the enter events
 			ASSERT(evt->get_param_info(fd_location)->type == PT_FD);
 			evt->get_tinfo()->m_lastevent_fd = evt->get_param(fd_location)->as<int64_t>();
 			evt->set_fd_info(evt->get_tinfo()->get_fd(evt->get_tinfo()->m_lastevent_fd));
@@ -2600,6 +2601,7 @@ void sinsp_parser::parse_fchmod_fchown_exit(sinsp_evt *evt) {
 		return;
 	}
 
+	// todo!: we will need to update this to PT_FD32
 	ASSERT(evt->get_param_info(1)->type == PT_FD);
 	int64_t fd = evt->get_param(1)->as<int64_t>();
 	evt->get_tinfo()->m_lastevent_fd = fd;
@@ -2708,6 +2710,7 @@ inline void sinsp_parser::infer_sendto_fdinfo(sinsp_evt *const evt) {
 
 	const sinsp_evt_param *parinfo = nullptr;
 
+	// todo!: we will need to update this to PT_FD32
 	ASSERT(evt->get_param_info(FILE_DESCRIPTOR_PARAM)->type == PT_FD);
 	int64_t fd = evt->get_param(FILE_DESCRIPTOR_PARAM)->as<int64_t>();
 
@@ -5224,6 +5227,7 @@ void sinsp_parser::parse_memfd_create_exit(sinsp_evt *evt, scap_fd_type type) {
 	}
 
 	/* ret (fd) */
+	// todo!: we will need to update this to PT_FD32
 	ASSERT(evt->get_param_info(0)->type == PT_FD);
 	fd = evt->get_param(0)->as<int64_t>();
 
@@ -5257,6 +5261,7 @@ void sinsp_parser::parse_pidfd_open_exit(sinsp_evt *evt) {
 	}
 
 	/* ret (fd) */
+	// todo!: we will need to update this to PT_FD32
 	ASSERT(evt->get_param_info(0)->type == PT_FD);
 	fd = evt->get_param(0)->as<int64_t>();
 
@@ -5291,14 +5296,17 @@ void sinsp_parser::parse_pidfd_getfd_exit(sinsp_evt *evt) {
 	}
 
 	/* ret (fd) */
+	// todo!: we will need to update this to PT_FD32
 	ASSERT(evt->get_param_info(0)->type == PT_FD);
 	fd = evt->get_param(0)->as<int64_t>();
 
 	/* pidfd */
+	// todo!: we will need to update this to PT_FD32
 	ASSERT(evt->get_param_info(1)->type == PT_FD);
 	pidfd = evt->get_param(1)->as<int64_t>();
 
 	/* targetfd */
+	// todo!: we will need to update this to PT_FD32
 	ASSERT(evt->get_param_info(2)->type == PT_FD);
 	targetfd = evt->get_param(2)->as<int64_t>();
 

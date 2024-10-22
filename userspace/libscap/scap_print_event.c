@@ -81,6 +81,7 @@ static void print_parameter(int16_t num_param, scap_evt *ev, uint16_t offset) {
 		break;
 
 	case PT_INT32:
+	case PT_FD32:
 		printf("PARAM %d: %d\n", num_param, *(int32_t *)(valptr));
 		break;
 
@@ -108,7 +109,6 @@ static void print_parameter(int16_t num_param, scap_evt *ev, uint16_t offset) {
 	case PT_SIGSET:
 	case PT_MODE:
 	case PT_ENUMFLAGS32:
-	case PT_FD32:
 		printf("PARAM %d: %d\n", num_param, *(uint32_t *)(valptr));
 		break;
 
