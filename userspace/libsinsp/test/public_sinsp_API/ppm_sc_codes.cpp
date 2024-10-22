@@ -747,7 +747,8 @@ TEST(ppm_sc_API, NGEN_event_set_NGEN) {
 	                                                                  PPME_SYSCALL_BRK_4_E,
 	                                                                  PPME_SYSCALL_BRK_4_X,
 	                                                                  PPME_SYSCALL_BRK_1_E,
-	                                                                  PPME_SYSCALL_BRK_1_X};
+	                                                                  PPME_SYSCALL_BRK_1_X,
+	                                                                  PPME_SYSCALL_BRK};
 	ASSERT_PPM_EVENT_CODES_EQ(expected_not_generic_events, not_generic_events);
 	const auto not_generic_events_names_again = test_utils::unordered_set_to_ordered(
 	        libsinsp::events::event_set_to_names(not_generic_events));
@@ -973,7 +974,8 @@ TEST(ppm_sc_API, NGSS_event_set_NGSS) {
 	        PPME_SYSCALL_BRK_1_E,
 	        PPME_SYSCALL_BRK_1_X,
 	        PPME_SYSCALL_BRK_4_E,
-	        PPME_SYSCALL_BRK_4_X};
+	        PPME_SYSCALL_BRK_4_X,
+	        PPME_SYSCALL_BRK};
 	ASSERT_PPM_EVENT_CODES_EQ(expected_not_generic_event_set, not_generic_event_set);
 
 	/* We lose also the `PPM_SC_UNKNOWN` */

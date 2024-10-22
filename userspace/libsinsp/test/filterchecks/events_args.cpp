@@ -67,3 +67,42 @@ TEST_F(sinsp_with_test_input, evt_arg_open_failure) {
 	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"), "ESRCH");
 	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.fd32_rename"), std::to_string(fd));
 }
+
+TEST_F(sinsp_with_test_input, evt_arg_brk) {
+	add_default_init_thread();
+	open_inspector();
+
+	uint64_t res = 2808032;
+	uint32_t vm_size = 294;
+	uint32_t vm_rss = 295;
+	uint32_t vm_swap = 296;
+	uint64_t addr = 83983092;
+
+	// todo!: do we want to create a helper for this like for open?
+	auto evt = add_event_advance_ts(increasing_ts(),
+	                                INIT_TID,
+	                                PPME_SYSCALL_BRK,
+	                                5,
+	                                res,
+	                                vm_size,
+	                                vm_rss,
+	                                vm_swap,
+	                                addr);
+
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"), "2AD8E0");  // hexadecimal notation
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.res"), std::to_string(res));
+
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[1]"), std::to_string(vm_size));
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.vm_size"), std::to_string(vm_size));
+
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[2]"), std::to_string(vm_rss));
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.vm_rss"), std::to_string(vm_rss));
+
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[3]"), std::to_string(vm_swap));
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.vm_swap"), std::to_string(vm_swap));
+
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[4]"), "5017AF4");  // hexadecimal notation
+	// todo!: this is broken because due to the longest prefix match we think that `addr` is a
+	// SOCKADDR parameter ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.addr"),
+	// std::to_string(addr));
+}
