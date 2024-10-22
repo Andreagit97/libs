@@ -16,9 +16,9 @@ limitations under the License.
 
 */
 
-#include <test/helpers/threads_helpers.h>
+#include <sinsp_with_test_input.h>
 
-TEST_F(sinsp_with_test_input, open_success) {
+TEST_F(sinsp_with_test_input, parse_open_success) {
 	add_default_init_thread();
 	open_inspector();
 
@@ -41,7 +41,7 @@ TEST_F(sinsp_with_test_input, open_success) {
 	          sinsp_test_input::open_params::default_filename);
 }
 
-TEST_F(sinsp_with_test_input, open_failure) {
+TEST_F(sinsp_with_test_input, parse_open_failure) {
 	add_default_init_thread();
 	open_inspector();
 
@@ -61,11 +61,10 @@ TEST_F(sinsp_with_test_input, open_failure) {
 	ASSERT_FALSE(field_has_value(evt, "fd.filename"));
 }
 
-TEST_F(sinsp_with_test_input, open_path_too_long) {
+TEST_F(sinsp_with_test_input, parse_open_path_too_long) {
 	add_default_init_thread();
 
 	open_inspector();
-	sinsp_evt* evt = NULL;
 
 	std::stringstream long_path_ss;
 	long_path_ss << "/";
@@ -79,7 +78,8 @@ TEST_F(sinsp_with_test_input, open_path_too_long) {
 
 	std::string long_path = long_path_ss.str();
 
-	evt = generate_open_event(sinsp_test_input::open_params{.fd = 3, .path = long_path.c_str()});
+	auto evt =
+	        generate_open_event(sinsp_test_input::open_params{.fd = 3, .path = long_path.c_str()});
 	ASSERT_EQ(get_field_as_string(evt, "fd.name"), "/PATH_TOO_LONG");
 
 	int64_t fd = 4, mountfd = 5;

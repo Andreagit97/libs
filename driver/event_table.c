@@ -2405,9 +2405,10 @@ const struct ppm_event_info g_event_info[] = {
                                EC_FILE | EC_SYSCALL,
                                EF_CREATES_FD | EF_MODIFIES_STATE,
                                6,
-                               // todo!: it would be great to rename this field to `res` but it is a
-                               // breaking change for the filterchecks...
-                               {{"fd", PT_FD32, PF_DEC},
+                               // todo!: See `find_longest_matching_evt_param` method, at the end of
+                               // the work we should
+                               // rename `fd32_rename` into `fd`
+                               {{"fd32_rename", PT_FD32, PF_DEC},
                                 {"name", PT_FSPATH, PF_NA},
                                 {"flags", PT_FLAGS32, PF_HEX, file_flags},
                                 {"mode", PT_UINT32, PF_OCT},

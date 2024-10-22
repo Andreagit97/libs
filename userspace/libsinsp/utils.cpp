@@ -747,6 +747,8 @@ const ppm_param_info* sinsp_utils::find_longest_matching_evt_param(std::string_v
 	const ppm_param_info* res = nullptr;
 	const auto name_len = name.size();
 
+	// todo!: this mean that we cannot have 2 parameters with the same name but of different
+	// types... so `fd` cannot be PT_FD32 and PT_FD at the same time.
 	for(uint32_t j = 0; j < PPM_EVENT_MAX; j++) {
 		const ppm_event_info* ei = &g_infotables.m_event_info[j];
 
