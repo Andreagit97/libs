@@ -294,6 +294,8 @@ char* sinsp_filter_check::rawval_to_string(uint8_t* rawval,
 		return m_getpropertystr_storage.data();
 	case PT_L4PROTO:  // This can be resolved in the future
 	case PT_UINT8:
+	case PT_FLAGS8:
+	case PT_ENUMFLAGS8:
 		if(print_format == PF_OCT) {
 			prfmt = (char*)"%" PRIo8;
 		} else if(print_format == PF_DEC || print_format == PF_ID) {
@@ -313,6 +315,8 @@ char* sinsp_filter_check::rawval_to_string(uint8_t* rawval,
 		return m_getpropertystr_storage.data();
 	case PT_PORT:  // This can be resolved in the future
 	case PT_UINT16:
+	case PT_FLAGS16:
+	case PT_ENUMFLAGS16:
 		if(print_format == PF_OCT) {
 			prfmt = (char*)"%" PRIo16;
 		} else if(print_format == PF_DEC || print_format == PF_ID) {
@@ -331,6 +335,8 @@ char* sinsp_filter_check::rawval_to_string(uint8_t* rawval,
 		         rawval_cast<uint16_t>(rawval));
 		return m_getpropertystr_storage.data();
 	case PT_UINT32:
+	case PT_FLAGS32:
+	case PT_ENUMFLAGS32:
 		if(print_format == PF_OCT) {
 			prfmt = (char*)"%" PRIo32;
 		} else if(print_format == PF_DEC || print_format == PF_ID) {
