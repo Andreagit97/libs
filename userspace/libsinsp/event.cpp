@@ -686,11 +686,17 @@ std::string sinsp_evt::get_base_dir(uint32_t id, sinsp_threadinfo *tinfo) {
 
 	const ppm_param_info *dir_param_info = &(m_info->params[dirfd_id]);
 	// Ensure the index points to an actual FD
-	if(dir_param_info->type != PT_FD) {
+	if(dir_param_info->type != PT_FD || dir_param_info->type != PT_FD32) {
 		return cwd;
 	}
 
-	const int64_t dirfd = get_param(dirfd_id)->as<int64_t>();
+	// todo!: all FDS will be on 32 bit at the end of the work so we can remove this.
+	int64_t dirfd = 0;
+	if(dir_param_info->type == PT_FD) {
+		dirfd = get_param(dirfd_id)->as<int64_t>();
+	} else {
+		dirfd = (int64_t)get_param(dirfd_id)->as<int32_t>();
+	}
 
 	// If the FD is special value PPM_AT_FDCWD, just use CWD
 	if(dirfd == PPM_AT_FDCWD) {
@@ -788,8 +794,14 @@ const char *sinsp_evt::get_param_as_str(uint32_t id,
 
 		snprintf(&m_paramstr_storage[0], m_paramstr_storage.size(), prfmt, param->as<int64_t>());
 		break;
+	// todo!: at the end of the work we shouldn't have param type PT_FD
 	case PT_FD: {
 		int64_t fd = param->as<int64_t>();
+		render_fd(fd, resolved_str, fmt);
+		break;
+	}
+	case PT_FD32: {
+		int64_t fd = (int64_t)param->as<int32_t>();
 		render_fd(fd, resolved_str, fmt);
 		break;
 	}
