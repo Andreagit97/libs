@@ -18,6 +18,10 @@ limitations under the License.
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct ppm_evt_hdr scap_evt;
 
 // 50 consecutive conversions on the same event should be more than enough
@@ -32,3 +36,7 @@ typedef enum conversion_result {
 } conversion_result;
 
 conversion_result scap_convert_event(scap_evt* new_evt, scap_evt* evt_to_convert, char* error);
+
+#ifdef __cplusplus
+};
+#endif
