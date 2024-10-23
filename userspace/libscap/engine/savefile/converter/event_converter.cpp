@@ -122,8 +122,8 @@ static conversion_result validate_nparams(scap_evt *evt, char *error, int num_va
 	         SCAP_LASTERR_SIZE,
 	         "Unknown number of parameters '%d' for event '%s_%c(num: %d)'.",
 	         evt->nparams,
-	         get_event_name(evt->type),
-	         get_direction_char(evt->type),
+	         get_event_name((ppm_event_code)evt->type),
+	         get_direction_char((ppm_event_code)evt->type),
 	         evt->type);
 	return CONVERSION_ERROR;
 }
@@ -214,7 +214,9 @@ static void fill_missing_parameters(scap_evt *new_evt, uint16_t *offset) {
 	PRINT_EVENT(new_evt, PRINT_FULL);
 }
 
-conversion_result scap_convert_event(scap_evt *new_evt, scap_evt *evt_to_convert, char *error) {
+extern "C" conversion_result scap_convert_event(scap_evt *new_evt,
+                                                scap_evt *evt_to_convert,
+                                                char *error) {
 	switch(evt_to_convert->type) {
 		////////////////////////
 		// SYSCALL OPEN
