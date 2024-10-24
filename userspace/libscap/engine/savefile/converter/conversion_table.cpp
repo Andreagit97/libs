@@ -21,9 +21,7 @@ limitations under the License.
 #include <functional>
 #include <cstring>
 #include <cstdio>
-
-typedef std::function<conversion_result(scap_evt *new_evt, scap_evt *evt_to_convert, char *error)>
-        conv_func_t;
+#include <unordered_map>
 
 /* ============================= Converters ============================= */
 
@@ -86,22 +84,13 @@ conversion_result convert_PPME_SYSCALL_OPEN_X(scap_evt *new_evt,
 
 /* ============================= Converters ============================= */
 
-static conv_func_t g_conversion_table[PPM_EVENT_MAX] = {};
+using conv_func_t = conversion_result (*)(scap_evt *new_evt, scap_evt *evt_to_convert, char *error);
 
-void initialize_conversion_table() {
-	// First, initialize all entries to conversion_completed
-	for(int i = 0; i < PPM_EVENT_MAX; ++i) {
-		g_conversion_table[i] = conversion_completed;
-	}
+static std::unordered_map<ppm_event_code, conv_func_t> g_conversion_table = {
+        {PPME_SYSCALL_OPEN_E, conversion_skip},
+        {PPME_SYSCALL_OPEN_X, convert_PPME_SYSCALL_OPEN_X},
 
-	// Now override specific entries
-	g_conversion_table[PPME_SYSCALL_OPEN_E] =
-	        conversion_skip;  // todo!: maybe we could store the event and use
-	                          // it in the exit to handle the old TOCTOU fix
-	                          // but it seems a little bit an overkill for
-	                          // scap-files. At the moment we skip it
-	g_conversion_table[PPME_SYSCALL_OPEN_X] = convert_PPME_SYSCALL_OPEN_X;
-}
+};
 
 conversion_result call_conversion(scap_evt *new_evt, scap_evt *evt_to_convert, char *error) {
 	if(evt_to_convert->type >= PPM_EVENT_MAX) {
@@ -109,11 +98,11 @@ conversion_result call_conversion(scap_evt *new_evt, scap_evt *evt_to_convert, c
 		return CONVERSION_ERROR;
 	}
 
-	// Workaround to initialize the table only once
-	[[maybe_unused]] static bool is_table_initialized = []() {
-		initialize_conversion_table();
-		return true;
-	}();
+	if(g_conversion_table.find((ppm_event_code)evt_to_convert->type) != g_conversion_table.end()) {
+		return g_conversion_table[(ppm_event_code)evt_to_convert->type](new_evt,
+		                                                                evt_to_convert,
+		                                                                error);
+	}
 
-	return g_conversion_table[evt_to_convert->type](new_evt, evt_to_convert, error);
+	return conversion_completed(new_evt, evt_to_convert, error);
 }
