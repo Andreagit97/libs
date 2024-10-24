@@ -29,6 +29,7 @@ struct iovec {
 };
 #endif
 
+#define MAX_EVENT_SIZE 64 * 1024
 #define HANDLE(engine) ((struct savefile_engine *)(engine.m_handle))
 
 #include <libscap/engine/savefile/savefile.h>
@@ -39,7 +40,7 @@ struct iovec {
 #include <libscap/engine/savefile/savefile_platform.h>
 #include <libscap/engine/savefile/scap_reader.h>
 #include <libscap/engine/noop/noop.h>
-#include <libscap/engine/savefile/converter/event_converter.h>
+#include <libscap/engine/savefile/converter/public_converter.h>
 #include <libscap/strl.h>
 
 //

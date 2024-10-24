@@ -22,7 +22,7 @@ limitations under the License.
 #include <cstdarg>
 #include <memory>
 #include <stdexcept>
-#include <libscap/engine/savefile/converter/event_converter.h>
+#include <libscap/engine/savefile/converter/public_converter.h>
 
 typedef std::unique_ptr<scap_evt, decltype(free) *> safe_scap_evt_t;
 

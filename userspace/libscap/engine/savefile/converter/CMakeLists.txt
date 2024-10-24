@@ -14,9 +14,11 @@
 #
 # Since we have circular dependencies between libscap and the savefile engine, make this library
 # always static (directly linked into libscap)
-add_library(scap_savefile_converter STATIC event_converter.cpp)
+add_library(
+	scap_savefile_converter STATIC public_converter.cpp converters_helpers.cpp conversion_table.cpp
+)
 
 target_include_directories(
-	scap_savefile_converter PRIVATE $<BUILD_INTERFACE:${LIBS_DIR}>
-									$<BUILD_INTERFACE:${LIBS_DIR}/userspace>
+	scap_savefile_converter PRIVATE ${LIBS_DIR} ${LIBS_DIR}/userspace
+									${LIBS_DIR}/userspace/libscap/engine/savefile
 )

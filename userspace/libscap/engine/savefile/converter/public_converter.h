@@ -22,18 +22,10 @@ limitations under the License.
 extern "C" {
 #endif
 
-typedef struct ppm_evt_hdr scap_evt;
+#include <libscap/engine/savefile/converter/conversion_types.h>
 
 // 50 consecutive conversions on the same event should be more than enough
 #define MAX_CONVERSION_BOUNDARY 50
-#define MAX_EVENT_SIZE 64 * 1024
-
-typedef enum conversion_result {
-	CONVERSION_CONTINUE,
-	CONVERSION_COMPLETED,
-	CONVERSION_SKIP,
-	CONVERSION_ERROR
-} conversion_result;
 
 conversion_result scap_convert_event(scap_evt* new_evt, scap_evt* evt_to_convert, char* error);
 
