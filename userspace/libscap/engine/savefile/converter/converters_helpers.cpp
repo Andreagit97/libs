@@ -21,6 +21,9 @@ limitations under the License.
 #include <converter/debug_macro.h>
 #include <stdarg.h>
 #include <cstdio>
+#include <unordered_map>
+
+static std::unordered_map<uint64_t, scap_evt *> evt_storage = {};
 
 extern const struct ppm_event_info g_event_info[];
 
@@ -200,4 +203,24 @@ void fill_missing_parameters(scap_evt *new_evt, uint16_t *offset) {
 
 	PRINT_MESSAGE("Final event:\n");
 	PRINT_EVENT(new_evt, PRINT_FULL);
+}
+
+void store_evt(uint64_t tid, scap_evt *evt) {
+	// if there was a previous event for this tid, we can overwrite the pointer because it means we
+	// don't need it anymore. We need to keep the enter event until we retrieve it in the
+	// corresponding exit event, but if the same thread is doing another enter event it means the
+	// previous syscall is already completed
+	// todo!: understand if we need to alloc memory or it is enough to store the pointer
+	evt_storage[tid] = evt;
+}
+
+scap_evt *retrieve_evt(uint64_t tid) {
+	if(evt_storage.find(tid) != evt_storage.end()) {
+		return evt_storage[tid];
+	}
+	return nullptr;
+}
+
+void clear_storage() {
+	evt_storage.clear();
 }

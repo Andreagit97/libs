@@ -46,3 +46,7 @@ void copy_params(scap_evt *new_evt,
                  uint16_t *offset);
 
 void fill_missing_parameters(scap_evt *new_evt, uint16_t *offset);
+
+void store_evt(uint64_t tid, scap_evt *evt);
+
+scap_evt *retrieve_evt(uint64_t tid);
