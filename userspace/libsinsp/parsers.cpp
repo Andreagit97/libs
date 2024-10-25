@@ -425,7 +425,7 @@ void sinsp_parser::process_event(sinsp_evt *evt) {
 			break;
 		}
 
-		auto res = evt->get_param(0)->as<int64_t>();
+		auto res = evt->get_syscall_return_value();
 		if(res >= 0) {
 			// Only if successful
 			auto dirfd = evt->get_param(1)->as<int64_t>();
@@ -438,7 +438,7 @@ void sinsp_parser::process_event(sinsp_evt *evt) {
 			break;
 		}
 
-		auto res = evt->get_param(0)->as<int64_t>();
+		auto res = evt->get_syscall_return_value();
 		if(res >= 0) {
 			// Only if successful
 			auto dirfd = evt->get_param(2)->as<int64_t>();
@@ -706,7 +706,7 @@ bool sinsp_parser::reset(sinsp_evt *evt) {
 		                                  (evt->get_info()->params[0].name[0] == 'f' &&
 		                                   evt->get_info()->params[0].name[1] == 'd' &&
 		                                   evt->get_info()->params[0].name[2] == '\0'))) {
-			int64_t res = evt->get_param(0)->as<int64_t>();
+			int64_t res = evt->get_syscall_return_value();
 
 			if(res < 0) {
 				evt->set_errorcode(-(int32_t)res);
@@ -1870,7 +1870,7 @@ void sinsp_parser::parse_clone_exit_child(sinsp_evt *evt) {
 }
 
 void sinsp_parser::parse_clone_exit(sinsp_evt *evt) {
-	int64_t childtid = evt->get_param(0)->as<int64_t>();
+	int64_t childtid = evt->get_syscall_return_value();
 	/* Please note that if the child is in a namespace different from the init one
 	 * we should never use this `childtid` otherwise we will use a thread id referred to
 	 * an internal namespace and not to the init one!
@@ -1895,7 +1895,7 @@ void sinsp_parser::parse_execve_exit(sinsp_evt *evt) {
 	sinsp_evt *enter_evt = &m_tmp_evt;
 
 	// Validate the return value
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	/* Some architectures like s390x send a `PPME_SYSCALL_EXECVEAT_X` exit event
 	 * when the `execveat` syscall succeeds, for this reason, we need to manage also
@@ -2402,7 +2402,6 @@ std::string sinsp_parser::parse_dirfd(sinsp_evt *evt, std::string_view name, int
 }
 
 void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt) {
-	int64_t fd = 0;
 	std::string_view name;
 	std::string_view enter_evt_name;
 	uint32_t flags;
@@ -2419,24 +2418,13 @@ void sinsp_parser::parse_open_openat_creat_exit(sinsp_evt *evt) {
 		return;
 	}
 
-	//
-	// Check the return value
-	//
-	// todo!: remove it at the end of the rework
-	switch(etype) {
-	case PPME_SYSCALL_OPEN:
-		fd = evt->get_param(0)->as<int32_t>();
-		break;
+	int64_t fd = evt->get_syscall_return_value();
 
-	default:
-		fd = evt->get_param(0)->as<int64_t>();
-		if(etype != PPME_SYSCALL_OPEN_BY_HANDLE_AT_X) {
-			//
-			// Load the enter event so we can access its arguments
-			//
-			lastevent_retrieved = retrieve_enter_event(enter_evt, evt);
-		}
-		break;
+	if(etype != PPME_SYSCALL_OPEN_BY_HANDLE_AT_X) {
+		//
+		// Load the enter event so we can access its arguments
+		//
+		lastevent_retrieved = retrieve_enter_event(enter_evt, evt);
 	}
 
 	//
@@ -2757,7 +2745,7 @@ void sinsp_parser::parse_socket_exit(sinsp_evt *evt) {
 	// parameters in one scan. We don't care too much because we assume that we get here
 	// seldom enough that saving few tens of CPU cycles is not important.
 	//
-	fd = evt->get_param(0)->as<int64_t>();
+	fd = evt->get_syscall_return_value();
 
 	if(fd < 0) {
 		//
@@ -2801,7 +2789,7 @@ void sinsp_parser::parse_bind_exit(sinsp_evt *evt) {
 		return;
 	}
 
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval < 0) {
 		return;
@@ -3102,7 +3090,7 @@ void sinsp_parser::parse_connect_exit(sinsp_evt *evt) {
 		}
 	}
 
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(m_track_connection_status) {
 		if(retval == -SE_EINPROGRESS) {
@@ -3159,7 +3147,7 @@ void sinsp_parser::parse_accept_exit(sinsp_evt *evt) {
 	//
 	// Extract the fd
 	//
-	fd = evt->get_param(0)->as<int64_t>();
+	fd = evt->get_syscall_return_value();
 
 	if(fd < 0) {
 		//
@@ -3299,7 +3287,7 @@ void sinsp_parser::parse_close_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	//
 	// If the close() was successful, do the cleanup
@@ -3380,7 +3368,7 @@ void sinsp_parser::parse_socketpair_exit(sinsp_evt *evt) {
 	uint64_t source_address;
 	uint64_t peer_address;
 
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval < 0) {
 		//
@@ -3425,7 +3413,7 @@ void sinsp_parser::parse_pipe_exit(sinsp_evt *evt) {
 	uint64_t ino;
 	uint32_t openflags = 0;
 
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval < 0) {
 		//
@@ -3734,7 +3722,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(evt->get_fd_info() == NULL) {
 		return;
@@ -3973,7 +3961,7 @@ void sinsp_parser::parse_sendfile_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	//
 	// If the operation was successful, validate that the fd exists
@@ -4010,7 +3998,7 @@ void sinsp_parser::parse_eventfd_exit(sinsp_evt *evt) {
 		return;
 	}
 
-	fd = evt->get_param(0)->as<int64_t>();
+	fd = evt->get_syscall_return_value();
 
 	if(fd < 0) {
 		//
@@ -4045,7 +4033,7 @@ void sinsp_parser::parse_chdir_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	//
 	// In case of success, update the thread working dir
@@ -4062,7 +4050,7 @@ void sinsp_parser::parse_fchdir_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	//
 	// In case of success, update the thread working dir
@@ -4086,7 +4074,7 @@ void sinsp_parser::parse_getcwd_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	//
 	// Check if the syscall was successful
@@ -4141,7 +4129,7 @@ void sinsp_parser::parse_shutdown_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	//
 	// If the operation was successful, do the cleanup
@@ -4167,7 +4155,7 @@ void sinsp_parser::parse_dup_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	//
 	// Check if the syscall was successful
@@ -4252,7 +4240,7 @@ void sinsp_parser::parse_single_param_fd_exit(sinsp_evt *evt, scap_fd_type type)
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(evt->get_tinfo() == nullptr) {
 		return;
@@ -4298,7 +4286,7 @@ void sinsp_parser::parse_getrlimit_setrlimit_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	//
 	// Check if the syscall was successful
@@ -4345,7 +4333,7 @@ void sinsp_parser::parse_prlimit_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	//
 	// Check if the syscall was successful
@@ -4434,7 +4422,7 @@ void sinsp_parser::parse_fcntl_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	//
 	// If this is not a F_DUPFD or F_DUPFD_CLOEXEC command, ignore it
@@ -4496,7 +4484,7 @@ void sinsp_parser::parse_setresuid_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval == 0 && retrieve_enter_event(enter_evt, evt)) {
 		uint32_t new_euid = enter_evt->get_param(1)->as<uint32_t>();
@@ -4516,7 +4504,7 @@ void sinsp_parser::parse_setreuid_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval == 0) {
 		uint32_t new_euid = evt->get_param(1)->as<uint32_t>();
@@ -4537,7 +4525,7 @@ void sinsp_parser::parse_setresgid_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval == 0 && retrieve_enter_event(enter_evt, evt)) {
 		uint32_t new_egid = enter_evt->get_param(1)->as<uint32_t>();
@@ -4557,7 +4545,7 @@ void sinsp_parser::parse_setregid_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval == 0) {
 		uint32_t new_egid = evt->get_param(1)->as<uint32_t>();
@@ -4578,7 +4566,7 @@ void sinsp_parser::parse_setuid_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval == 0 && retrieve_enter_event(enter_evt, evt)) {
 		uint32_t new_euid = enter_evt->get_param(0)->as<uint32_t>();
@@ -4596,7 +4584,7 @@ void sinsp_parser::parse_setgid_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval == 0 && retrieve_enter_event(enter_evt, evt)) {
 		uint32_t new_egid = enter_evt->get_param(0)->as<uint32_t>();
@@ -4987,7 +4975,7 @@ void sinsp_parser::parse_cpu_hotplug_enter(sinsp_evt *evt) {
 
 void sinsp_parser::parse_prctl_exit_event(sinsp_evt *evt) {
 	/* Parameter 1: res (type: PT_ERRNO) */
-	int64_t retval = evt->get_param(0)->as<int64_t>();
+	int64_t retval = evt->get_syscall_return_value();
 
 	if(retval < 0) {
 		/* we are not interested in parsing something if the syscall fails */
@@ -5042,7 +5030,7 @@ void sinsp_parser::parse_chroot_exit(sinsp_evt *evt) {
 		return;
 	}
 
-	int64_t retval = evt->get_param(0)->as<int64_t>();
+	int64_t retval = evt->get_syscall_return_value();
 	if(retval == 0) {
 		const char *resolved_path;
 		auto path = evt->get_param_as_str(1, &resolved_path);
@@ -5075,7 +5063,7 @@ void sinsp_parser::parse_setsid_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval >= 0) {
 		if(evt->get_thread_info()) {
@@ -5109,7 +5097,7 @@ void sinsp_parser::parse_getsockopt_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval < 0) {
 		return;
@@ -5153,7 +5141,7 @@ void sinsp_parser::parse_capset_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval < 0 || evt->get_tinfo() == nullptr) {
 		return;
@@ -5177,7 +5165,7 @@ void sinsp_parser::parse_unshare_setns_exit(sinsp_evt *evt) {
 	int64_t retval;
 	uint32_t flags = 0;
 
-	retval = evt->get_param(0)->as<int64_t>();
+	retval = evt->get_syscall_return_value();
 
 	if(retval < 0 || evt->get_tinfo() == nullptr) {
 		return;
@@ -5219,7 +5207,6 @@ void sinsp_parser::free_event_buffer(uint8_t *ptr) {
 }
 
 void sinsp_parser::parse_memfd_create_exit(sinsp_evt *evt, scap_fd_type type) {
-	int64_t fd;
 	uint32_t flags;
 
 	if(evt->get_tinfo() == nullptr) {
@@ -5227,9 +5214,7 @@ void sinsp_parser::parse_memfd_create_exit(sinsp_evt *evt, scap_fd_type type) {
 	}
 
 	/* ret (fd) */
-	// todo!: we will need to update this to PT_FD32
-	ASSERT(evt->get_param_info(0)->type == PT_FD);
-	fd = evt->get_param(0)->as<int64_t>();
+	int64_t fd = evt->get_syscall_return_value();
 
 	/* name */
 	/*
@@ -5252,7 +5237,6 @@ void sinsp_parser::parse_memfd_create_exit(sinsp_evt *evt, scap_fd_type type) {
 }
 
 void sinsp_parser::parse_pidfd_open_exit(sinsp_evt *evt) {
-	int64_t fd;
 	int64_t pid;
 	int64_t flags;
 
@@ -5261,9 +5245,7 @@ void sinsp_parser::parse_pidfd_open_exit(sinsp_evt *evt) {
 	}
 
 	/* ret (fd) */
-	// todo!: we will need to update this to PT_FD32
-	ASSERT(evt->get_param_info(0)->type == PT_FD);
-	fd = evt->get_param(0)->as<int64_t>();
+	int64_t fd = evt->get_syscall_return_value();
 
 	/* pid (fd) */
 	ASSERT(evt->get_param_info(1)->type == PT_PID);
@@ -5287,7 +5269,6 @@ void sinsp_parser::parse_pidfd_open_exit(sinsp_evt *evt) {
 }
 
 void sinsp_parser::parse_pidfd_getfd_exit(sinsp_evt *evt) {
-	int64_t fd;
 	int64_t pidfd;
 	int64_t targetfd;
 
@@ -5296,9 +5277,7 @@ void sinsp_parser::parse_pidfd_getfd_exit(sinsp_evt *evt) {
 	}
 
 	/* ret (fd) */
-	// todo!: we will need to update this to PT_FD32
-	ASSERT(evt->get_param_info(0)->type == PT_FD);
-	fd = evt->get_param(0)->as<int64_t>();
+	int64_t fd = evt->get_syscall_return_value();
 
 	/* pidfd */
 	// todo!: we will need to update this to PT_FD32

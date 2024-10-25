@@ -236,7 +236,7 @@ TEST_F(sys_call_test, close_badfd) {
 	};
 
 	captured_event_callback_t callback = [&](const callback_param& param) {
-		int fd = param.m_evt->get_param(0)->as<int64_t>();
+		int fd = param.m_evt->get_syscall_return_value();
 		if(param.m_evt->get_direction() == SCAP_ED_IN && (fd == -1 || fd == INT_MAX)) {
 			callnum++;
 		} else if(param.m_evt->get_direction() == SCAP_ED_OUT && fd == -EBADF) {
@@ -263,7 +263,7 @@ TEST_F(sys_call_test, close_badfd_dropping) {
 	};
 
 	captured_event_callback_t callback = [&](const callback_param& param) {
-		int fd = param.m_evt->get_param(0)->as<int64_t>();
+		int fd = param.m_evt->get_syscall_return_value();
 		if(param.m_evt->get_direction() == SCAP_ED_IN && (fd == -1 || fd == INT_MAX)) {
 			callnum++;
 		} else if(param.m_evt->get_direction() == SCAP_ED_OUT && fd == -EBADF) {
