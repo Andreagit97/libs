@@ -22,43 +22,85 @@ TEST_F(sinsp_with_test_input, parse_open_success) {
 	add_default_init_thread();
 	open_inspector();
 
-	sinsp_evt* evt = generate_open_event();
-	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_OPEN);
+	int32_t fd = 5;
+	uint32_t flags = PPM_O_APPEND | PPM_O_CREAT | PPM_O_RDWR;
+	uint32_t mode = PPM_S_IRUSR | PPM_S_IWUSR | PPM_S_IRGRP | PPM_S_IROTH;
+	uint32_t dev = 324;
+	uint64_t ino = 534;
+
+	auto evt = generate_open_event(
+	        sinsp_test_input::open_params{.fd = fd,
+	                                      .path = sinsp_test_input::open_params::default_path,
+	                                      .flags = flags,
+	                                      .mode = mode,
+	                                      .dev = dev,
+	                                      .ino = ino});
 
 	// Assert file descriptor presence
 	sinsp_threadinfo* init_tinfo = m_inspector.get_thread_ref(INIT_TID, false, true).get();
 	ASSERT_TRUE(init_tinfo);
 
-	sinsp_fdinfo* fdinfo = init_tinfo->get_fd(sinsp_test_input::open_params::default_fd);
+	// The default one + the one just opened
+	ASSERT_EQ(init_tinfo->get_fd_opencount(), 2);
+
+	sinsp_fdinfo* fdinfo = init_tinfo->get_fd(fd);
 	ASSERT_TRUE(fdinfo);
 	ASSERT_EQ(fdinfo->m_name, sinsp_test_input::open_params::default_path);
 
-	// Assert some filterchecks
+	// Assert path filterchecks
 	ASSERT_EQ(get_field_as_string(evt, "fd.name"), sinsp_test_input::open_params::default_path);
 	ASSERT_EQ(get_field_as_string(evt, "fd.directory"),
 	          sinsp_test_input::open_params::default_directory);
 	ASSERT_EQ(get_field_as_string(evt, "fd.filename"),
 	          sinsp_test_input::open_params::default_filename);
+
+	// Assert parameters filterchecks
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"),
+	          std::string("<f>") + sinsp_test_input::open_params::default_path);
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.fd32_rename"), std::to_string(fd));
+
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[1]"), sinsp_test_input::open_params::default_path);
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.name"),
+	          sinsp_test_input::open_params::default_path);
+
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[2]"), "O_APPEND|O_CREAT|O_RDWR");
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.flags"), std::to_string(flags));
+
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[3]"),
+	          "0644");  // octal notation of 420 formatted as string.
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.mode"),
+	          "644");  // todo!: not sure we want this and not the decimal value like with dev
+
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[4]"), "144");  // hexadecimal notation
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.dev"), std::to_string(dev));
+
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[5]"), std::to_string(ino));
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.ino"), std::to_string(ino));
 }
 
 TEST_F(sinsp_with_test_input, parse_open_failure) {
 	add_default_init_thread();
 	open_inspector();
 
-	sinsp_evt* evt = generate_open_event(sinsp_test_input::open_params{.fd = -1});
-	ASSERT_EQ(evt->get_type(), PPME_SYSCALL_OPEN);
+	int32_t fd = -3;
+	sinsp_evt* evt = generate_open_event(sinsp_test_input::open_params{.fd = fd});
 
 	// Assert file descriptor presence
 	sinsp_threadinfo* init_tinfo = m_inspector.get_thread_ref(INIT_TID, false, true).get();
 	ASSERT_TRUE(init_tinfo);
 
-	sinsp_fdinfo* fdinfo = init_tinfo->get_fd(sinsp_test_input::open_params::default_fd);
-	ASSERT_FALSE(fdinfo);
+	// We should have only the default file descriptor opened, the event failed so no new file
+	// descriptor should be created
+	ASSERT_EQ(init_tinfo->get_fd_opencount(), 1);
 
-	// Assert some filterchecks
+	// Assert path filterchecks
 	ASSERT_FALSE(field_has_value(evt, "fd.name"));
 	ASSERT_FALSE(field_has_value(evt, "fd.directory"));
 	ASSERT_FALSE(field_has_value(evt, "fd.filename"));
+
+	// Assert return value filterchecks
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"), "ESRCH");
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.fd32_rename"), std::to_string(fd));
 }
 
 TEST_F(sinsp_with_test_input, parse_open_path_too_long) {
