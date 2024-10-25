@@ -50,3 +50,9 @@ void fill_missing_parameters(scap_evt *new_evt, uint16_t *offset);
 void store_evt(uint64_t tid, scap_evt *evt);
 
 scap_evt *retrieve_evt(uint64_t tid);
+
+uint32_t get_param_len(scap_evt *evt, uint8_t num_param);
+
+char *get_param_ptr(scap_evt *evt, uint8_t num_param);
+
+void fill_missing_parameters_v(scap_evt *new_evt, uint16_t *offset, int num_args, ...);

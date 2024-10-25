@@ -16,11 +16,22 @@ limitations under the License.
 
 */
 #include <converter/conversion_types.h>
+#include <stdint.h>
 
 extern conversion_result call_conversion(scap_evt *new_evt, scap_evt *evt_to_convert, char *error);
+extern scap_evt *retrieve_evt(uint64_t tid);
+extern void clear_storage();
 
 extern "C" conversion_result scap_convert_event(scap_evt *new_evt,
                                                 scap_evt *evt_to_convert,
                                                 char *error) {
 	return call_conversion(new_evt, evt_to_convert, error);
+}
+
+extern "C" scap_evt *retrieve_evt_from_storage(uint64_t tid) {
+	return retrieve_evt(tid);
+}
+
+extern "C" void clear_evt_storage() {
+	clear_storage();
 }

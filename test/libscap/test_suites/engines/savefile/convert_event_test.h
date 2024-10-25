@@ -24,7 +24,7 @@ limitations under the License.
 #include <stdexcept>
 #include <libscap/engine/savefile/converter/public_converter.h>
 
-typedef std::unique_ptr<scap_evt, decltype(free) *> safe_scap_evt_t;
+typedef std::shared_ptr<scap_evt> safe_scap_evt_t;
 
 safe_scap_evt_t safe_scap_evt(scap_evt *evt) {
 	return safe_scap_evt_t{evt, free};
@@ -34,6 +34,11 @@ class convert_event_test : public testing::Test {
 	static constexpr uint16_t safe_margin = 100;
 
 protected:
+	virtual void TearDown() {
+		// At every iteration we want to clear the storage in the converter
+		clear_evt_storage();
+	}
+
 	safe_scap_evt_t create_safe_scap_event(uint64_t ts,
 	                                       uint64_t tid,
 	                                       ppm_event_code event_type,
@@ -144,6 +149,16 @@ protected:
 			printf("\nConverted event:\n");
 			scap_print_event(new_evt.get(), PRINT_FULL);
 			FAIL() << error;
+		}
+	}
+
+	void assert_event_storage_presence(uint64_t tid, uint16_t evt_type) {
+		auto event = retrieve_evt_from_storage(tid);
+		if(!event) {
+			FAIL() << "Event with tid " << tid << " not found in the storage";
+		}
+		if(event->type != evt_type) {
+			FAIL() << "Expected event type " << evt_type << ", got: " << event->type;
 		}
 	}
 };

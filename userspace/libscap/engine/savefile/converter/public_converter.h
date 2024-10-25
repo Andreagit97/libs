@@ -29,6 +29,10 @@ extern "C" {
 
 conversion_result scap_convert_event(scap_evt* new_evt, scap_evt* evt_to_convert, char* error);
 
+// Only for testing purposes
+scap_evt* retrieve_evt_from_storage(uint64_t tid);
+void clear_evt_storage();
+
 #ifdef __cplusplus
 };
 #endif

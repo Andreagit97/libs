@@ -21,6 +21,7 @@ limitations under the License.
 #include <converter/debug_macro.h>
 #include <stdarg.h>
 #include <cstdio>
+#include <cassert>
 #include <unordered_map>
 
 static std::unordered_map<uint64_t, scap_evt *> evt_storage = {};
@@ -223,4 +224,63 @@ scap_evt *retrieve_evt(uint64_t tid) {
 
 void clear_storage() {
 	evt_storage.clear();
+}
+
+uint16_t get_param_len(scap_evt *evt, uint8_t num_param) {
+	if(evt->nparams <= num_param) {
+		assert(false);
+		return 0;
+	}
+
+	// todo!: we need to manage LARGE_PAYLOAD events
+	uint16_t off_len = sizeof(scap_evt) + sizeof(uint16_t) * num_param;
+	uint16_t len = 0;
+	memcpy(&len, (char *)evt + off_len, sizeof(uint16_t));
+	return (uint32_t)len;
+}
+
+char *get_param_ptr(scap_evt *evt, uint8_t num_param) {
+	if(evt->nparams <= num_param) {
+		assert(false);
+		return nullptr;
+	}
+
+	// todo!: we need to manage LARGE_PAYLOAD events
+	char *ptr = (char *)evt + sizeof(scap_evt) + sizeof(uint16_t) * evt->nparams;
+	uint16_t ptr_off = 0;
+	for(auto i = 0; i < num_param; i++) {
+		uint16_t len = 0;
+		memcpy(&len, (char *)evt + sizeof(scap_evt) + sizeof(uint16_t) * i, sizeof(uint16_t));
+		ptr_off += len;
+	}
+
+	return ptr + ptr_off;
+}
+
+void fill_missing_parameters_v(scap_evt *new_evt, uint16_t *offset, int num_args, ...) {
+	// We should always receive pairs of arguments (param, len)
+	if(num_args == 0 || num_args % 2 != 0) {
+		assert(false);
+		return;
+	}
+
+	va_list args;
+	va_start(args, num_args);
+
+	for(int i = 0; i < num_args; i += 2) {
+		uint16_t param_len = va_arg(args, int);
+		char *get_param_ptr = va_arg(args, char *);
+
+		memcpy((char *)new_evt + *offset, get_param_ptr, param_len);
+		*offset += param_len;
+	}
+	va_end(args);
+
+	// Adjust the number of parameters
+	new_evt->nparams = g_event_info[new_evt->type].nparams;
+	// Adjust the final length
+	new_evt->len = *offset;
+
+	PRINT_MESSAGE("Final event:\n");
+	PRINT_EVENT(new_evt, PRINT_FULL);
 }

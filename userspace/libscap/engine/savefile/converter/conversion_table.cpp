@@ -82,6 +82,71 @@ conversion_result convert_PPME_SYSCALL_OPEN_X(scap_evt *new_evt,
 	return return_error(evt_to_convert, error);
 }
 
+/////////////////////////////
+// BRK
+/////////////////////////////
+
+conversion_result convert_PPME_SYSCALL_BRK_1_X(scap_evt *new_evt,
+                                               scap_evt *evt_to_convert,
+                                               char *error) {
+	if(validate_nparams(evt_to_convert, error, 1, 1) == CONVERSION_ERROR) {
+		return CONVERSION_ERROR;
+	}
+
+	// - Num params: 1
+	// - p(0): res
+	// We want to convert it to PPME_SYSCALL_BRK_4_X with 4 parameters.
+
+	uint16_t offset = copy_first_n_lengths_and_header(new_evt, evt_to_convert, 1);
+	// we want to change the event type here because otherwise we will access the wrong
+	// entry in the event table
+	change_event_type(new_evt, PPME_SYSCALL_BRK_4_X);
+	fill_missing_lengths(new_evt, &offset);
+	copy_params(new_evt, evt_to_convert, 1, &offset);
+	fill_missing_parameters(new_evt, &offset);
+	return CONVERSION_CONTINUE;
+}
+
+conversion_result convert_PPME_SYSCALL_BRK_4_E(scap_evt *new_evt,
+                                               scap_evt *evt_to_convert,
+                                               char *error) {
+	if(validate_nparams(evt_to_convert, error, 1, 1) == CONVERSION_ERROR) {
+		return CONVERSION_ERROR;
+	}
+
+	store_evt(evt_to_convert->tid, evt_to_convert);
+	return CONVERSION_SKIP;
+}
+
+conversion_result convert_PPME_SYSCALL_BRK_4_X(scap_evt *new_evt,
+                                               scap_evt *evt_to_convert,
+                                               char *error) {
+	if(validate_nparams(evt_to_convert, error, 1, 4) == CONVERSION_ERROR) {
+		return CONVERSION_ERROR;
+	}
+
+	// - Num params: 4
+	// - p(0): res, p(1): vm_size, p(2): vm_rss, p(3): vm_swap
+	// We want to convert it to PPME_SYSCALL_BRK with 5 parameters.
+
+	uint16_t offset = copy_first_n_lengths_and_header(new_evt, evt_to_convert, 4);
+	change_event_type(new_evt, PPME_SYSCALL_BRK);
+	fill_missing_lengths(new_evt, &offset);
+	copy_params(new_evt, evt_to_convert, 4, &offset);
+
+	// If we are able to retrieve the enter event we should copy the value from the enter event
+	// otherwise we use the default for that type.
+	auto enter_evt = retrieve_evt(evt_to_convert->tid);
+	if(enter_evt) {
+		auto addr_len = get_param_len(enter_evt, 0);
+		char *addr = get_param_ptr(enter_evt, 0);
+		fill_missing_parameters_v(new_evt, &offset, 2, addr_len, addr);
+	} else {
+		fill_missing_parameters(new_evt, &offset);
+	}
+	return CONVERSION_COMPLETED;
+}
+
 /* ============================= Converters ============================= */
 
 using conv_func_t = conversion_result (*)(scap_evt *new_evt, scap_evt *evt_to_convert, char *error);
@@ -89,7 +154,10 @@ using conv_func_t = conversion_result (*)(scap_evt *new_evt, scap_evt *evt_to_co
 static std::unordered_map<ppm_event_code, conv_func_t> g_conversion_table = {
         {PPME_SYSCALL_OPEN_E, conversion_skip},
         {PPME_SYSCALL_OPEN_X, convert_PPME_SYSCALL_OPEN_X},
-
+        {PPME_SYSCALL_BRK_1_E, conversion_skip},
+        {PPME_SYSCALL_BRK_1_X, convert_PPME_SYSCALL_BRK_1_X},
+        {PPME_SYSCALL_BRK_4_E, convert_PPME_SYSCALL_BRK_4_E},
+        {PPME_SYSCALL_BRK_4_X, convert_PPME_SYSCALL_BRK_4_X},
 };
 
 conversion_result call_conversion(scap_evt *new_evt, scap_evt *evt_to_convert, char *error) {
