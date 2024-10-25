@@ -28,11 +28,13 @@ TEST_F(sinsp_with_test_input, bcontains_bstartswith) {
 
 	uint8_t read_buf[] = {'h', 'e', 'l', 'l', 'o'};
 	sinsp_evt* evt = add_event_advance_ts(increasing_ts(),
-	                                      1,
-	                                      PPME_SYSCALL_READ_X,
-	                                      2,
-	                                      (int64_t)0,
-	                                      scap_const_sized_buffer{read_buf, sizeof(read_buf)});
+	                                      INIT_TID,
+	                                      PPME_SYSCALL_READ,
+	                                      4,
+	                                      (int32_t)0,
+	                                      scap_const_sized_buffer{read_buf, sizeof(read_buf)},
+	                                      (int32_t)5,
+	                                      (uint32_t)sizeof(read_buf));
 
 	// test filters with bcontains
 	EXPECT_FALSE(filter_compiles("evt.buffer bcontains"));

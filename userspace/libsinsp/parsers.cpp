@@ -175,7 +175,7 @@ void sinsp_parser::process_event(sinsp_evt *evt) {
 	case PPME_SYSCALL_UNLINKAT_X:
 		parse_fspath_related_exit(evt);
 		break;
-	case PPME_SYSCALL_READ_X:
+	case PPME_SYSCALL_READ:
 	case PPME_SYSCALL_WRITE_X:
 	case PPME_SOCKET_RECV_X:
 	case PPME_SOCKET_SEND_X:
@@ -3734,6 +3734,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt) {
 	//
 	// Extract the return value
 	//
+	// todo!: this is wrong
 	retval = evt->get_param(0)->as<int64_t>();
 
 	if(evt->get_fd_info() == NULL) {
