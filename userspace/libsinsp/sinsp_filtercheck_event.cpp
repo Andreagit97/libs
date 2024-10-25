@@ -820,65 +820,18 @@ Json::Value sinsp_filter_check_event::extract_as_js(sinsp_evt* evt, uint32_t* le
 	return Json::nullValue;
 }
 
-// we need to call it only for the exit events and for syscall events
-inline int64_t get_res_value_from_syscall_evt(sinsp_evt* evt) {
-	// todo!: safe checks that we need to remove at the end of the work
-	if(!libsinsp::events::is_syscall_event((ppm_event_code)evt->get_type()) ||
-	   (PPME_IS_ENTER(evt->get_type()) && evt->get_type() < PPME_SYSCALL_OPEN)) {
-		ASSERT(false);
-		return 0;
-	}
-
-	// The return value is always the first parameter
-	const sinsp_evt_param* p = evt->get_param(0);
-	if(p == NULL) {
-		ASSERT(false);
-		return 0;
-	}
-
-	// the only return values should be on 32 or 64 bits
-	switch(scap_get_size_bytes_from_type(p->get_info()->type)) {
-	case 4:
-		return (int64_t)p->as<int32_t>();
-	case 8:
-		return p->as<int64_t>();
-	default:
-		ASSERT(false);
-		return 0;
-	}
-
-	return 0;
-}
-
 // The `len` parameter is need for the macro `RETURN_EXTRACT_VAR`. todo!: we can probably cleanup.
 uint8_t* sinsp_filter_check_event::extract_error_count(sinsp_evt* evt, uint32_t* len) {
+	// todo!: we need to understand if we want to return `0` or `<NA>`.
+	// At the moment we return `<NA>`.
+	if(!evt->has_return_value()) {
+		return NULL;
+	}
+
 	m_val.u32 = 0;
-	// This is a filtercheck we use only for syscalls so all other events should be considered
-	if(evt->get_type() >= PPME_SYSCALL_OPEN &&
-	   libsinsp::events::is_syscall_event((ppm_event_code)evt->get_type())) {
-		if(get_res_value_from_syscall_evt(evt) < 0) {
-			m_val.u32 = 1;
-		}
-		RETURN_EXTRACT_VAR(m_val.u32);
+	if(evt->get_syscall_return_value() < 0) {
+		m_val.u32 = 1;
 	}
-
-	// todo!: Old logic should be deleted at the end of the work
-	const sinsp_evt_param* pi = evt->get_param_by_name("res");
-
-	if(pi != NULL) {
-		if(pi->as<int64_t>() < 0) {
-			m_val.u32 = 1;
-		}
-	} else if((evt->get_info_flags() & EF_CREATES_FD) && PPME_IS_EXIT(evt->get_type())) {
-		pi = evt->get_param_by_name("fd");
-
-		if(pi != NULL) {
-			if(pi->as<int64_t>() < 0) {
-				m_val.u32 = 1;
-			}
-		}
-	}
-
 	RETURN_EXTRACT_VAR(m_val.u32);
 }
 
@@ -1321,86 +1274,24 @@ uint8_t* sinsp_filter_check_event::extract_single(sinsp_evt* evt,
 		}
 		break;
 	case TYPE_RESRAW: {
-		if(evt->get_type() >= PPME_SYSCALL_OPEN &&
-		   libsinsp::events::is_syscall_event((ppm_event_code)evt->get_type())) {
-			m_val.s64 = get_res_value_from_syscall_evt(evt);
-			RETURN_EXTRACT_VAR(m_val.s64);
+		if(!evt->has_return_value()) {
+			return NULL;
 		}
 
-		// todo!: Old logic should be deleted at the end of the work
-		const sinsp_evt_param* pi = evt->get_param_by_name("res");
-
-		if(pi != NULL) {
-			*len = pi->m_len;
-			return (uint8_t*)pi->m_val;
-		}
-
-		if((evt->get_info_flags() & EF_CREATES_FD) && PPME_IS_EXIT(evt->get_type())) {
-			pi = evt->get_param_by_name("fd");
-
-			if(pi != NULL) {
-				*len = pi->m_len;
-				return (uint8_t*)pi->m_val;
-			}
-		}
-
-		return NULL;
+		m_val.s64 = evt->get_syscall_return_value();
+		RETURN_EXTRACT_VAR(m_val.s64);
 	} break;
 	case TYPE_RESSTR: {
-		// This is a filtercheck we use only for syscalls so all other events should be considered
-		if(evt->get_type() >= PPME_SYSCALL_OPEN &&
-		   libsinsp::events::is_syscall_event((ppm_event_code)evt->get_type())) {
-			int64_t res = get_res_value_from_syscall_evt(evt);
-			if(res >= 0) {
-				RETURN_EXTRACT_CSTR("SUCCESS");
-			}
-			m_strstorage = sinsp_utils::errno_to_str((int32_t)res);
-			RETURN_EXTRACT_STRING(m_strstorage);
-		}
-		// todo!: Old logic should be deleted at the end of the work
-		const char* resolved_argstr;
-		const char* argstr;
-
-		const sinsp_evt_param* pi = evt->get_param_by_name("res");
-
-		if(pi != NULL) {
-			int64_t res = pi->as<int64_t>();
-
-			if(res >= 0) {
-				RETURN_EXTRACT_CSTR("SUCCESS");
-			} else {
-				argstr = evt->get_param_value_str("res", &resolved_argstr);
-				ASSERT(resolved_argstr != NULL && resolved_argstr[0] != 0);
-
-				if(resolved_argstr != NULL && resolved_argstr[0] != 0) {
-					RETURN_EXTRACT_CSTR(resolved_argstr);
-				} else if(argstr != NULL) {
-					RETURN_EXTRACT_CSTR(argstr);
-				}
-			}
-		} else {
-			if((evt->get_info_flags() & EF_CREATES_FD) && PPME_IS_EXIT(evt->get_type())) {
-				pi = evt->get_param_by_name("fd");
-				if(pi) {
-					int64_t res = pi->as<int64_t>();
-
-					if(res >= 0) {
-						RETURN_EXTRACT_CSTR("SUCCESS");
-					} else {
-						argstr = evt->get_param_value_str("fd", &resolved_argstr);
-						ASSERT(resolved_argstr != NULL && resolved_argstr[0] != 0);
-
-						if(resolved_argstr != NULL && resolved_argstr[0] != 0) {
-							RETURN_EXTRACT_CSTR(resolved_argstr);
-						} else if(argstr != NULL) {
-							RETURN_EXTRACT_CSTR(argstr);
-						}
-					}
-				}
-			}
+		if(!evt->has_return_value()) {
+			return NULL;
 		}
 
-		return NULL;
+		int64_t res = evt->get_syscall_return_value();
+		if(res >= 0) {
+			RETURN_EXTRACT_CSTR("SUCCESS");
+		}
+		m_strstorage = sinsp_utils::errno_to_str((int32_t)res);
+		RETURN_EXTRACT_STRING(m_strstorage);
 	} break;
 	case TYPE_ISIO: {
 		ppm_event_flags eflags = evt->get_info_flags();

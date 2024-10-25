@@ -1851,3 +1851,46 @@ void sinsp_evt_param::throw_invalid_len_error(size_t requested_length) const {
 const ppm_param_info *sinsp_evt_param::get_info() const {
 	return &(m_evt->get_info()->params[m_idx]);
 }
+
+bool sinsp_evt::has_return_value() {
+	// The event has a return value:
+	// * if it is a syscall event and it is an exit event.
+	if(!libsinsp::events::is_syscall_event((ppm_event_code)get_type())) {
+		return false;
+	}
+
+	// Please note that the macro `PPME_IS_ENTER` can be used only for events `< PPME_SYSCALL_OPEN`
+	// because after that event they are no more paired.
+	// todo!: we need to remove the `PPME_IS_ENTER` check at the end of the work because we will
+	// have only exit events by default
+	if(PPME_IS_ENTER(get_type()) && get_type() < PPME_SYSCALL_OPEN) {
+		return false;
+	}
+
+	return true;
+}
+
+int64_t sinsp_evt::get_syscall_return_value() {
+	ASSERT(has_return_value());
+
+	// The return value is always the first parameter of the syscall event
+	// It could have different names depending on the event type `res`,`fd`, etc.
+	const sinsp_evt_param *p = get_param(0);
+	if(p == NULL) {
+		// We should always have the return value in the syscall
+		ASSERT(false);
+		return 0;
+	}
+
+	// the only return values should be on 32 or 64 bits
+	// todo!: check it at the end of the work
+	switch(scap_get_size_bytes_from_type(p->get_info()->type)) {
+	case 4:
+		return (int64_t)p->as<int32_t>();
+	case 8:
+		return p->as<int64_t>();
+	default:
+		ASSERT(false);
+		return 0;
+	}
+}

@@ -680,6 +680,10 @@ public:
 
 	inline std::vector<sinsp_evt_param>& get_params() { return m_params; }
 
+	bool has_return_value();
+
+	int64_t get_syscall_return_value();
+
 private:
 	sinsp* m_inspector;
 	scap_evt* m_pevt;
