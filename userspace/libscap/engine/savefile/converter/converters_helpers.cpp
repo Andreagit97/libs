@@ -177,7 +177,7 @@ void copy_params(scap_evt *new_evt,
 	*offset += len_to_copy;
 }
 
-void fill_missing_parameters(scap_evt *new_evt, uint16_t *offset) {
+void fill_missing_parameters_with_default(scap_evt *new_evt, uint16_t *offset) {
 	// Please ensure that `new_evt->type` is already the final type you want to obtain.
 	// Otherwise we will access the wrong entry in the event table.
 	const struct ppm_event_info *event_info = &(g_event_info[new_evt->type]);
@@ -257,7 +257,7 @@ char *get_param_ptr(scap_evt *evt, uint8_t num_param) {
 	return ptr + ptr_off;
 }
 
-void fill_missing_parameters_v(scap_evt *new_evt, uint16_t *offset, int num_args, ...) {
+void fill_missing_parameters(scap_evt *new_evt, uint16_t *offset, int num_args, ...) {
 	// We should always receive pairs of arguments (param, len)
 	if(num_args == 0 || num_args % 2 != 0) {
 		assert(false);

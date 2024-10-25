@@ -61,7 +61,7 @@ conversion_result convert_PPME_SYSCALL_OPEN_X(scap_evt *new_evt,
 		// Copy the rest of the parameters we need to keep
 		copy_params(new_evt, evt_to_convert, 4, &offset);
 		// Now we need to add the missing parameters
-		fill_missing_parameters(new_evt, &offset);
+		fill_missing_parameters_with_default(new_evt, &offset);
 		return CONVERSION_CONTINUE;
 	}
 
@@ -103,7 +103,7 @@ conversion_result convert_PPME_SYSCALL_BRK_1_X(scap_evt *new_evt,
 	change_event_type(new_evt, PPME_SYSCALL_BRK_4_X);
 	fill_missing_lengths(new_evt, &offset);
 	copy_params(new_evt, evt_to_convert, 1, &offset);
-	fill_missing_parameters(new_evt, &offset);
+	fill_missing_parameters_with_default(new_evt, &offset);
 	return CONVERSION_CONTINUE;
 }
 
@@ -140,9 +140,9 @@ conversion_result convert_PPME_SYSCALL_BRK_4_X(scap_evt *new_evt,
 	if(enter_evt) {
 		auto addr_len = get_param_len(enter_evt, 0);
 		char *addr = get_param_ptr(enter_evt, 0);
-		fill_missing_parameters_v(new_evt, &offset, 2, addr_len, addr);
+		fill_missing_parameters(new_evt, &offset, 2, addr_len, addr);
 	} else {
-		fill_missing_parameters(new_evt, &offset);
+		fill_missing_parameters_with_default(new_evt, &offset);
 	}
 	return CONVERSION_COMPLETED;
 }
