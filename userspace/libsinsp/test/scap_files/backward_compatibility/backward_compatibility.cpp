@@ -17,7 +17,7 @@ limitations under the License.
 
 */
 
-#include "scap_file_test.h"
+#include <scap_files/scap_file_test.h>
 
 // Use `sudo sysdig -r <scap-file> -S -q` to check the number of events in the scap file.
 // When you find a specific event to assert use

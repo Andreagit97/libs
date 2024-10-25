@@ -24,27 +24,9 @@ limitations under the License.
 
 typedef std::unique_ptr<scap_evt, decltype(free)*> safe_scap_evt_t;
 
-safe_scap_evt_t create_safe_scap_evt(scap_evt* evt) {
-	return safe_scap_evt_t{evt, free};
-}
-
 class scap_file_test : public testing::Test {
 private:
-	// todo!: remove it if we don't need it at the end of the work
-	sinsp_evt* get_evt_by_num(uint64_t evt_num) {
-		sinsp_evt* evt;
-		int ret = SCAP_SUCCESS;
-		while(ret != SCAP_EOF) {
-			ret = m_inspector->next(&evt);
-			if(ret != SCAP_SUCCESS) {
-				throw std::runtime_error("Error reading event: " + m_inspector->getlasterr());
-			}
-			if(ret == SCAP_SUCCESS && evt->get_num() == evt_num) {
-				return evt;
-			}
-		}
-		return NULL;
-	}
+	safe_scap_evt_t create_safe_scap_evt(scap_evt* evt) { return safe_scap_evt_t{evt, free}; }
 
 protected:
 	// todo!: remove it if we don't need it at the end of the work
@@ -140,6 +122,26 @@ protected:
 		}
 		FAIL() << "There is no an event with ts: " << expected_evt->ts
 		       << " and tid: " << expected_evt->tid;
+	}
+
+	sinsp_evt* capture_search_evt_by_type_and_tid(uint64_t type, int64_t tid) {
+		sinsp_evt* evt;
+		int ret = SCAP_SUCCESS;
+		while(ret != SCAP_EOF) {
+			ret = m_inspector->next(&evt);
+			if(ret == SCAP_SUCCESS && evt->get_type() == type && evt->get_tid() == tid) {
+				return evt;
+			}
+		}
+		return NULL;
+	}
+
+	void read_until_EOF() {
+		sinsp_evt* evt;
+		int ret = SCAP_SUCCESS;
+		while(ret != SCAP_EOF) {
+			ret = m_inspector->next(&evt);
+		}
 	}
 
 	std::unique_ptr<sinsp> m_inspector;
