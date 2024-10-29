@@ -56,3 +56,5 @@ uint32_t get_param_len(scap_evt *evt, uint8_t num_param);
 char *get_param_ptr(scap_evt *evt, uint8_t num_param);
 
 void fill_missing_parameters(scap_evt *new_evt, uint16_t *offset, int num_args, ...);
+
+uint16_t copy_header(scap_evt *new_evt, scap_evt *evt_to_convert);

@@ -119,3 +119,49 @@ TEST_F(scap_file_test, brk_4_x_same_number_of_events) {
 	// There are `284` PPME_SYSCALL_BRK_4_X events in the scap file. We should have the same number.
 	assert_num_event_type(PPME_SYSCALL_BRK, 284);
 }
+
+////////////////////////////
+// READ
+////////////////////////////
+
+TEST_F(scap_file_test, no_read_e) {
+	open_filename("scap_2013.scap");
+	assert_no_event_type(PPME_SYSCALL_READ_E);
+}
+
+TEST_F(scap_file_test, read_same_number_of_events) {
+	open_filename("scap_2013.scap");
+	assert_num_event_type(PPME_SYSCALL_READ, 24957);
+}
+
+TEST_F(scap_file_test, read_check_final_converted_event) {
+	open_filename("scap_2013.scap");
+
+	// Inside the scap-file the event `430682` is the following:
+	//
+	// type=PPME_SYSCALL_READ_X,  ts=1380933088076148247, tid=44106, args=res=270 data=HTTP/1.1 302
+	// Found..Date: Sat, 05 Oct 2013 00:31:28 GMT..Server: Apache/2.4.4 (U
+	//
+	// And its corresponding enter event `430681` is the following:
+	// type=PPME_SYSCALL_READ_E, ts=1380933088076145348, tid=44106,
+	// args=fd=33(<4t>127.0.0.1:38308->127.0.0.1:80) size=8192
+	//
+	// Let's check if it has been converted to the new event!
+
+	uint64_t ts = 1380933088076148247;
+	int64_t tid = 44106;
+	int32_t res = 270;
+	std::string data =
+	        "HTTP/1.1 302 Found..Date: Sat, 05 Oct 2013 00:31:28 GMT..Server: Apache/2.4.4 (U";
+	int32_t fd = 33;
+	uint32_t size = 8192;
+
+	assert_event_presence(create_safe_scap_event(ts,
+	                                             tid,
+	                                             PPME_SYSCALL_READ,
+	                                             4,
+	                                             res,
+	                                             scap_const_sized_buffer{data.c_str(), data.size()},
+	                                             fd,
+	                                             size));
+}

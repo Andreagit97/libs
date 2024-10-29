@@ -157,6 +157,7 @@ protected:
 		if(!event) {
 			FAIL() << "Event with tid " << tid << " not found in the storage";
 		}
+		// todo!: we could do the comparison of the whole event here
 		if(event->type != evt_type) {
 			FAIL() << "Expected event type " << evt_type << ", got: " << event->type;
 		}

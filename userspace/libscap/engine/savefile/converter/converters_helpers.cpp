@@ -23,6 +23,8 @@ limitations under the License.
 #include <cstdio>
 #include <cassert>
 #include <unordered_map>
+#include <string>
+#include <stdexcept>
 
 static std::unordered_map<uint64_t, scap_evt *> evt_storage = {};
 
@@ -38,6 +40,7 @@ void copy_old_event(scap_evt *new_evt, scap_evt *evt_to_convert) {
 	PRINT_EVENT(new_evt, PRINT_FULL);
 }
 
+// the first parameter of te event has `param_idx` == 0
 void change_param_len_from_s64_to_s32(scap_evt *e, uint8_t param_idx) {
 	uint16_t off_len = sizeof(scap_evt);
 	uint16_t tot_len = 0;
@@ -142,6 +145,14 @@ uint16_t copy_first_n_lengths_and_header(scap_evt *new_evt,
 	return offset;
 }
 
+uint16_t copy_header(scap_evt *new_evt, scap_evt *evt_to_convert) {
+	memcpy(new_evt, evt_to_convert, sizeof(scap_evt));
+
+	PRINT_MESSAGE("New header:\n");
+	PRINT_EVENT(new_evt, PRINT_HEADER);
+	return sizeof(scap_evt);
+}
+
 void fill_missing_lengths(scap_evt *new_evt, uint16_t *offset) {
 	// Please ensure that `new_evt->type` is already the final type you want to obtain.
 	// Otherwise we will access the wrong entry in the event table.
@@ -170,7 +181,7 @@ void copy_params(scap_evt *new_evt,
 	memcpy((char *)new_evt + *offset, (char *)evt_to_convert + offset_evt_to_convert, len_to_copy);
 
 	PRINT_MESSAGE(
-	        "copy the rest of the event to convert (len: %ld) in the new event at offest (%d)\n",
+	        "copy the rest of the event to convert (len: %d) in the new event at offest (%d)\n",
 	        len_to_copy,
 	        *offset);
 
@@ -211,11 +222,19 @@ void store_evt(uint64_t tid, scap_evt *evt) {
 	// don't need it anymore. We need to keep the enter event until we retrieve it in the
 	// corresponding exit event, but if the same thread is doing another enter event it means the
 	// previous syscall is already completed
-	// todo!: understand if we need to alloc memory or it is enough to store the pointer
-	evt_storage[tid] = evt;
+
+	// todo!: use smart pointers.
+	if(evt_storage.find(tid) != evt_storage.end()) {
+		free(evt_storage[tid]);
+	}
+
+	scap_evt *tmp_evt = (scap_evt *)malloc(evt->len);
+	memcpy(tmp_evt, evt, evt->len);
+	evt_storage[tid] = tmp_evt;
 }
 
 scap_evt *retrieve_evt(uint64_t tid) {
+	// todo! : we need to check that the type is the right one not just the tid
 	if(evt_storage.find(tid) != evt_storage.end()) {
 		return evt_storage[tid];
 	}
@@ -223,13 +242,19 @@ scap_evt *retrieve_evt(uint64_t tid) {
 }
 
 void clear_storage() {
+	for(auto it = evt_storage.begin(); it != evt_storage.end(); ++it) {
+		free(it->second);
+	}
 	evt_storage.clear();
 }
 
 uint16_t get_param_len(scap_evt *evt, uint8_t num_param) {
 	if(evt->nparams <= num_param) {
-		assert(false);
-		return 0;
+		std::string error = "Try to access len of param num '" + std::to_string(num_param) +
+		                    "' for event " + get_event_name((ppm_event_code)evt->type) + "_" +
+		                    get_direction_char((ppm_event_code)evt->type) +
+		                    " (num parameters: " + std::to_string(evt->type) + ").";
+		throw std::runtime_error(error);
 	}
 
 	// todo!: we need to manage LARGE_PAYLOAD events
@@ -241,8 +266,11 @@ uint16_t get_param_len(scap_evt *evt, uint8_t num_param) {
 
 char *get_param_ptr(scap_evt *evt, uint8_t num_param) {
 	if(evt->nparams <= num_param) {
-		assert(false);
-		return nullptr;
+		std::string error = "Try to access param num '" + std::to_string(num_param) +
+		                    "' for event " + get_event_name((ppm_event_code)evt->type) + "_" +
+		                    get_direction_char((ppm_event_code)evt->type) +
+		                    " (num parameters: " + std::to_string(evt->type) + ").";
+		throw std::runtime_error(error);
 	}
 
 	// todo!: we need to manage LARGE_PAYLOAD events
@@ -260,8 +288,9 @@ char *get_param_ptr(scap_evt *evt, uint8_t num_param) {
 void fill_missing_parameters(scap_evt *new_evt, uint16_t *offset, int num_args, ...) {
 	// We should always receive pairs of arguments (param, len)
 	if(num_args == 0 || num_args % 2 != 0) {
-		assert(false);
-		return;
+		std::string error = "Try to call the method with an odd number of arguments: " +
+		                    std::to_string(num_args);
+		throw std::runtime_error(error);
 	}
 
 	va_list args;

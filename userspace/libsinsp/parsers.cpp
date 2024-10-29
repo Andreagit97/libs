@@ -175,7 +175,7 @@ void sinsp_parser::process_event(sinsp_evt *evt) {
 	case PPME_SYSCALL_UNLINKAT_X:
 		parse_fspath_related_exit(evt);
 		break;
-	case PPME_SYSCALL_READ_X:
+	case PPME_SYSCALL_READ:
 	case PPME_SYSCALL_WRITE_X:
 	case PPME_SOCKET_RECV_X:
 	case PPME_SOCKET_SEND_X:
@@ -3754,15 +3754,9 @@ void sinsp_parser::parse_fspath_related_exit(sinsp_evt *evt) {
 
 void sinsp_parser::parse_rw_exit(sinsp_evt *evt) {
 	const sinsp_evt_param *parinfo;
-	int64_t retval;
 	int64_t tid = evt->get_tid();
 	sinsp_evt *enter_evt = &m_tmp_evt;
 	ppm_event_flags eflags = evt->get_info_flags();
-
-	//
-	// Extract the return value
-	//
-	retval = evt->get_syscall_return_value();
 
 	if(evt->get_fd_info() == NULL) {
 		return;
@@ -3771,6 +3765,7 @@ void sinsp_parser::parse_rw_exit(sinsp_evt *evt) {
 	//
 	// If the operation was successful, validate that the fd exists
 	//
+	int64_t retval = evt->get_syscall_return_value();
 	if(retval >= 0) {
 		uint16_t etype = evt->get_type();
 

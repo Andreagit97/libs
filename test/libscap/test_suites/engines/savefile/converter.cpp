@@ -254,3 +254,81 @@ TEST_F(convert_event_test, PPME_SYSCALL_BRK_1_X_to_PPME_SYSCALL_BRK_no_enter) {
 	                                              vm_swap,
 	                                              addr));
 }
+
+////////////////////////////
+// READ
+////////////////////////////
+
+TEST_F(convert_event_test, store_PPME_SYSCALL_READ_E) {
+	uint64_t ts = 12;
+	int64_t tid = 25;
+
+	int64_t fd = 25;
+	uint32_t size = 89;
+
+	auto evt = create_safe_scap_event(ts, tid, PPME_SYSCALL_READ_E, 2, fd, size);
+	assert_single_conversion_skip(evt);
+	// todo!: compare the acutal event not just the type.
+	assert_event_storage_presence(tid, PPME_SYSCALL_READ_E);
+}
+
+TEST_F(convert_event_test, PPME_SYSCALL_READ_X_to_PPME_SYSCALL_READ_no_enter) {
+	uint64_t ts = 12;
+	int64_t tid = 25;
+
+	int64_t res = 89;
+	uint8_t read_buf[] = {'h', 'e', 'l', 'l', 'o'};
+
+	// Defaulted to 0
+	int64_t fd = 0;
+	uint32_t size = 0;
+
+	assert_single_conversion_success(
+	        conversion_result::CONVERSION_COMPLETED,
+	        create_safe_scap_event(ts,
+	                               tid,
+	                               PPME_SYSCALL_READ_X,
+	                               2,
+	                               res,
+	                               scap_const_sized_buffer{read_buf, sizeof(read_buf)}),
+	        create_safe_scap_event(ts,
+	                               tid,
+	                               PPME_SYSCALL_READ,
+	                               4,
+	                               res,
+	                               scap_const_sized_buffer{read_buf, sizeof(read_buf)},
+	                               (int32_t)fd,
+	                               size));
+}
+
+TEST_F(convert_event_test, PPME_SYSCALL_READ_X_to_PPME_SYSCALL_READ_with_enter) {
+	uint64_t ts = 12;
+	int64_t tid = 25;
+
+	int64_t res = 89;
+	uint8_t read_buf[] = {'h', 'e', 'l', 'l', 'o'};
+	int64_t fd = 25;
+	uint32_t size = 36;
+
+	// After the first conversion we should have the storage
+	auto evt = create_safe_scap_event(ts, tid, PPME_SYSCALL_READ_E, 2, fd, size);
+	assert_single_conversion_skip(evt);
+	assert_event_storage_presence(tid, PPME_SYSCALL_READ_E);
+
+	assert_single_conversion_success(
+	        conversion_result::CONVERSION_COMPLETED,
+	        create_safe_scap_event(ts,
+	                               tid,
+	                               PPME_SYSCALL_READ_X,
+	                               2,
+	                               res,
+	                               scap_const_sized_buffer{read_buf, sizeof(read_buf)}),
+	        create_safe_scap_event(ts,
+	                               tid,
+	                               PPME_SYSCALL_READ,
+	                               4,
+	                               res,
+	                               scap_const_sized_buffer{read_buf, sizeof(read_buf)},
+	                               (int32_t)fd,
+	                               size));
+}

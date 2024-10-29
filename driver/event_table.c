@@ -86,12 +86,12 @@ const struct ppm_event_info g_event_info[] = {
                                   {{"res", PT_ERRNO, PF_DEC}}},
         [PPME_SYSCALL_READ_E] = {"read",
                                  EC_IO_READ | EC_SYSCALL,
-                                 EF_USES_FD | EF_READS_FROM_FD,
+                                 EF_USES_FD | EF_READS_FROM_FD | EF_OLD_VERSION,
                                  2,
                                  {{"fd", PT_FD, PF_DEC}, {"size", PT_UINT32, PF_DEC}}},
         [PPME_SYSCALL_READ_X] = {"read",
                                  EC_IO_READ | EC_SYSCALL,
-                                 EF_USES_FD | EF_READS_FROM_FD,
+                                 EF_USES_FD | EF_READS_FROM_FD | EF_OLD_VERSION,
                                  2,
                                  {{"res", PT_ERRNO, PF_DEC}, {"data", PT_BYTEBUF, PF_NA}}},
         [PPME_SYSCALL_WRITE_E] = {"write",
@@ -2423,6 +2423,19 @@ const struct ppm_event_info g_event_info[] = {
                                {"vm_rss", PT_UINT32, PF_DEC},
                                {"vm_swap", PT_UINT32, PF_DEC},
                                {"addr", PT_UINT64, PF_HEX}}},
+        [PPME_SYSCALL_READ] =
+                {"read",
+                 EC_IO_READ | EC_SYSCALL,
+                 EF_USES_FD | EF_READS_FROM_FD,
+                 4,
+                 {{"res32_rename",
+                   PT_INT32,
+                   PF_DEC},  // On Linux, read() (and similar system calls) will
+                             // transfer at most 0x7ffff000 (2,147,479,552) bytes so 32 bits should
+                             // be enough. For the same reason we use only 32 bits for the `size`.
+                  {"data", PT_BYTEBUF, PF_NA},
+                  {"fd32_rename", PT_FD32, PF_DEC},
+                  {"size", PT_UINT32, PF_DEC}}},
 };
 #pragma GCC diagnostic pop
 

@@ -147,6 +147,89 @@ conversion_result convert_PPME_SYSCALL_BRK_4_X(scap_evt *new_evt,
 	return CONVERSION_COMPLETED;
 }
 
+/////////////////////////////
+// READ
+/////////////////////////////
+
+conversion_result convert_PPME_SYSCALL_READ_E(scap_evt *new_evt,
+                                              scap_evt *evt_to_convert,
+                                              char *error) {
+	if(validate_nparams(evt_to_convert, error, 1, 2) == CONVERSION_ERROR) {
+		return CONVERSION_ERROR;
+	}
+
+	store_evt(evt_to_convert->tid, evt_to_convert);
+	return CONVERSION_SKIP;
+}
+
+conversion_result convert_PPME_SYSCALL_READ_X(scap_evt *new_evt,
+                                              scap_evt *evt_to_convert,
+                                              char *error) {
+	if(validate_nparams(evt_to_convert, error, 1, 2) == CONVERSION_ERROR) {
+		return CONVERSION_ERROR;
+	}
+
+	// - Num params: 2
+	// - p(0): res, p(1): data
+	// We want to convert it to PPME_SYSCALL_READ with 4 parameters.
+
+	// todo!: we will improve it at the next iteration.
+	uint16_t offset = copy_header(new_evt, evt_to_convert);
+	change_event_type(new_evt, PPME_SYSCALL_READ);
+	uint16_t len_offset = offset;
+	uint16_t param_offset = offset + 4 * sizeof(uint16_t);
+
+	// param 1
+	uint16_t len = 4;
+	memcpy((char *)new_evt + len_offset, &len, (sizeof(uint16_t)));
+	len_offset += sizeof(uint16_t);
+
+	auto prt = get_param_ptr(evt_to_convert, 0);
+	memcpy((char *)new_evt + param_offset, prt, len);
+	param_offset += len;
+
+	// param 2
+	len = get_param_len(evt_to_convert, 1);
+	memcpy((char *)new_evt + len_offset, &len, (sizeof(uint16_t)));
+	len_offset += sizeof(uint16_t);
+
+	prt = get_param_ptr(evt_to_convert, 1);
+	memcpy((char *)new_evt + param_offset, prt, len);
+	param_offset += len;
+
+	auto enter_evt = retrieve_evt(evt_to_convert->tid);
+	if(enter_evt) {
+		// param 3
+		len = 4;
+		memcpy((char *)new_evt + len_offset, &len, (sizeof(uint16_t)));
+		len_offset += sizeof(uint16_t);
+
+		prt = get_param_ptr(enter_evt, 0);
+		memcpy((char *)new_evt + param_offset, prt, len);
+		param_offset += len;
+
+		// param 4
+		len = get_param_len(enter_evt, 1);
+		memcpy((char *)new_evt + len_offset, &len, (sizeof(uint16_t)));
+		len_offset += sizeof(uint16_t);
+
+		prt = get_param_ptr(enter_evt, 1);
+		memcpy((char *)new_evt + param_offset, prt, len);
+		param_offset += len;
+		new_evt->len = param_offset;
+		new_evt->nparams = 4;
+	} else {
+		len = 4;
+		memcpy((char *)new_evt + len_offset, &len, (sizeof(uint16_t)));
+		len_offset += sizeof(uint16_t);
+		memcpy((char *)new_evt + len_offset, &len, (sizeof(uint16_t)));
+		len_offset += sizeof(uint16_t);
+
+		fill_missing_parameters_with_default(new_evt, &param_offset);
+	}
+	return CONVERSION_COMPLETED;
+}
+
 /* ============================= Converters ============================= */
 
 using conv_func_t = conversion_result (*)(scap_evt *new_evt, scap_evt *evt_to_convert, char *error);
@@ -158,6 +241,8 @@ static std::unordered_map<ppm_event_code, conv_func_t> g_conversion_table = {
         {PPME_SYSCALL_BRK_1_X, convert_PPME_SYSCALL_BRK_1_X},
         {PPME_SYSCALL_BRK_4_E, convert_PPME_SYSCALL_BRK_4_E},
         {PPME_SYSCALL_BRK_4_X, convert_PPME_SYSCALL_BRK_4_X},
+        {PPME_SYSCALL_READ_E, convert_PPME_SYSCALL_READ_E},
+        {PPME_SYSCALL_READ_X, convert_PPME_SYSCALL_READ_X},
 };
 
 conversion_result call_conversion(scap_evt *new_evt, scap_evt *evt_to_convert, char *error) {

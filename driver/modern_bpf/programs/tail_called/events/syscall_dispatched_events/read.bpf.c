@@ -48,19 +48,19 @@ int BPF_PROG(read_x, struct pt_regs *regs, long ret) {
 		return 0;
 	}
 
-	auxmap__preload_event_header(auxmap, PPME_SYSCALL_READ_X);
+	auxmap__preload_event_header(auxmap, PPME_SYSCALL_READ);
 
 	/*=============================== COLLECT PARAMETERS  ===========================*/
 
-	/* Parameter 1: res (type: PT_ERRNO) */
-	auxmap__store_s64_param(auxmap, ret);
+	/* Parameter 1: res (type: PT_INT32) */
+	auxmap__store_s32_param(auxmap, ret);
 
 	if(ret > 0) {
 		/* We read the minimum between `snaplen` and what we really
 		 * have in the buffer.
 		 */
 		uint16_t snaplen = maps__get_snaplen();
-		apply_dynamic_snaplen(regs, &snaplen, false, PPME_SYSCALL_READ_X);
+		apply_dynamic_snaplen(regs, &snaplen, false, PPME_SYSCALL_READ);
 		if(snaplen > ret) {
 			snaplen = ret;
 		}
@@ -72,6 +72,14 @@ int BPF_PROG(read_x, struct pt_regs *regs, long ret) {
 		/* Parameter 2: data (type: PT_BYTEBUF) */
 		auxmap__store_empty_param(auxmap);
 	}
+
+	/* Parameter 3: fd (type: PT_FD32) */
+	int32_t fd = (int32_t)extract__syscall_argument(regs, 0);
+	auxmap__store_s32_param(auxmap, fd);
+
+	/* Parameter 4: size (type: PT_UINT32) */
+	uint32_t size = (uint32_t)extract__syscall_argument(regs, 2);
+	auxmap__store_u32_param(auxmap, size);
 
 	/*=============================== COLLECT PARAMETERS  ===========================*/
 

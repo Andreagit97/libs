@@ -400,13 +400,13 @@ void sinsp_threadinfo::add_fd_from_scap(scap_fdinfo* fdi) {
 		// its thread info as non-filterable.
 
 		// note: just like the case of  PPME_SCAPEVENT_E used for thread info
-		// filtering, the usage of PPME_SYSCALL_READ_X is opinionated. This
+		// filtering, the usage of PPME_SYSCALL_READ is opinionated. This
 		// kind of event has been chosen as a tradeoff of a lightweight and
 		// usually-ignored event (in the context of filtering), but that is also
 		// marked as using a file descriptor so that file-descriptor filter fields
 		// can extract meaningful values.
 		scap_evt tscapevt = {};
-		tscapevt.type = PPME_SYSCALL_READ_X;
+		tscapevt.type = PPME_SYSCALL_READ;
 		tscapevt.tid = m_tid;
 		tscapevt.ts = 0;
 		tscapevt.nparams = 0;
@@ -414,7 +414,7 @@ void sinsp_threadinfo::add_fd_from_scap(scap_fdinfo* fdi) {
 
 		sinsp_evt tevt = {};
 		tevt.set_scap_evt(&tscapevt);
-		tevt.set_info(&(g_infotables.m_event_info[PPME_SYSCALL_READ_X]));
+		tevt.set_info(&(g_infotables.m_event_info[PPME_SYSCALL_READ]));
 		tevt.set_cpuid(0);
 		tevt.set_num(0);
 		tevt.set_inspector(m_inspector);

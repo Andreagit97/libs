@@ -993,6 +993,7 @@ static const ppm_sc_code *g_events_to_sc_map[] = {
         [PPME_SYSCALL_SETREGID_X] = (ppm_sc_code[]){PPM_SC_SETREGID, -1},
         [PPME_SYSCALL_OPEN] = (ppm_sc_code[]){PPM_SC_OPEN, -1},
         [PPME_SYSCALL_BRK] = (ppm_sc_code[]){PPM_SC_BRK, -1},
+        [PPME_SYSCALL_READ] = (ppm_sc_code[]){PPM_SC_READ, -1},
 };
 
 #if defined(__GNUC__) || (__STDC_VERSION__ >= 201112L)

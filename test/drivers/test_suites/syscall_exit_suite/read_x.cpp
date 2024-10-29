@@ -41,14 +41,20 @@ TEST(SyscallExit, readX_no_snaplen) {
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: res (type: PT_ERRNO) */
-	evt_test->assert_numeric_param(1, (int64_t)read_bytes);
+	evt_test->assert_numeric_param(1, (int32_t)read_bytes);
 
 	/* Parameter 2: data (type: PT_BYTEBUF) */
 	evt_test->assert_bytebuf_param(2, buf, read_bytes);
 
+	/* Parameter 3: fd (type: PT_FD32) */
+	evt_test->assert_numeric_param(3, (int32_t)fd);
+
+	/* Parameter 4: size (type: PT_UINT32) */
+	evt_test->assert_numeric_param(4, (uint32_t)data_len);
+
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
-	evt_test->assert_num_params_pushed(2);
+	evt_test->assert_num_params_pushed(4);
 }
 
 TEST(SyscallExit, readX_snaplen) {
@@ -88,14 +94,20 @@ TEST(SyscallExit, readX_snaplen) {
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: res (type: PT_ERRNO) */
-	evt_test->assert_numeric_param(1, (int64_t)read_bytes);
+	evt_test->assert_numeric_param(1, (int32_t)read_bytes);
 
 	/* Parameter 2: data (type: PT_BYTEBUF) */
 	evt_test->assert_bytebuf_param(2, buf, DEFAULT_SNAPLEN);
 
+	/* Parameter 3: fd (type: PT_FD32) */
+	evt_test->assert_numeric_param(3, (int32_t)fd);
+
+	/* Parameter 4: size (type: PT_UINT32) */
+	evt_test->assert_numeric_param(4, (uint32_t)data_len);
+
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
-	evt_test->assert_num_params_pushed(2);
+	evt_test->assert_num_params_pushed(4);
 }
 
 TEST(SyscallExit, readXfail) {
@@ -129,14 +141,20 @@ TEST(SyscallExit, readXfail) {
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: res (type: PT_ERRNO) */
-	evt_test->assert_numeric_param(1, (int64_t)errno_value);
+	evt_test->assert_numeric_param(1, (int32_t)errno_value);
 
 	/* Parameter 2: data (type: PT_BYTEBUF) */
 	evt_test->assert_empty_param(2);
 
+	/* Parameter 3: fd (type: PT_FD32) */
+	evt_test->assert_numeric_param(3, (int32_t)-1);
+
+	/* Parameter 4: size (type: PT_UINT32) */
+	evt_test->assert_numeric_param(4, (uint32_t)data_len);
+
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
-	evt_test->assert_num_params_pushed(2);
+	evt_test->assert_num_params_pushed(4);
 }
 
 TEST(SyscallExit, readX_ipv4_tcp_message_truncated_by_snaplen) {
@@ -167,14 +185,14 @@ TEST(SyscallExit, readX_ipv4_tcp_message_truncated_by_snaplen) {
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: res (type: PT_ERRNO) */
-	evt_test->assert_numeric_param(1, (int64_t)MAX_RECV_BUF_SIZE);
+	evt_test->assert_numeric_param(1, (int32_t)MAX_RECV_BUF_SIZE);
 
 	/* Parameter 2: data (type: PT_BYTEBUF) */
 	evt_test->assert_bytebuf_param(2, LONG_MESSAGE, DEFAULT_SNAPLEN);
 
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
-	evt_test->assert_num_params_pushed(2);
+	evt_test->assert_num_params_pushed(4);
 }
 
 TEST(SyscallExit, readX_ipv4_tcp_message_not_truncated_fullcapture_port) {
@@ -218,14 +236,14 @@ TEST(SyscallExit, readX_ipv4_tcp_message_not_truncated_fullcapture_port) {
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: res (type: PT_ERRNO) */
-	evt_test->assert_numeric_param(1, (int64_t)MAX_RECV_BUF_SIZE);
+	evt_test->assert_numeric_param(1, (int32_t)MAX_RECV_BUF_SIZE);
 
 	/* Parameter 2: data (type: PT_BYTEBUF) */
 	evt_test->assert_bytebuf_param(2, LONG_MESSAGE, MAX_RECV_BUF_SIZE);
 
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
-	evt_test->assert_num_params_pushed(2);
+	evt_test->assert_num_params_pushed(4);
 }
 
 TEST(SyscallExit, readX_ipv4_udp_message_truncated_by_snaplen) {
@@ -256,14 +274,14 @@ TEST(SyscallExit, readX_ipv4_udp_message_truncated_by_snaplen) {
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: res (type: PT_ERRNO) */
-	evt_test->assert_numeric_param(1, (int64_t)MAX_RECV_BUF_SIZE);
+	evt_test->assert_numeric_param(1, (int32_t)MAX_RECV_BUF_SIZE);
 
 	/* Parameter 2: data (type: PT_BYTEBUF) */
 	evt_test->assert_bytebuf_param(2, LONG_MESSAGE, DEFAULT_SNAPLEN);
 
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
-	evt_test->assert_num_params_pushed(2);
+	evt_test->assert_num_params_pushed(4);
 }
 
 TEST(SyscallExit, readX_ipv4_udp_message_truncated_fullcapture_client_port) {
@@ -305,7 +323,7 @@ TEST(SyscallExit, readX_ipv4_udp_message_truncated_fullcapture_client_port) {
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: res (type: PT_ERRNO) */
-	evt_test->assert_numeric_param(1, (int64_t)MAX_RECV_BUF_SIZE);
+	evt_test->assert_numeric_param(1, (int32_t)MAX_RECV_BUF_SIZE);
 
 	/* Parameter 2: data (type: PT_BYTEBUF) */
 	// We cannot retrieve the client port and so the FULLCAPTURE_PORT_RANGE logic doesn't increase
@@ -314,7 +332,7 @@ TEST(SyscallExit, readX_ipv4_udp_message_truncated_fullcapture_client_port) {
 
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
-	evt_test->assert_num_params_pushed(2);
+	evt_test->assert_num_params_pushed(4);
 }
 
 TEST(SyscallExit, readX_ipv4_udp_message_not_truncated_fullcapture_server_port) {
@@ -358,14 +376,14 @@ TEST(SyscallExit, readX_ipv4_udp_message_not_truncated_fullcapture_server_port) 
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
 	/* Parameter 1: res (type: PT_ERRNO) */
-	evt_test->assert_numeric_param(1, (int64_t)MAX_RECV_BUF_SIZE);
+	evt_test->assert_numeric_param(1, (int32_t)MAX_RECV_BUF_SIZE);
 
 	/* Parameter 2: data (type: PT_BYTEBUF) */
 	evt_test->assert_bytebuf_param(2, LONG_MESSAGE, MAX_RECV_BUF_SIZE);
 
 	/*=============================== ASSERT PARAMETERS  ===========================*/
 
-	evt_test->assert_num_params_pushed(2);
+	evt_test->assert_num_params_pushed(4);
 }
 
 #endif

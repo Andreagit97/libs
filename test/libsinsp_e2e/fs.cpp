@@ -1231,7 +1231,7 @@ TEST_F(sys_call_test, large_read_write) {
 			if(callnum == 2) {
 				callnum++;
 			}
-		} else if(type == PPME_SYSCALL_READ_X) {
+		} else if(type == PPME_SYSCALL_READ) {
 			if(callnum == 3) {
 				const sinsp_evt_param* p = e->get_param_by_name("data");
 
