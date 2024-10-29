@@ -53,6 +53,7 @@ TEST_F(sinsp_with_test_input, parse_open_success) {
 	          sinsp_test_input::open_params::default_directory);
 	ASSERT_EQ(get_field_as_string(evt, "fd.filename"),
 	          sinsp_test_input::open_params::default_filename);
+	EXPECT_EQ(get_field_as_string(evt, "fd.num"), std::to_string(fd));
 
 	// Assert parameters filterchecks
 	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"),
@@ -94,6 +95,8 @@ TEST_F(sinsp_with_test_input, parse_open_failure) {
 	ASSERT_EQ(init_tinfo->get_fd_opencount(), 1);
 
 	// Assert path filterchecks
+	// we expect `-1` because m_lastevent_fd is set to -1 when the syscall fails.
+	EXPECT_EQ(get_field_as_string(evt, "fd.num"), std::to_string(-1));
 	ASSERT_FALSE(field_has_value(evt, "fd.name"));
 	ASSERT_FALSE(field_has_value(evt, "fd.directory"));
 	ASSERT_FALSE(field_has_value(evt, "fd.filename"));

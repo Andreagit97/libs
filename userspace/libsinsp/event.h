@@ -684,6 +684,12 @@ public:
 
 	int64_t get_syscall_return_value();
 
+	inline bool uses_fd() const { return get_info_flags() & EF_USES_FD; }
+
+	inline bool creates_fd() const { return get_info_flags() & EF_CREATES_FD; }
+
+	int32_t get_used_fd();
+
 private:
 	sinsp* m_inspector;
 	scap_evt* m_pevt;

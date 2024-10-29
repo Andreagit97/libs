@@ -48,7 +48,7 @@ TEST_F(sinsp_with_test_input, signed_int_compare) {
 	EXPECT_TRUE(eval_filter(evt, "evt.rawarg.res > -65535"));
 
 	evt = generate_open_event(sinsp_test_input::open_params{.fd = -1});
-
+	EXPECT_EQ(get_field_as_string(evt, "fd.num"), "-1");
 	EXPECT_FALSE(eval_filter(evt, "fd.num >= 0"));
 	EXPECT_FALSE(eval_filter(evt, "fd.num > 0"));
 	EXPECT_TRUE(eval_filter(evt, "fd.num < 0"));

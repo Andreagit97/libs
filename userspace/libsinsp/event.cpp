@@ -1870,6 +1870,16 @@ bool sinsp_evt::has_return_value() {
 	return true;
 }
 
+int32_t sinsp_evt::get_used_fd() {
+	// we need to be sure that this syscall has a fd between its parameters.
+	ASSERT(uses_fd());
+
+	// todo!: we could have the file descriptor in the same position (like the second argument) for
+	// all the events with this flag but it could increase the complexity of the conversion phase.
+	// At the moment we find it by name and we don't rely on its position.
+	return get_param_by_name("fd32_rename")->as<int32_t>();
+}
+
 int64_t sinsp_evt::get_syscall_return_value() {
 	ASSERT(has_return_value());
 

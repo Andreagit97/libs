@@ -653,112 +653,152 @@ bool sinsp_parser::reset(sinsp_evt *evt) {
 		evt->get_tinfo()->m_flags |= PPM_CL_ACTIVE;
 	}
 
-	if(PPME_IS_ENTER(etype)) {
-		evt->get_tinfo()->m_lastevent_fd = -1;
-		evt->get_tinfo()->set_lastevent_type(etype);
+	if(etype < PPME_SYSCALL_OPEN) {
+		// todo!: this is legacy logic that we need to remove at the end of the work.
+		if(PPME_IS_ENTER(etype)) {
+			evt->get_tinfo()->m_lastevent_fd = -1;
+			evt->get_tinfo()->set_lastevent_type(etype);
 
-		if(eflags & EF_USES_FD) {
-			//
-			// Get the fd.
-			// An fd will usually be the first parameter of the enter event,
-			// but there are exceptions, as is the case with mmap, mmap2
-			//
-			int fd_location = get_fd_location(etype);
-			// we will never have `PT_FD32` in the enter events
-			ASSERT(evt->get_param_info(fd_location)->type == PT_FD);
-			evt->get_tinfo()->m_lastevent_fd = evt->get_param(fd_location)->as<int64_t>();
-			evt->set_fd_info(evt->get_tinfo()->get_fd(evt->get_tinfo()->m_lastevent_fd));
-		}
+			if(eflags & EF_USES_FD) {
+				//
+				// Get the fd.
+				// An fd will usually be the first parameter of the enter event,
+				// but there are exceptions, as is the case with mmap, mmap2
+				//
+				int fd_location = get_fd_location(etype);
+				// we will never have `PT_FD32` in the enter events
+				ASSERT(evt->get_param_info(fd_location)->type == PT_FD);
+				evt->get_tinfo()->m_lastevent_fd = evt->get_param(fd_location)->as<int64_t>();
+				evt->set_fd_info(evt->get_tinfo()->get_fd(evt->get_tinfo()->m_lastevent_fd));
+			}
 
-		evt->get_tinfo()->m_latency = 0;
-		evt->get_tinfo()->m_last_latency_entertime = evt->get_ts();
-	} else {
-		sinsp_threadinfo *tinfo = evt->get_tinfo();
-
-		//
-		// event latency
-		//
-		if(tinfo->m_last_latency_entertime != 0) {
-			tinfo->m_latency = evt->get_ts() - tinfo->m_last_latency_entertime;
-			ASSERT((int64_t)tinfo->m_latency >= 0);
-		}
-
-		if((etype == PPME_SYSCALL_EXECVE_18_X || etype == PPME_SYSCALL_EXECVE_19_X) &&
-		   tinfo->get_lastevent_type() == PPME_SYSCALL_EXECVEAT_E) {
-			tinfo->set_lastevent_data_validity(true);
-		} else if(etype == tinfo->get_lastevent_type() + 1) {
-			tinfo->set_lastevent_data_validity(true);
+			evt->get_tinfo()->m_latency = 0;
+			evt->get_tinfo()->m_last_latency_entertime = evt->get_ts();
 		} else {
-			tinfo->set_lastevent_data_validity(false);
+			sinsp_threadinfo *tinfo = evt->get_tinfo();
 
-			if(tinfo->get_lastevent_type() != PPME_TRACER_E) {
-				return false;
+			//
+			// event latency
+			//
+			if(tinfo->m_last_latency_entertime != 0) {
+				tinfo->m_latency = evt->get_ts() - tinfo->m_last_latency_entertime;
+				ASSERT((int64_t)tinfo->m_latency >= 0);
+			}
+
+			if((etype == PPME_SYSCALL_EXECVE_18_X || etype == PPME_SYSCALL_EXECVE_19_X) &&
+			   tinfo->get_lastevent_type() == PPME_SYSCALL_EXECVEAT_E) {
+				tinfo->set_lastevent_data_validity(true);
+			} else if(etype == tinfo->get_lastevent_type() + 1) {
+				tinfo->set_lastevent_data_validity(true);
+			} else {
+				tinfo->set_lastevent_data_validity(false);
+
+				if(tinfo->get_lastevent_type() != PPME_TRACER_E) {
+					return false;
+				}
+			}
+
+			//
+			// Error detection logic
+			//
+			if(evt->get_num_params() != 0 && ((evt->get_info()->params[0].name[0] == 'r' &&
+			                                   evt->get_info()->params[0].name[1] == 'e' &&
+			                                   evt->get_info()->params[0].name[2] == 's' &&
+			                                   evt->get_info()->params[0].name[3] == '\0') ||
+			                                  (evt->get_info()->params[0].name[0] == 'f' &&
+			                                   evt->get_info()->params[0].name[1] == 'd' &&
+			                                   evt->get_info()->params[0].name[2] == '\0'))) {
+				int64_t res = evt->get_syscall_return_value();
+
+				if(res < 0) {
+					evt->set_errorcode(-(int32_t)res);
+				}
+			}
+
+			//
+			// Retrieve the fd
+			//
+			if(eflags & EF_USES_FD) {
+				//
+				// The copy_file_range syscall has the peculiarity of using two fds
+				// Set as m_lastevent_fd the output fd
+				//
+				if(etype == PPME_SYSCALL_COPY_FILE_RANGE_X) {
+					tinfo->m_lastevent_fd = evt->get_param(1)->as<int64_t>();
+				}
+
+				evt->set_fd_info(tinfo->get_fd(tinfo->m_lastevent_fd));
+
+				if(evt->get_fd_info() == NULL) {
+					return false;
+				}
+
+				if(evt->get_errorcode() != 0 && m_inspector->get_observer()) {
+					m_inspector->get_observer()->on_error(evt);
+				}
+
+				if(evt->get_fd_info()->m_flags & sinsp_fdinfo::FLAGS_CLOSE_CANCELED) {
+					//
+					// A close gets canceled when the same fd is created successfully between
+					// close enter and close exit.
+					// If that happens
+					//
+					erase_fd_params eparams;
+
+					evt->get_fd_info()->m_flags &= ~sinsp_fdinfo::FLAGS_CLOSE_CANCELED;
+					eparams.m_fd = CANCELED_FD_NUMBER;
+					eparams.m_fdinfo = tinfo->get_fd(CANCELED_FD_NUMBER);
+
+					//
+					// Remove the fd from the different tables
+					//
+					eparams.m_remove_from_table = true;
+					eparams.m_tinfo = tinfo;
+					eparams.m_ts = evt->get_ts();
+
+					erase_fd(&eparams);
+				}
 			}
 		}
-
-		//
-		// Error detection logic
-		//
-		if(evt->get_num_params() != 0 && ((evt->get_info()->params[0].name[0] == 'r' &&
-		                                   evt->get_info()->params[0].name[1] == 'e' &&
-		                                   evt->get_info()->params[0].name[2] == 's' &&
-		                                   evt->get_info()->params[0].name[3] == '\0') ||
-		                                  (evt->get_info()->params[0].name[0] == 'f' &&
-		                                   evt->get_info()->params[0].name[1] == 'd' &&
-		                                   evt->get_info()->params[0].name[2] == '\0'))) {
+	} else {
+		// todo!: check if we really need this logic, since in many other parts we check again the
+		// return value this could be a duplicate...or at least we can store it since we compute it
+		// for each event here.
+		if(evt->has_return_value()) {
 			int64_t res = evt->get_syscall_return_value();
-
 			if(res < 0) {
 				evt->set_errorcode(-(int32_t)res);
 			}
 		}
 
-		//
-		// Retrieve the fd
-		//
-		if(eflags & EF_USES_FD) {
-			//
-			// The copy_file_range syscall has the peculiarity of using two fds
-			// Set as m_lastevent_fd the output fd
-			//
-			if(etype == PPME_SYSCALL_COPY_FILE_RANGE_X) {
-				tinfo->m_lastevent_fd = evt->get_param(1)->as<int64_t>();
-			}
+		// The tinfo is never NULL here, we can move it outside at the end of the work
+		sinsp_threadinfo *tinfo = evt->get_tinfo();
+		ASSERT(tinfo);
 
+		if(evt->uses_fd()) {
+			// This is a strategy to save the fd even if we don't have the fdinfo available for that
+			// event. Probably we can do better and save the information in the event itself rather
+			// than in the thread.
+			tinfo->m_lastevent_fd = evt->get_used_fd();
+
+			// todo!: note that `tinfo->get_fd` can return NULL if we dropped some events.
+			// if we look at many parsers we return immediately if `m_fdinfo` is NULL maybe we could
+			// return here (?)
 			evt->set_fd_info(tinfo->get_fd(tinfo->m_lastevent_fd));
+		}
 
-			if(evt->get_fd_info() == NULL) {
-				return false;
+		if(evt->creates_fd()) {
+			// The fd is always the return value in this case.
+			int64_t res = evt->get_syscall_return_value();
+			if(res < 0) {
+				tinfo->m_lastevent_fd = -1;
+			} else {
+				tinfo->m_lastevent_fd = evt->get_syscall_return_value();
 			}
 
-			if(evt->get_errorcode() != 0 && m_inspector->get_observer()) {
-				m_inspector->get_observer()->on_error(evt);
-			}
-
-			if(evt->get_fd_info()->m_flags & sinsp_fdinfo::FLAGS_CLOSE_CANCELED) {
-				//
-				// A close gets canceled when the same fd is created successfully between
-				// close enter and close exit.
-				// If that happens
-				//
-				erase_fd_params eparams;
-
-				evt->get_fd_info()->m_flags &= ~sinsp_fdinfo::FLAGS_CLOSE_CANCELED;
-				eparams.m_fd = CANCELED_FD_NUMBER;
-				eparams.m_fdinfo = tinfo->get_fd(CANCELED_FD_NUMBER);
-
-				//
-				// Remove the fd from the different tables
-				//
-				eparams.m_remove_from_table = true;
-				eparams.m_tinfo = tinfo;
-				eparams.m_ts = evt->get_ts();
-
-				erase_fd(&eparams);
-			}
+			// we cannot set the fdinfo here since we still need to create it.
 		}
 	}
-
 	return true;
 }
 
