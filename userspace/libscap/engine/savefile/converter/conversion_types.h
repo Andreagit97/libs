@@ -17,11 +17,32 @@ limitations under the License.
 */
 #pragma once
 
-typedef struct ppm_evt_hdr scap_evt;
+#include <vector>
+#include <cstdint>
 
-typedef enum conversion_result {
-	CONVERSION_CONTINUE,
-	CONVERSION_COMPLETED,
-	CONVERSION_SKIP,
-	CONVERSION_ERROR
-} conversion_result;
+#define C_ACTION_TERMINATE 0
+#define C_ACTION_SKIP (1 << 0)
+#define C_ACTION_STORAGE (1 << 1)
+#define C_FROM_OLD_EVENT (1 << 2)
+#define C_FROM_ENTER_EVENT (1 << 3)
+#define C_FROM_DEFAULT (1 << 4)
+#define C_MOD_TO_32 (1 << 5)
+
+// Alternative way to define the struct:
+// struct conversion_instruction {
+// 	conversion_action action = C_ACTION_TERMINATE;
+// 	conversion_source source = C_FROM_DEFAULT;
+// 	conversion_modifier modifier = C_MOD_TO_32;
+// 	uint8_t param_num = 0;
+// };
+
+struct conversion_instruction {
+	uint16_t flags = 0;
+	uint8_t param_num = 0;
+};
+
+struct conversion_info {
+	uint16_t desired_type = 0;
+	std::vector<uint8_t> valid_param_nums = {}; /* When we face a `0` we completed */
+	conversion_instruction instr[32] = {};
+};

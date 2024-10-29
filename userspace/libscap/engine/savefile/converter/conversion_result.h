@@ -15,24 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 */
-
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+typedef struct ppm_evt_hdr scap_evt;
 
-#include <libscap/engine/savefile/converter/conversion_result.h>
-
-// 50 consecutive conversions on the same event should be more than enough
-#define MAX_CONVERSION_BOUNDARY 50
-
-conversion_result scap_convert_event(scap_evt* new_evt, scap_evt* evt_to_convert, char* error);
-
-// Only for testing purposes
-scap_evt* retrieve_evt_from_storage(uint64_t tid);
-void clear_evt_storage();
-
-#ifdef __cplusplus
-};
-#endif
+typedef enum conversion_result {
+	CONVERSION_CONTINUE,
+	CONVERSION_COMPLETED,
+	CONVERSION_SKIP,
+	CONVERSION_ERROR
+} conversion_result;

@@ -16,6 +16,7 @@ limitations under the License.
 
 */
 
+#include <converter/conversion_result.h>
 #include <converter/conversion_types.h>
 #include <driver/ppm_events_public.h>
 
@@ -30,7 +31,9 @@ const char *get_event_name(ppm_event_code event_type);
 
 char get_direction_char(ppm_event_code event_type);
 
-conversion_result validate_nparams(scap_evt *evt, char *error, int num_valid_params, ...);
+conversion_result validate_nparams(scap_evt *evt,
+                                   std::vector<uint8_t> &valid_param_nums,
+                                   char *error);
 
 conversion_result return_error(scap_evt *evt, char *error);
 
@@ -50,8 +53,6 @@ void fill_missing_parameters_with_default(scap_evt *new_evt, uint16_t *offset);
 void store_evt(uint64_t tid, scap_evt *evt);
 
 scap_evt *retrieve_evt(uint64_t tid);
-
-uint32_t get_param_len(scap_evt *evt, uint8_t num_param);
 
 char *get_param_ptr(scap_evt *evt, uint8_t num_param);
 

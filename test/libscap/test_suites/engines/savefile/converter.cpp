@@ -43,7 +43,7 @@ TEST_F(convert_event_test, PPME_SYSCALL_OPEN_X_3_params) {
 	        create_safe_scap_event(ts, tid, PPME_SYSCALL_OPEN_X, 3, fd, name, flags));
 }
 
-TEST_F(convert_event_test, PPME_SYSCALL_OPEN_X_4_params_to_6) {
+TEST_F(convert_event_test, PPME_SYSCALL_OPEN_X_4_params_to_PPME_SYSCALL_OPEN) {
 	uint64_t ts = 12;
 	int64_t tid = 25;
 	int64_t fd = 6;
@@ -54,13 +54,13 @@ TEST_F(convert_event_test, PPME_SYSCALL_OPEN_X_4_params_to_6) {
 	uint64_t ino = 0;
 
 	assert_single_conversion_success(
-	        conversion_result::CONVERSION_CONTINUE,
+	        conversion_result::CONVERSION_COMPLETED,
 	        create_safe_scap_event(ts, tid, PPME_SYSCALL_OPEN_X, 4, fd, name, flags, mode),
 	        create_safe_scap_event(ts,
 	                               tid,
-	                               PPME_SYSCALL_OPEN_X,
+	                               PPME_SYSCALL_OPEN,
 	                               6,
-	                               fd,
+	                               (int32_t)fd,
 	                               name,
 	                               flags,
 	                               mode,

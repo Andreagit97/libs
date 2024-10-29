@@ -48,6 +48,11 @@ enum ppm_event_category scap_get_event_category_from_event(ppm_event_code ev) {
 	return g_event_info[ev].category & ~(EC_SYSCALL - 1);
 }
 
+bool scap_is_old_event_version(ppm_event_code ev) {
+	ASSERT(ev < PPM_EVENT_MAX);
+	return g_event_info[ev].flags & EF_OLD_VERSION;
+}
+
 uint32_t scap_event_getlen(scap_evt *e) {
 	return e->len;
 }

@@ -16,8 +16,12 @@ limitations under the License.
 
 */
 
+// todo!: rename into converter_helpers
+
 #include <driver/ppm_events_public.h>
 #include <converter/conversion_types.h>
+#include <converter/conversion_result.h>
+#include <converter/conversion_table.h>
 #include <converter/debug_macro.h>
 #include <stdarg.h>
 #include <cstdio>
@@ -100,29 +104,6 @@ char get_direction_char(ppm_event_code event_type) {
 	}
 }
 
-conversion_result validate_nparams(scap_evt *evt, char *error, int num_valid_params, ...) {
-	va_list args;
-	va_start(args, num_valid_params);
-
-	for(int i = 0; i < num_valid_params; ++i) {
-		int valid_param = va_arg(args, int);
-		if(evt->nparams == valid_param) {
-			va_end(args);
-			return CONVERSION_CONTINUE;
-		}
-	}
-
-	va_end(args);
-	snprintf(error,
-	         SCAP_LASTERR_SIZE,
-	         "Unknown number of parameters '%d' for event '%s_%c(num: %d)'.",
-	         evt->nparams,
-	         get_event_name((ppm_event_code)evt->type),
-	         get_direction_char((ppm_event_code)evt->type),
-	         evt->type);
-	return CONVERSION_ERROR;
-}
-
 conversion_result return_error(scap_evt *evt, char *error) {
 	// This should never happen
 	snprintf(error, SCAP_LASTERR_SIZE, "Reached unkown state for event '%d'.", evt->type);
@@ -147,9 +128,6 @@ uint16_t copy_first_n_lengths_and_header(scap_evt *new_evt,
 
 uint16_t copy_header(scap_evt *new_evt, scap_evt *evt_to_convert) {
 	memcpy(new_evt, evt_to_convert, sizeof(scap_evt));
-
-	PRINT_MESSAGE("New header:\n");
-	PRINT_EVENT(new_evt, PRINT_HEADER);
 	return sizeof(scap_evt);
 }
 
@@ -312,4 +290,217 @@ void fill_missing_parameters(scap_evt *new_evt, uint16_t *offset, int num_args, 
 
 	PRINT_MESSAGE("Final event:\n");
 	PRINT_EVENT(new_evt, PRINT_FULL);
+}
+
+conversion_result validate_nparams(scap_evt *evt,
+                                   std::vector<uint8_t> &valid_param_nums,
+                                   char *error) {
+	// We skip the validation phase if the array is empty
+	if(valid_param_nums.empty()) {
+		return CONVERSION_CONTINUE;
+	}
+
+	for(const auto &valid_param : valid_param_nums) {
+		if(evt->nparams == valid_param) {
+			return CONVERSION_CONTINUE;
+		}
+	}
+
+	snprintf(error,
+	         SCAP_LASTERR_SIZE,
+	         "Unknown number of parameters '%d' for event '%s_%c(num: %d)'.",
+	         evt->nparams,
+	         get_event_name((ppm_event_code)evt->type),
+	         get_direction_char((ppm_event_code)evt->type),
+	         evt->type);
+	return CONVERSION_ERROR;
+}
+
+// This writes len + the param
+void push_default_parameter(scap_evt *evt, uint16_t *params_offset, uint8_t param_num) {
+	// Please ensure that `new_evt->type` is already the final type you want to obtain.
+	// Otherwise we will access the wrong entry in the event table.
+	const struct ppm_event_info *event_info = &(g_event_info[evt->type]);
+	uint16_t len = scap_get_size_bytes_from_type(event_info->params[param_num].type);
+	char *ptr = scap_get_default_value_from_type(event_info->params[param_num].type);
+	uint16_t lens_offset = sizeof(scap_evt) + param_num * sizeof(uint16_t);
+
+	PRINT_MESSAGE(
+	        "push default param (%d, type: %d) with len (%d) at {params_offest (%d), "
+	        "lens_offset (%d)}\n",
+	        param_num,
+	        event_info->params[param_num].type,
+	        len,
+	        *params_offset,
+	        lens_offset);
+
+	// If value is NULL, the len should be 0
+	memcpy((char *)evt + *params_offset, ptr, len);
+	*params_offset += len;
+	memcpy((char *)evt + lens_offset, &len, sizeof(uint16_t));
+}
+
+void push_parameter(scap_evt *new_evt,
+                    scap_evt *tmp_evt,
+                    uint16_t *params_offset,
+                    uint8_t param_num,
+                    uint8_t evt_param_pos,
+                    uint16_t flags) {
+	uint16_t len = 0;
+	char *ptr = 0;
+	uint16_t lens_offset = sizeof(scap_evt) + param_num * sizeof(uint16_t);
+
+	// Let's first see if we have a len modifier.
+	if(flags & C_MOD_TO_32) {
+		len = 4;
+	} else {
+		len = get_param_len(tmp_evt, evt_param_pos);
+	}
+	ptr = get_param_ptr(tmp_evt, evt_param_pos);
+
+	PRINT_MESSAGE(
+	        "push param (%d) with len (%d, modified %s) at {params_offest (%d), "
+	        "lens_offset (%d)} from param (%d) in %s event\n",
+	        param_num,
+	        len,
+	        flags & C_MOD_TO_32 ? "yes" : "no",
+	        *params_offset,
+	        lens_offset,
+	        evt_param_pos,
+	        flags & C_FROM_OLD_EVENT ? "old" : "enter");
+
+	// todo!: At the moment we just convert from s64 to s32 so this code should be always ok, check
+	// if this is the case.
+	memcpy((char *)new_evt + *params_offset, ptr, len);
+	*params_offset += len;
+	memcpy((char *)new_evt + lens_offset, &len, sizeof(uint16_t));
+}
+
+conversion_result convert_event(scap_evt *new_evt,
+                                scap_evt *evt_to_convert,
+                                conversion_info *ci,
+                                char *error) {
+	// First we validate the number of parameters if necessary
+	if(validate_nparams(evt_to_convert, ci->valid_param_nums, error) == CONVERSION_ERROR) {
+		return CONVERSION_ERROR;
+	}
+
+	// Skip the convertion if needed
+	if(ci->instr[0].flags & C_ACTION_SKIP) {
+		return CONVERSION_SKIP;
+	}
+
+	// Store the event if needed
+	if(ci->instr[0].flags & C_ACTION_STORAGE) {
+		store_evt(evt_to_convert->tid, evt_to_convert);
+		return CONVERSION_SKIP;
+	}
+
+	/////////////////////////////
+	// Start the real conversion in all other cases
+	/////////////////////////////
+
+	// update the type and the number of parameters. We just need to update the final length at the
+	// end.
+	memcpy(new_evt, evt_to_convert, sizeof(scap_evt));
+	new_evt->type = ci->desired_type;
+	new_evt->nparams = g_event_info[new_evt->type].nparams;
+	PRINT_MESSAGE("New event header (the len is still the old one):\n");
+	PRINT_EVENT(new_evt, PRINT_HEADER);
+
+	uint16_t params_offset = sizeof(scap_evt) + new_evt->nparams * sizeof(uint16_t);
+	scap_evt *tmp_evt = NULL;
+	uint32_t flags = 0;
+
+	for(int i = 0; i < PPM_MAX_EVENT_PARAMS; i++) {
+		flags = ci->instr[i].flags;
+		if(flags == C_ACTION_TERMINATE) {
+			// It was the last parameter we need to do nothing
+			break;
+		}
+
+		// We shouldn't have modifiers so ` == C_FROM_DEFAULT` should be ok.
+		if(flags == C_FROM_DEFAULT) {
+			push_default_parameter(new_evt, &params_offset, i);
+			continue;
+		}
+
+		if(flags & C_FROM_ENTER_EVENT) {
+			tmp_evt = retrieve_evt(evt_to_convert->tid);
+			if(!tmp_evt) {
+				// If there is no the enter event because we dropped it in the capture or we come
+				// here from another conversion (see the BRK_1 example) we get the default value.
+				push_default_parameter(new_evt, &params_offset, i);
+				continue;
+			}
+			// todo!: undestand if we can pretend this is an error or it is a normal situation.
+			if(tmp_evt->type != evt_to_convert->type - 1) {
+				snprintf(error,
+				         SCAP_LASTERR_SIZE,
+				         "The enter event for '%s_%c' is not the right one! Event found '%s_%c'.",
+				         get_event_name((ppm_event_code)evt_to_convert->type),
+				         get_direction_char((ppm_event_code)evt_to_convert->type),
+				         get_event_name((ppm_event_code)tmp_evt->type),
+				         get_direction_char((ppm_event_code)tmp_evt->type));
+				return CONVERSION_ERROR;
+			}
+
+		} else if(flags & C_FROM_OLD_EVENT) {
+			tmp_evt = evt_to_convert;
+			if(tmp_evt->nparams <= i) {
+				// If this is an old version we don't have the available parameters so we get the
+				// default value (see OPEN_X example).
+				push_default_parameter(new_evt, &params_offset, i);
+				continue;
+			}
+		} else {
+			snprintf(error,
+			         SCAP_LASTERR_SIZE,
+			         "Unknown instruction (flags: %d, param_num: %d).",
+			         ci->instr[i].flags,
+			         ci->instr[i].param_num);
+			return CONVERSION_ERROR;
+		}
+
+		// Now tmp_evt should contain the evt from which we need to extract our param.
+		push_parameter(new_evt, tmp_evt, &params_offset, i, ci->instr[i].param_num, flags);
+	}
+
+	// todo!: If we used the enter event we clean it. Use a share pointer since we need it more than
+	// once in the for loop.
+	new_evt->len = params_offset;
+	// If we are still an old event version we need to continue otherwise the conversion is
+	// complete.
+	PRINT_MESSAGE("Final event:\n");
+	PRINT_EVENT(new_evt, PRINT_FULL);
+	return scap_is_old_event_version((ppm_event_code)ci->desired_type) ? CONVERSION_CONTINUE
+	                                                                   : CONVERSION_COMPLETED;
+}
+
+extern "C" scap_evt *retrieve_evt_from_storage(uint64_t tid) {
+	return retrieve_evt(tid);
+}
+
+extern "C" void clear_evt_storage() {
+	clear_storage();
+}
+
+extern "C" conversion_result scap_convert_event(scap_evt *new_evt,
+                                                scap_evt *evt_to_convert,
+                                                char *error) {
+	if(evt_to_convert->type >= PPM_EVENT_MAX) {
+		snprintf(error, SCAP_LASTERR_SIZE, "Unknown event type '%d'.", evt_to_convert->type);
+		return CONVERSION_ERROR;
+	}
+
+	if(g_conversion_table.find((ppm_event_code)evt_to_convert->type) != g_conversion_table.end()) {
+		return convert_event(new_evt,
+		                     evt_to_convert,
+		                     &g_conversion_table[(ppm_event_code)evt_to_convert->type],
+		                     error);
+	}
+
+	// todo!: at the moment we just memcpy the whole event but probably we can improve this.
+	memcpy(new_evt, evt_to_convert, evt_to_convert->len);
+	return CONVERSION_COMPLETED;
 }

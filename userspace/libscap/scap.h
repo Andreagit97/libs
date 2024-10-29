@@ -879,6 +879,8 @@ typedef enum scap_print_info {
 } scap_print_info;
 void scap_print_event(scap_evt* ev, scap_print_info i);
 
+bool scap_is_old_event_version(ppm_event_code ev);
+
 /*@}*/
 
 ///////////////////////////////////////////////////////////////////////////////
