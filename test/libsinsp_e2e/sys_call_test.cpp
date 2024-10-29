@@ -579,7 +579,7 @@ TEST_F(sys_call_test, brk) {
 			}
 
 			callnum++;
-		} else if(type == PPME_SYSCALL_BRK_4_X) {
+		} else if(type == PPME_SYSCALL_BRK) {
 			if(ignore_this_call) {
 				ignore_this_call = false;
 				return;
