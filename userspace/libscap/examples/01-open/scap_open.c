@@ -28,6 +28,12 @@ limitations under the License.
 
 #define SYSCALL_NAME_MAX_LEN 40
 
+/*
+ * Legacy event types (todo!: remove it at the end of the work)
+ * Enter events have even numbers while exit events have odd numbers.
+ */
+#define PPME_IS_ENTER(x) ((x & 1) == 0)
+
 /* SCAP SOURCES */
 #define KMOD_OPTION "--kmod"
 #define BPF_OPTION "--bpf"

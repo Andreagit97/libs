@@ -1049,17 +1049,6 @@ or GPL2.txt for full copies of the license.
 #endif
 
 /*
- * The list of event types
- * Enter events have even numbers while exit events have odd numbers.
- * NOTE: there can't be gaps in the numbering, because these numbers correspond
- * to the entries in the g_event_info table
- */
-#define PPME_DIRECTION_FLAG 1
-#define PPME_IS_ENTER(x) ((x & PPME_DIRECTION_FLAG) == 0)
-#define PPME_IS_EXIT(x) (x & PPME_DIRECTION_FLAG)
-#define PPME_MAKE_ENTER(x) (x & (~1))
-
-/*
  * Event category to classify events in generic categories
  */
 enum ppm_capture_category {
