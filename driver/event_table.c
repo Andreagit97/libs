@@ -2410,6 +2410,15 @@ const struct ppm_event_info g_event_info[] = {
                                 {"mode", PT_UINT32, PF_OCT},
                                 {"dev", PT_UINT32, PF_HEX},
                                 {"ino", PT_UINT64, PF_DEC}}},
+        [PPME_SYSCALL_BRK] = {"brk",
+                              EC_MEMORY | EC_SYSCALL,
+                              EF_NEW_VERSION,
+                              5,
+                              {{"res", PT_UINT64, PF_HEX},
+                               {"vm_size", PT_UINT32, PF_DEC},
+                               {"vm_rss", PT_UINT32, PF_DEC},
+                               {"vm_swap", PT_UINT32, PF_DEC},
+                               {"addr", PT_UINT64, PF_HEX}}},
 };
 #pragma GCC diagnostic pop
 

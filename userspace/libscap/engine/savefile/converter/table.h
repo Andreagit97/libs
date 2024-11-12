@@ -24,7 +24,7 @@ limitations under the License.
 #include <unordered_map>
 
 static std::unordered_map<ppm_event_code, conversion_info> g_conversion_table = {
-        {PPME_SYSCALL_OPEN_E, {.desired_type = C_ACTION_SKIP}},
+        {PPME_SYSCALL_OPEN_E, {.desired_type = C_ACTION_SKIP, .valid_param_nums = {0, 3}}},
         {PPME_SYSCALL_OPEN_X,
          {.desired_type = PPME_SYSCALL_OPEN,
           .valid_param_nums = {4, 6},
@@ -34,4 +34,21 @@ static std::unordered_map<ppm_event_code, conversion_info> g_conversion_table = 
                     {C_INSTR_FROM_OLD, 3},
                     {C_INSTR_FROM_OLD, 4},
                     {C_INSTR_FROM_OLD, 5}}}},
+        {PPME_SYSCALL_BRK_1_E, {.desired_type = C_ACTION_SKIP, .valid_param_nums = {1}}},
+        {PPME_SYSCALL_BRK_1_X,
+         {.desired_type = PPME_SYSCALL_BRK_4_X,
+          .valid_param_nums = {1},
+          .instr = {{C_INSTR_FROM_OLD, 0},
+                    {C_INSTR_FROM_DEFAULT, 1},
+                    {C_INSTR_FROM_DEFAULT, 2},
+                    {C_INSTR_FROM_DEFAULT, 3}}}},
+        {PPME_SYSCALL_BRK_4_E, {.desired_type = C_ACTION_STORE, .valid_param_nums = {1}}},
+        {PPME_SYSCALL_BRK_4_X,
+         {.desired_type = PPME_SYSCALL_BRK,
+          .valid_param_nums = {4},
+          .instr = {{C_INSTR_FROM_OLD, 0},
+                    {C_INSTR_FROM_OLD, 1},
+                    {C_INSTR_FROM_OLD, 2},
+                    {C_INSTR_FROM_OLD, 3},
+                    {C_INSTR_FROM_ENTER, 0}}}},
 };

@@ -111,11 +111,11 @@ TEST_F(sinsp_with_test_input, parse_open_failure) {
 	ASSERT_EQ(get_field_as_string(evt, "fd.typechar"), "f");
 
 	// Assert return value filterchecks
-	ASSERT_EQ(get_field_as_string(evt, "evt.res"), "ESRCH");
+	ASSERT_EQ(get_field_as_string(evt, "evt.res"), sinsp_utils::errno_to_str(fd));
 	ASSERT_EQ(get_field_as_string(evt, "evt.rawres"), std::to_string(fd));
 	ASSERT_EQ(get_field_as_string(evt, "evt.failed"), "true");
 
-	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"), "ESRCH");
+	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"), sinsp_utils::errno_to_str(fd));
 	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.fd32_rename"), std::to_string(fd));
 }
 

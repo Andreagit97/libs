@@ -454,6 +454,10 @@ void sinsp_parser::process_event(sinsp_evt *evt) {
 		parse_open_openat_creat_exit(evt);
 		break;
 
+	case PPME_SYSCALL_BRK:
+		parse_brk_munmap_mmap_exit(evt);
+		break;
+
 	default:
 		break;
 	}
