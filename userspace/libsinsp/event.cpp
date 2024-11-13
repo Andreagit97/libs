@@ -750,6 +750,27 @@ const char *sinsp_evt::get_param_as_str(uint32_t id,
 		return &m_paramstr_storage[0];
 	}
 
+	// todo!: today we use `PT_ERRNO` as a type for the return value but almost all syscalls when
+	// they fail are `errno`! We should use ad-hoc types and just handle the negative value as an
+	// errno.
+	if(is_new_event_version() && id == 0) {
+		// This is a return value, if the syscall is falied we can immediately render it as an
+		// errno.
+		int64_t ret = get_syscall_return_value();
+		if(ret < 0) {
+			snprintf(&m_paramstr_storage[0], m_paramstr_storage.size(), "%" PRId64, ret);
+			std::string errstr = sinsp_utils::errno_to_str((int32_t)ret);
+			snprintf(&m_resolved_paramstr_storage[0],
+			         m_resolved_paramstr_storage.size(),
+			         "%s",
+			         errstr.c_str());
+			// The resolved is the Errno message
+			*resolved_str = &m_resolved_paramstr_storage[0];
+			// This is the plain negative value
+			return &m_paramstr_storage[0];
+		}
+	}
+
 	//
 	// Get the parameter information
 	//
