@@ -41,14 +41,7 @@ TEST_F(sinsp_with_test_input, parse_brk_updated_prog_break) {
 	ASSERT_EQ(init_tinfo->m_vmrss_kb, vm_rss);
 	ASSERT_EQ(init_tinfo->m_vmswap_kb, vm_swap);
 
-	// Assert parameters filterchecks
-	ASSERT_EQ(get_field_as_string(evt, "evt.res"), "SUCCESS");
-	ASSERT_EQ(get_field_as_string(evt, "evt.rawres"), std::to_string(res));
-	ASSERT_EQ(get_field_as_string(evt, "evt.failed"), "false");
-
-	// Filter checks on the parameters
-	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"), "5017AF4");  // hexadecimal notation
-	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.res"), "5017AF4");
+	assert_return_value(evt, res);
 
 	ASSERT_EQ(get_field_as_string(evt, "evt.arg[1]"), std::to_string(vm_size));
 	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.vm_size"), std::to_string(vm_size));
@@ -94,11 +87,8 @@ TEST_F(sinsp_with_test_input, parse_brk_no_update) {
 	ASSERT_EQ(init_tinfo->m_vmrss_kb, vm_rss);
 	ASSERT_EQ(init_tinfo->m_vmswap_kb, vm_swap);
 
-	// Assert parameters filterchecks
 	// BRK can update or not update the program break according to the value we provide. Today we
 	// don't consider a failure if the program break in not updated, we consider a failure only if
 	// the syscall sets an errno.
-	ASSERT_EQ(get_field_as_string(evt, "evt.res"), "SUCCESS");
-	ASSERT_EQ(get_field_as_string(evt, "evt.rawres"), std::to_string(res));
-	ASSERT_EQ(get_field_as_string(evt, "evt.failed"), "false");
+	assert_return_value(evt, res);
 }

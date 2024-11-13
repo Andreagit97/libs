@@ -24,6 +24,13 @@ TEST_F(sinsp_with_test_input, parse_open_success) {
 	uint32_t dev = 324;
 	uint64_t ino = 534;
 
+	// Assert file descriptor presence
+	sinsp_threadinfo* init_tinfo = m_inspector.get_thread_ref(INIT_TID, false, true).get();
+	ASSERT_TRUE(init_tinfo);
+
+	// The default one
+	ASSERT_EQ(init_tinfo->get_fd_opencount(), 1);
+
 	auto evt = generate_open_event(
 	        sinsp_test_input::open_params{.fd = fd,
 	                                      .path = sinsp_test_input::open_params::default_path,
@@ -32,34 +39,18 @@ TEST_F(sinsp_with_test_input, parse_open_success) {
 	                                      .dev = dev,
 	                                      .ino = ino});
 
-	// Assert file descriptor presence
-	sinsp_threadinfo* init_tinfo = m_inspector.get_thread_ref(INIT_TID, false, true).get();
-	ASSERT_TRUE(init_tinfo);
-
 	// The default one + the one just opened
 	ASSERT_EQ(init_tinfo->get_fd_opencount(), 2);
 
-	sinsp_fdinfo* fdinfo = init_tinfo->get_fd(fd);
-	ASSERT_TRUE(fdinfo);
-	ASSERT_EQ(fdinfo->m_name, sinsp_test_input::open_params::default_path);
+	assert_fd_fields(evt,
+	                 sinsp_test_input::fd_info_fields{
+	                         .fd_num = fd,
+	                         .fd_name = sinsp_test_input::open_params::default_path,
+	                         .fd_name_raw = sinsp_test_input::open_params::default_path,
+	                         .fd_directory = sinsp_test_input::open_params::default_directory,
+	                         .fd_filename = sinsp_test_input::open_params::default_filename});
 
-	// Assert path filterchecks
-	ASSERT_EQ(get_field_as_string(evt, "fd.name"), sinsp_test_input::open_params::default_path);
-	ASSERT_EQ(get_field_as_string(evt, "fd.directory"),
-	          sinsp_test_input::open_params::default_directory);
-	ASSERT_EQ(get_field_as_string(evt, "fd.filename"),
-	          sinsp_test_input::open_params::default_filename);
-	EXPECT_EQ(get_field_as_string(evt, "fd.num"), std::to_string(fd));
-	ASSERT_EQ(get_field_as_string(evt, "fd.typechar"), "f");
-
-	// Assert parameters filterchecks
-	ASSERT_EQ(get_field_as_string(evt, "evt.res"), "SUCCESS");
-	ASSERT_EQ(get_field_as_string(evt, "evt.rawres"), std::to_string(fd));
-	ASSERT_EQ(get_field_as_string(evt, "evt.failed"), "false");
-
-	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"),
-	          std::string("<f>") + sinsp_test_input::open_params::default_path);
-	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.fd"), std::to_string(fd));
+	assert_return_value(evt, fd);
 
 	ASSERT_EQ(get_field_as_string(evt, "evt.arg[1]"), sinsp_test_input::open_params::default_path);
 	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.name"),
@@ -98,25 +89,18 @@ TEST_F(sinsp_with_test_input, parse_open_failure) {
 	// descriptor should be created
 	ASSERT_EQ(init_tinfo->get_fd_opencount(), 1);
 
-	// Assert path filterchecks
-	// we expect `-1` because m_lastevent_fd is set to -1 when the syscall fails.
-	EXPECT_EQ(get_field_as_string(evt, "fd.num"), std::to_string(-1));
-	// we recover these parameters directly from the syscall even if it fails.
-	ASSERT_EQ(get_field_as_string(evt, "fd.name"), sinsp_test_input::open_params::default_path);
-	ASSERT_EQ(get_field_as_string(evt, "fd.directory"),
-	          sinsp_test_input::open_params::default_directory);
+	assert_fd_fields(
+	        evt,
+	        sinsp_test_input::fd_info_fields{
+	                // we expect `-1` because m_lastevent_fd is set to -1 when the syscall fails.
+	                .fd_num = -1,
+	                .fd_name = sinsp_test_input::open_params::default_path,
+	                .fd_name_raw = sinsp_test_input::open_params::default_path,
+	                .fd_directory = sinsp_test_input::open_params::default_directory,
+	                // We don't recover the filename
+	        });
 
-	// We don't recover the filename
-	ASSERT_FALSE(field_has_value(evt, "fd.filename"));
-	ASSERT_EQ(get_field_as_string(evt, "fd.typechar"), "f");
-
-	// Assert return value filterchecks
-	ASSERT_EQ(get_field_as_string(evt, "evt.res"), sinsp_utils::errno_to_str(fd));
-	ASSERT_EQ(get_field_as_string(evt, "evt.rawres"), std::to_string(fd));
-	ASSERT_EQ(get_field_as_string(evt, "evt.failed"), "true");
-
-	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"), sinsp_utils::errno_to_str(fd));
-	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.fd"), std::to_string(fd));
+	assert_return_value(evt, fd);
 }
 
 TEST_F(sinsp_with_test_input, parse_open_path_too_long) {
@@ -136,7 +120,15 @@ TEST_F(sinsp_with_test_input, parse_open_path_too_long) {
 
 	std::string long_path = long_path_ss.str();
 
-	auto evt =
-	        generate_open_event(sinsp_test_input::open_params{.fd = 3, .path = long_path.c_str()});
-	ASSERT_EQ(get_field_as_string(evt, "fd.name"), "/PATH_TOO_LONG");
+	auto evt = generate_open_event(sinsp_test_input::open_params{.path = long_path.c_str()});
+
+	assert_fd_fields(evt,
+	                 sinsp_test_input::fd_info_fields{
+	                         .fd_num = sinsp_test_input::open_params::default_fd,
+	                         .fd_name = "/PATH_TOO_LONG",
+	                         .fd_name_raw = long_path,
+	                         // todo!: not ideal we probably want to fix this
+	                         .fd_directory = "/",
+	                         .fd_filename = "PATH_TOO_LONG",
+	                 });
 }

@@ -25,7 +25,7 @@ limitations under the License.
 #include <libsinsp/filterchecks.h>
 #include <libscap/strl.h>
 #include <libsinsp_test_var.h>
-
+#include <optional>
 #include <gtest/gtest.h>
 #include <stdexcept>
 
@@ -49,6 +49,15 @@ struct open_params {
 	uint32_t dev = 0;
 	uint64_t ino = 0;
 };
+
+struct fd_info_fields {
+	std::optional<int32_t> fd_num = std::nullopt;
+	std::optional<std::string> fd_name = std::nullopt;
+	std::optional<std::string> fd_name_raw = std::nullopt;
+	std::optional<std::string> fd_directory = std::nullopt;
+	std::optional<std::string> fd_filename = std::nullopt;
+};
+
 }  // namespace sinsp_test_input
 
 class sinsp_with_test_input : public ::testing::Test {
@@ -281,6 +290,9 @@ protected:
 	                 std::shared_ptr<sinsp_filter_cache_factory> cachef = nullptr);
 	bool filter_compiles(std::string_view filter_str);
 	bool filter_compiles(std::string_view filter_str, filter_check_list&);
+
+	void assert_return_value(sinsp_evt* evt, int64_t expected_retval);
+	void assert_fd_fields(sinsp_evt* evt, sinsp_test_input::fd_info_fields fields = {});
 
 	sinsp_evt* next_event();
 
