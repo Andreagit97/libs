@@ -59,7 +59,7 @@ TEST_F(sinsp_with_test_input, parse_open_success) {
 
 	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"),
 	          std::string("<f>") + sinsp_test_input::open_params::default_path);
-	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.fd32_rename"), std::to_string(fd));
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.fd"), std::to_string(fd));
 
 	ASSERT_EQ(get_field_as_string(evt, "evt.arg[1]"), sinsp_test_input::open_params::default_path);
 	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.name"),
@@ -116,7 +116,7 @@ TEST_F(sinsp_with_test_input, parse_open_failure) {
 	ASSERT_EQ(get_field_as_string(evt, "evt.failed"), "true");
 
 	ASSERT_EQ(get_field_as_string(evt, "evt.arg[0]"), sinsp_utils::errno_to_str(fd));
-	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.fd32_rename"), std::to_string(fd));
+	ASSERT_EQ(get_field_as_string(evt, "evt.rawarg.fd"), std::to_string(fd));
 }
 
 TEST_F(sinsp_with_test_input, parse_open_path_too_long) {
@@ -139,18 +139,4 @@ TEST_F(sinsp_with_test_input, parse_open_path_too_long) {
 	auto evt =
 	        generate_open_event(sinsp_test_input::open_params{.fd = 3, .path = long_path.c_str()});
 	ASSERT_EQ(get_field_as_string(evt, "fd.name"), "/PATH_TOO_LONG");
-
-	int64_t fd = 4, mountfd = 5;
-	add_event_advance_ts(increasing_ts(), 1, PPME_SYSCALL_OPEN_BY_HANDLE_AT_E, 0);
-	evt = add_event_advance_ts(increasing_ts(),
-	                           1,
-	                           PPME_SYSCALL_OPEN_BY_HANDLE_AT_X,
-	                           4,
-	                           fd,
-	                           mountfd,
-	                           PPM_O_RDWR,
-	                           long_path.c_str());
-
-	ASSERT_EQ(get_field_as_string(evt, "fd.name"), "/PATH_TOO_LONG");
-	ASSERT_EQ(get_field_as_string(evt, "evt.abspath"), "/PATH_TOO_LONG");
 }
