@@ -458,6 +458,10 @@ void sinsp_parser::process_event(sinsp_evt *evt) {
 		parse_brk_munmap_mmap_exit(evt);
 		break;
 
+	case PPME_SYSCALL_READ:
+		parse_rw_exit(evt);
+		break;
+
 	default:
 		break;
 	}

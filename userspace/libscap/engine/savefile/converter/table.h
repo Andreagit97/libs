@@ -51,4 +51,12 @@ static std::unordered_map<ppm_event_code, conversion_info> g_conversion_table = 
                     {C_INSTR_FROM_OLD, 2},
                     {C_INSTR_FROM_OLD, 3},
                     {C_INSTR_FROM_ENTER, 0}}}},
+        {PPME_SYSCALL_READ_E, {.desired_type = C_ACTION_STORE, .valid_param_nums = {2}}},
+        {PPME_SYSCALL_READ_X,
+         {.desired_type = PPME_SYSCALL_READ,
+          .valid_param_nums = {2},
+          .instr = {{C_INSTR_FROM_OLD, 0},
+                    {C_INSTR_FROM_OLD, 1},
+                    {C_INSTR_FROM_ENTER, 0},
+                    {C_INSTR_FROM_ENTER, 1}}}},
 };
