@@ -191,8 +191,11 @@ static void push_parameter(scap_evt *new_evt,
 	if(new_param_type != tmp_param_type) {
 		// Today we know only some cases in which this is possible, if we miss some of them throw an
 		// exception.
-		if(new_param_type == PT_FD32 && tmp_param_type == PT_FD) {
-			// In this case is enough to force a shorter param len. From 8 to 4.
+
+		// From 8 to 4 bytes the conversion should be safe since we the upper 32 bits are all 0
+		// or 1.
+		if((tmp_param_type == PT_FD || tmp_param_type == PT_ERRNO || tmp_param_type == PT_PID) &&
+		   scap_get_size_bytes_from_type(new_param_type) == 4) {
 			len = 4;
 		} else {
 			std::string error = "Try to convert a parameter of type '" +
