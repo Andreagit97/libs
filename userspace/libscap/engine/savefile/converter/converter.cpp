@@ -118,30 +118,6 @@ static char *get_param_ptr(scap_evt *evt, uint8_t num_param) {
 	return ptr + ptr_off;
 }
 
-static conversion_result validate_nparams(scap_evt *evt,
-                                          std::vector<uint8_t> &valid_param_nums,
-                                          char *error) {
-	// We skip the validation phase if the array is empty
-	if(valid_param_nums.empty()) {
-		return CONVERSION_CONTINUE;
-	}
-
-	for(const auto &valid_param : valid_param_nums) {
-		if(evt->nparams == valid_param) {
-			return CONVERSION_CONTINUE;
-		}
-	}
-
-	snprintf(error,
-	         SCAP_LASTERR_SIZE,
-	         "Unknown number of parameters '%d' for event '%s_%c(num: %d)'.",
-	         evt->nparams,
-	         get_event_name((ppm_event_code)evt->type),
-	         get_direction_char((ppm_event_code)evt->type),
-	         evt->type);
-	return CONVERSION_ERROR;
-}
-
 // This writes len + the param
 static void push_default_parameter(scap_evt *evt, uint16_t *params_offset, uint8_t param_num) {
 	// Please ensure that `new_evt->type` is already the final type you want to obtain.
@@ -193,44 +169,87 @@ static void push_parameter(scap_evt *new_evt,
 	memcpy((char *)new_evt + lens_offset, &len, sizeof(uint16_t));
 }
 
-// static uint16_t copy_old_event_content(scap_evt *new_evt, scap_evt *old_evt) {
-// 	// Copy the header
-// 	memcpy(new_evt, old_evt, sizeof(scap_evt));
+static uint16_t copy_old_params(scap_evt *new_evt, scap_evt *evt_to_convert) {
+	// Copy the lengths array
+	uint16_t new_evt_offset = sizeof(scap_evt);
+	uint16_t old_evt_offset = sizeof(scap_evt);
+	uint16_t size_to_copy = evt_to_convert->nparams * sizeof(uint16_t);
+	memcpy((char *)new_evt + new_evt_offset, (char *)evt_to_convert + old_evt_offset, size_to_copy);
 
-// 	// Copy the legths array of the old event.
-// 	memcpy((char *)new_evt + sizeof(scap_evt),
-// 	       (char *)old_evt + sizeof(scap_evt),
-// 	       old_evt->nparams * sizeof(uint16_t));
+	PRINT_MESSAGE(
+	        "Copy lengths array (size %d) from old event offset '%d' to new event "
+	        "offset '%d'\n",
+	        size_to_copy,
+	        old_evt_offset,
+	        new_evt_offset);
 
-// 	// NO: THIS IS WRONG! It doesn't work when we change type.
-// 	new_evt->nparams = g_event_info[old_evt->type].nparams;
+	// Copy the parameters (we left some space for the missing lengths)
+	new_evt_offset = sizeof(scap_evt) + new_evt->nparams * sizeof(uint16_t);
+	old_evt_offset = sizeof(scap_evt) + evt_to_convert->nparams * sizeof(uint16_t);
+	size_to_copy =
+	        evt_to_convert->len - (sizeof(scap_evt) + evt_to_convert->nparams * sizeof(uint16_t));
+	memcpy((char *)new_evt + new_evt_offset, (char *)evt_to_convert + old_evt_offset, size_to_copy);
 
-// 	// Copy the parameters from the old event
-// 	uint16_t new_event_params_offset = sizeof(scap_evt) + new_evt->nparams * sizeof(uint16_t);
-// 	uint16_t old_event_params_offset = sizeof(scap_evt) + old_evt->nparams * sizeof(uint16_t);
-// 	uint16_t size_to_copy = old_evt->len - old_event_params_offset;
-// 	memcpy((char *)new_evt + new_event_params_offset,
-// 	       (char *)old_evt + old_event_params_offset,
-// 	       size_to_copy);
+	PRINT_MESSAGE(
+	        "Copy parameters (size %d) from old event offset '%d' to new event "
+	        "offset '%d'\n",
+	        size_to_copy,
+	        old_evt_offset,
+	        new_evt_offset);
 
-// 	return new_event_params_offset + size_to_copy;
-// }
+	return new_evt_offset + size_to_copy;
+}
+
+extern "C" bool is_conversion_needed(scap_evt *evt_to_convert) {
+	assert(evt_to_convert->type < PPM_EVENT_MAX);
+	const struct ppm_event_info *event_info = &(g_event_info[evt_to_convert->type]);
+
+	// todo!: we need to cleanup this logic when we can mark enter events as `EF_OLD_VERSION`
+
+	// If the event is not yet managed by the converter we never need a conversion
+	if((event_info->flags & EF_TMP_CONVERTER_MANAGED) == 0) {
+		return false;
+	}
+
+	// If the event is managed by the converter and it is an enter event it will always need a
+	// conversion.
+	if(PPME_IS_ENTER(evt_to_convert->type)) {
+		return true;
+	}
+
+	// If it is an exit event it needs a conversion when:
+	// - it is an `EF_OLD_VERSION`
+	// - the number of parameters is different from the one in the event table
+
+	// If we are a new event type we need to check the number of parameters.
+	assert(evt_to_convert->nparams <= event_info->nparams);
+
+	// If the number of parameters is different from the one in the event table we need a
+	// conversion.
+	if((event_info->flags & EF_OLD_VERSION) || (evt_to_convert->nparams != event_info->nparams)) {
+		return true;
+	}
+	return false;
+}
+
+extern "C" scap_evt *scap_retrieve_evt_from_converter_storage(uint64_t tid) {
+	return retrieve_evt(tid);
+}
+
+extern "C" void scap_clear_converter_storage() {
+	evt_storage.clear();
+}
 
 static conversion_result convert_event(scap_evt *new_evt,
                                        scap_evt *evt_to_convert,
-                                       conversion_info *ci,
+                                       const conversion_info *ci,
                                        char *error) {
-	/////////////////////////////
-	// Validate the number of parameters (if necessary)
-	/////////////////////////////
-
-	if(validate_nparams(evt_to_convert, ci->valid_param_nums, error) == CONVERSION_ERROR) {
-		return CONVERSION_ERROR;
-	}
-
 	/////////////////////////////
 	// Dispatch the action
 	/////////////////////////////
+
+	uint16_t params_offset = 0;
+	int param_to_populate = 0;
 
 	switch(ci->action) {
 	case C_ACTION_SKIP:
@@ -240,8 +259,21 @@ static conversion_result convert_event(scap_evt *new_evt,
 		store_evt(evt_to_convert->tid, evt_to_convert);
 		return CONVERSION_SKIP;
 
-	case C_ACTION_FILL:
+	case C_ACTION_ADD_PARAMS:
+		memcpy(new_evt, evt_to_convert, sizeof(scap_evt));
+		// The new number of params is the previous one plus the number of conversion instructions.
+		new_evt->nparams = evt_to_convert->nparams + ci->instr.size();
+		params_offset = copy_old_params(new_evt, evt_to_convert);
+		param_to_populate = evt_to_convert->nparams;
+		break;
+
 	case C_ACTION_CHANGE_TYPE:
+		memcpy(new_evt, evt_to_convert, sizeof(scap_evt));
+		// The new number of params is the number of conversion instructions.
+		new_evt->nparams = ci->instr.size();
+		new_evt->type = ci->desired_type;
+		params_offset = sizeof(scap_evt) + new_evt->nparams * sizeof(uint16_t);
+		param_to_populate = 0;
 		break;
 
 	default:
@@ -253,56 +285,31 @@ static conversion_result convert_event(scap_evt *new_evt,
 	// Fill the event to its most recent version
 	/////////////////////////////
 
-	memcpy(new_evt, evt_to_convert, sizeof(scap_evt));
-	// The new number of params we want is the number of conversion instructions.
-	new_evt->nparams = ci->instr.size();
 	PRINT_MESSAGE("New event header (the len is still the old one):\n");
 	PRINT_EVENT(new_evt, PRINT_HEADER);
-
-	// Change the type here if needed because we will need this information when we push default
-	// params
-	if(ci->action == C_ACTION_CHANGE_TYPE) {
-		new_evt->type = ci->desired_type;
-	}
-
-	uint16_t params_offset = sizeof(scap_evt) + new_evt->nparams * sizeof(uint16_t);
 
 	scap_evt *tmp_evt = NULL;
 	// If this is true at the end of the for loop we will free its memory.
 	bool used_enter_event = false;
 
-	for(int i = 0; i < new_evt->nparams; i++) {
-		// The old event always wins.
-		if(i < evt_to_convert->nparams) {
-			ci->instr[i].flags = C_INSTR_FROM_OLD;
-			ci->instr[i].param_num = i;
-		}
+	// We iterate over the instructions
+	for(int i = 0; i < ci->instr.size(); i++, param_to_populate++) {
+		PRINT_MESSAGE("Instruction n° %d. Param to populate: %d\n", i, param_to_populate);
 
 		switch(ci->instr[i].flags) {
 		case C_INSTR_FROM_DEFAULT:
-			if(ci->action != C_ACTION_CHANGE_TYPE) {
-				snprintf(error,
-				         SCAP_LASTERR_SIZE,
-				         "Cannot use the default value when not changing the type.");
-				return CONVERSION_ERROR;
-			}
-
-			if(new_evt->type != ci->desired_type) {
-				snprintf(error,
-				         SCAP_LASTERR_SIZE,
-				         "The new type is not updated with the desired one. We won't find the "
-				         "default value.");
-				return CONVERSION_ERROR;
-			}
-
 			tmp_evt = NULL;
 			break;
 
 		case C_INSTR_FROM_ENTER:
 			tmp_evt = retrieve_evt(evt_to_convert->tid);
 			if(!tmp_evt) {
-				// If there is no the enter event because we dropped it in the capture or we come
-				// here from another conversion (see the BRK_1 example) we get the default value.
+				// It could be due to different reasons:
+				// - we dropped the enter event in the capture
+				// - we jump here from a previous conversion. For example, we jump from `BRK_1_X` to
+				// `BRK_4_X` but in this case we don't have the enter event BRK_4_E because we don't
+				// convert `BRK_1_E` to `BRK_4_E`. It would be meaningless, they would't bring the
+				// same info.
 				break;
 			}
 
@@ -322,10 +329,17 @@ static conversion_result convert_event(scap_evt *new_evt,
 
 		case C_INSTR_FROM_OLD:
 			tmp_evt = evt_to_convert;
-			if(tmp_evt->nparams <= i) {
-				// If this is an old version we don't have the available parameters so we get the
-				// default value (see OPEN_X example).
-				tmp_evt = NULL;
+			if(tmp_evt->nparams <= ci->instr[i].param_num) {
+				// todo!: this sounds like an error but let's see in the future. At the moment we
+				// fail
+				snprintf(error,
+				         SCAP_LASTERR_SIZE,
+				         "We want to take parameter '%d' from event '%d' but this event has only "
+				         "'%d' parameters!",
+				         ci->instr[i].param_num,
+				         tmp_evt->type,
+				         tmp_evt->nparams);
+				return CONVERSION_ERROR;
 			}
 			break;
 
@@ -339,9 +353,13 @@ static conversion_result convert_event(scap_evt *new_evt,
 		}
 
 		if(!tmp_evt) {
-			push_default_parameter(new_evt, &params_offset, i);
+			push_default_parameter(new_evt, &params_offset, param_to_populate);
 		} else {
-			push_parameter(new_evt, tmp_evt, &params_offset, i, ci->instr[i].param_num);
+			push_parameter(new_evt,
+			               tmp_evt,
+			               &params_offset,
+			               param_to_populate,
+			               ci->instr[i].param_num);
 		}
 	}
 
@@ -354,34 +372,7 @@ static conversion_result convert_event(scap_evt *new_evt,
 
 	PRINT_MESSAGE("Final event:\n");
 	PRINT_EVENT(new_evt, PRINT_FULL);
-	return ci->action == C_ACTION_CHANGE_TYPE ? CONVERSION_CONTINUE : CONVERSION_COMPLETED;
-}
-
-extern "C" scap_evt *scap_retrieve_evt_from_converter_storage(uint64_t tid) {
-	return retrieve_evt(tid);
-}
-
-extern "C" void scap_clear_converter_storage() {
-	evt_storage.clear();
-}
-
-extern "C" bool is_conversion_needed(scap_evt *evt_to_convert) {
-	assert(evt_to_convert->type < PPM_EVENT_MAX);
-
-	// If we don't even have the entry for sure we don't need a conversion.
-	if(g_conversion_table.find((ppm_event_code)evt_to_convert->type) == g_conversion_table.end()) {
-		return false;
-	}
-
-	// Even if we have the entry we can skip the conversion in the following cases:
-	// - The action is `C_ACTION_FILL` && we already have the right number of parameters we can skip
-	conversion_info *ci = &g_conversion_table[(ppm_event_code)evt_to_convert->type];
-	if(ci->action == C_ACTION_FILL && evt_to_convert->nparams == ci->instr.size()) {
-		return false;
-	}
-
-	// We need the conversion
-	return true;
+	return is_conversion_needed(new_evt) ? CONVERSION_CONTINUE : CONVERSION_COMPLETED;
 }
 
 extern "C" conversion_result scap_convert_event(scap_evt *new_evt,
@@ -397,9 +388,17 @@ extern "C" conversion_result scap_convert_event(scap_evt *new_evt,
 		return CONVERSION_ERROR;
 	}
 
+	// If we need a conversion but we don't have an entry in the table we have an error.
+	auto conv_key = conversion_key{evt_to_convert->type, (uint8_t)evt_to_convert->nparams};
+	if(g_conversion_table.find(conv_key) == g_conversion_table.end()) {
+		snprintf(error,
+		         SCAP_LASTERR_SIZE,
+		         "Event '%d' has '%d' parameters, but we don't handle it in the table.",
+		         evt_to_convert->type,
+		         evt_to_convert->nparams);
+		return CONVERSION_ERROR;
+	}
+
 	// If we reached this point we have for sure an entry in the conversion table.
-	return convert_event(new_evt,
-	                     evt_to_convert,
-	                     &g_conversion_table[(ppm_event_code)evt_to_convert->type],
-	                     error);
+	return convert_event(new_evt, evt_to_convert, &g_conversion_table[conv_key], error);
 }

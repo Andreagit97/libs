@@ -35,14 +35,14 @@ limitations under the License.
 // just to avoid another field in the conversion_info struct
 // #define C_ACTION_SKIP (1 << 16) - 1
 // #define C_ACTION_STORE (1 << 16) - 2
-// #define C_ACTION_FILL (1 << 16) - 3
+// #define C_ACTION_ADD_PARAMS (1 << 16) - 3
 
 // Conversion actions
 enum conversion_action {
 	C_ACTION_UNKNOWN = 0,
 	C_ACTION_SKIP,
 	C_ACTION_STORE,
-	C_ACTION_FILL,
+	C_ACTION_ADD_PARAMS,
 	C_ACTION_CHANGE_TYPE,
 };
 
@@ -51,9 +51,28 @@ struct conversion_instruction {
 	uint8_t param_num = 0;
 };
 
+struct conversion_key {
+	uint16_t event_code = 0;
+	uint8_t param_num = 0;
+
+	// Comparison operator for equality (needed by std::unordered_map)
+	bool operator==(const conversion_key& other) const {
+		return event_code == other.event_code && param_num == other.param_num;
+	}
+};
+
+namespace std {
+template<>
+struct hash<conversion_key> {
+	size_t operator()(const conversion_key& key) const {
+		// Combine the hash of event_code and param_num
+		return std::hash<uint16_t>()(key.event_code) ^ (std::hash<uint8_t>()(key.param_num) << 1);
+	}
+};
+}  // namespace std
+
 struct conversion_info {
 	uint8_t action = 0;
 	uint16_t desired_type = 0;  // This is need only when the action is `C_ACTION_CHANGE_TYPE`
-	std::vector<uint8_t> valid_param_nums = {};  // When we face a `0` we completed
 	std::vector<conversion_instruction> instr = {};
 };

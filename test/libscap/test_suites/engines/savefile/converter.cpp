@@ -27,6 +27,18 @@ TEST_F(convert_event_test, PPME_SYSCALL_OPEN_E_skip) {
 	assert_single_conversion_skip(create_safe_scap_event(ts, tid, PPME_SYSCALL_OPEN_E, 0));
 }
 
+TEST_F(convert_event_test, PPME_SYSCALL_OPEN_E_3_params_skip) {
+	uint64_t ts = 12;
+	int64_t tid = 25;
+	const char* name = "/etc/passwd";
+	uint32_t flags = 0;
+	uint32_t mode = 0;
+
+	// The open enter event should be skipped.
+	assert_single_conversion_skip(
+	        create_safe_scap_event(ts, tid, PPME_SYSCALL_OPEN_E, 3, name, flags, mode));
+}
+
 TEST_F(convert_event_test, PPME_SYSCALL_OPEN_X_3_params) {
 	uint64_t ts = 12;
 	int64_t tid = 25;
@@ -39,7 +51,7 @@ TEST_F(convert_event_test, PPME_SYSCALL_OPEN_X_3_params) {
 	        create_safe_scap_event(ts, tid, PPME_SYSCALL_OPEN_X, 3, fd, name, flags));
 }
 
-TEST_F(convert_event_test, PPME_SYSCALL_OPEN_X_4_params_to_PPME_SYSCALL_OPEN) {
+TEST_F(convert_event_test, PPME_SYSCALL_OPEN_X_4_params_to_PPME_SYSCALL_OPEN_X_6_params) {
 	uint64_t ts = 12;
 	int64_t tid = 25;
 	int64_t fd = 6;
@@ -279,8 +291,9 @@ TEST_F(convert_event_test, PPME_SYSCALL_PREAD_E_store) {
 
 	int64_t fd = 25;
 	uint32_t size = 89;
+	uint64_t pos = 7;
 
-	auto evt = create_safe_scap_event(ts, tid, PPME_SYSCALL_PREAD_E, 2, fd, size);
+	auto evt = create_safe_scap_event(ts, tid, PPME_SYSCALL_PREAD_E, 3, fd, size, pos);
 	assert_single_conversion_skip(evt);
 	assert_event_storage_presence(evt);
 }
@@ -295,6 +308,7 @@ TEST_F(convert_event_test, PPME_SYSCALL_PREAD_X_to_4_params_no_enter) {
 	// Defaulted to 0
 	int64_t fd = 0;
 	uint32_t size = 0;
+	int64_t pos = 0;
 
 	assert_single_conversion_success(
 	        conversion_result::CONVERSION_COMPLETED,
@@ -307,11 +321,12 @@ TEST_F(convert_event_test, PPME_SYSCALL_PREAD_X_to_4_params_no_enter) {
 	        create_safe_scap_event(ts,
 	                               tid,
 	                               PPME_SYSCALL_PREAD_X,
-	                               4,
+	                               5,
 	                               res,
 	                               scap_const_sized_buffer{read_buf, sizeof(read_buf)},
 	                               fd,
-	                               size));
+	                               size,
+	                               pos));
 }
 
 TEST_F(convert_event_test, PPME_SYSCALL_PREAD_X__to_4_params_with_enter) {
@@ -322,9 +337,10 @@ TEST_F(convert_event_test, PPME_SYSCALL_PREAD_X__to_4_params_with_enter) {
 	uint8_t read_buf[] = {'h', 'e', 'l', 'l', 'o'};
 	int64_t fd = 25;
 	uint32_t size = 36;
+	uint64_t pos = 7;
 
 	// After the first conversion we should have the storage
-	auto evt = create_safe_scap_event(ts, tid, PPME_SYSCALL_PREAD_E, 2, fd, size);
+	auto evt = create_safe_scap_event(ts, tid, PPME_SYSCALL_PREAD_E, 3, fd, size, pos);
 	assert_single_conversion_skip(evt);
 	assert_event_storage_presence(evt);
 
@@ -339,9 +355,10 @@ TEST_F(convert_event_test, PPME_SYSCALL_PREAD_X__to_4_params_with_enter) {
 	        create_safe_scap_event(ts,
 	                               tid,
 	                               PPME_SYSCALL_PREAD_X,
-	                               4,
+	                               5,
 	                               res,
 	                               scap_const_sized_buffer{read_buf, sizeof(read_buf)},
 	                               fd,
-	                               size));
+	                               size,
+	                               pos));
 }
